@@ -226,30 +226,3 @@ fun ResultActionCard(
         }
     }
 }
-
-@Composable
-fun SampleResultScreen(navController: NavController) {
-    val formatter = SimpleDateFormat("MMMM dd, yyyy", Locale.getDefault())
-    val timestamp = formatter.format(Date())
-
-    LesionResultTemplate(
-        imageResId = R.drawable.sample_skin, // Replace with your actual image
-        title = "Results",
-        timestamp = timestamp,
-        riskTitle = "Risk assessment:",
-        riskDescription = "No serious risks detected. The lesion appears non-cancerous. Please monitor it for any changes in size, shape, or color. For your peace of mind, feel free to consult a dermatologist.",
-        showActions = true,
-        onBackClick = { navController.popBackStack() },
-        onDownloadClick = { /* TODO: Download PDF */ },
-        onFindClinicClick = { /* TODO: Navigate to clinics */ },
-        onSaveResultClick = { /* TODO: Save result */ },
-        onCancelClick =  { /* TODO: Save result */ },
-    )
-}
-
-
-@Preview(showBackground = true)
-@Composable
-fun SampleResultScreenPreview() {
-    SampleResultScreen(navController = rememberNavController())
-}

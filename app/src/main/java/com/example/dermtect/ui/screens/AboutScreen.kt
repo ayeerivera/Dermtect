@@ -14,11 +14,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.dermtect.R
+import com.example.dermtect.ui.components.BackButton
 
 @Composable
 fun AboutScreen(navController: NavController) {
@@ -30,50 +32,42 @@ fun AboutScreen(navController: NavController) {
         // Cyan background rectangle
         Box(
             modifier = Modifier
-                .offset(y = 59.dp)
-                .fillMaxWidth()
-                .height(833.dp)
+                .fillMaxSize()
                 .clip(RoundedCornerShape(20.dp))
                 .background(Color(0xFFCDFFFF))
         )
 
-        // Back button slightly above the About title
         Box(
             modifier = Modifier
-                .padding(start = 20.dp, top = 68.dp)
-                .size(37.dp)
-                .clip(CircleShape)
-                .background(Color.White)
-                .clickable { navController.popBackStack() },
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .padding(top = 50.dp, start = 23.dp)
         ) {
-            Icon(
-                painter = painterResource(id = R.drawable.back),
-                contentDescription = "Back"
+            BackButton(
+                onClick = { navController.popBackStack() },
+                modifier = Modifier.align(Alignment.CenterStart)
             )
         }
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 100.dp),
+                .padding(top = 80.dp, start = 20.dp, end = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // About title (not bold)
             Text(
                 text = "About",
-                fontSize = 24.sp,
-                color = Color(0xFF1D1D1D),
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Normal
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    color = Color(0xFF1D1D1D),
+                    fontWeight = FontWeight.Normal
+                )
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(15.dp))
 
-            // White content card centered
             Card(
                 modifier = Modifier
-                    .width(363.dp)
-                    .height(706.dp),
+                    .wrapContentHeight(),
                 shape = RoundedCornerShape(10.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White)
             ) {

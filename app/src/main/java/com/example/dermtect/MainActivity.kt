@@ -3,14 +3,16 @@ package com.example.dermtect
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.ui.res.painterResource
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.dermtect.model.NewsItem
+import com.example.dermtect.ui.components.DermaAssessmentReportScreen
 import com.example.dermtect.ui.components.FindClinic1Screen
-import com.example.dermtect.ui.components.FindClinic2Screen
 import com.example.dermtect.ui.screens.AboutScreen
 import com.example.dermtect.ui.screens.ArticleDetailScreen
+import com.example.dermtect.ui.screens.CaseHistoryScreen
 import com.example.dermtect.ui.screens.Register
 import com.example.dermtect.ui.screens.Login
 import com.example.dermtect.ui.screens.DermaHomeScreen
@@ -19,6 +21,7 @@ import com.example.dermtect.ui.screens.ForgotPass2
 import com.example.dermtect.ui.screens.ForgotPass3
 import com.example.dermtect.ui.screens.ForgotPass4
 import com.example.dermtect.ui.screens.HighlightArticle
+import com.example.dermtect.ui.screens.HistoryScreen
 import com.example.dermtect.ui.screens.MedicureClinicScreen
 import com.example.dermtect.ui.screens.UserHomeScreen
 import com.example.dermtect.ui.screens.QuestionnaireScreen
@@ -27,7 +30,7 @@ import com.example.dermtect.ui.screens.OnboardingScreen1
 import com.example.dermtect.ui.screens.OnboardingScreen2
 import com.example.dermtect.ui.screens.OnboardingScreen3
 import com.example.dermtect.ui.screens.OrtizClinicScreen
-import com.example.dermtect.ui.screens.SettingsScreen
+import com.example.dermtect.ui.components.SettingsScreenTemplate
 import com.example.dermtect.ui.screens.SplashScreen
 import com.example.dermtect.ui.screens.TutorialScreen0
 import com.example.dermtect.ui.screens.TutorialScreen1
@@ -35,7 +38,9 @@ import com.example.dermtect.ui.screens.TutorialScreen2
 import com.example.dermtect.ui.screens.TutorialScreen3
 import com.example.dermtect.ui.screens.TutorialScreen4
 import com.example.dermtect.ui.screens.TutorialScreen5
-import com.example.dermtect.ui.screens.ProfileScreen
+import com.example.dermtect.ui.screens.PendingCasesScreen
+import com.example.dermtect.ui.components.ProfileScreenTemplate
+import com.example.dermtect.ui.screens.DermaAssessmentScreen
 import com.example.dermtect.ui.screens.SkinBenefitClinicScreen
 import com.example.dermtect.ui.screens.SkinHealthClinicScreen
 import com.example.dermtect.ui.screens.VMClinicScreen
@@ -54,7 +59,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             DermtectTheme {
                 val navController = rememberNavController()
-                NavHost(navController = navController, startDestination = "settings") {
+                NavHost(navController = navController, startDestination = "assessment") {
                     composable("splash") { SplashScreen(navController) }
                     composable("onboarding_screen1") { OnboardingScreen1(navController) }
                     composable("onboarding_screen2") { OnboardingScreen2(navController) }
@@ -62,11 +67,13 @@ class MainActivity : ComponentActivity() {
                     composable("login") { Login(navController = navController) }
                     composable("register") { Register(navController = navController) }
                     composable("forgot_pass1") { ForgotPass1(navController) }
-                    composable("forgot_pass2") { ForgotPass2(navController) }
+                    composable("forgot_pass2?email={email}") { backStackEntry ->
+                        val email = backStackEntry.arguments?.getString("email") ?: ""
+                        ForgotPass2(navController, email)
+                    }
                     composable("forgot_pass3") { ForgotPass3(navController) }
                     composable("forgot_pass4") { ForgotPass4(navController) }
                     composable("user_home") {UserHomeScreen(navController = navController) }
-                    composable("derma_home") {DermaHomeScreen(navController = navController) }
                     composable("notifications") {NotificationScreen(navController = navController) }
                     composable("questionnaire") { QuestionnaireScreen(navController = navController)}
                     composable("highlightarticle/{newsJson}") { backStackEntry ->
@@ -74,12 +81,23 @@ class MainActivity : ComponentActivity() {
                         val newsItem = Gson().fromJson(json, NewsItem::class.java)
                         HighlightArticle(newsItem = newsItem, onBackClick = { navController.popBackStack() })
                     }
-
+                    composable("history") { HistoryScreen(navController = navController)}
                     composable("article_detail_screen/{newsJson}") { backStackEntry ->
                         val json = backStackEntry.arguments?.getString("newsJson") ?: ""
                         val newsItem = Gson().fromJson(json, NewsItem::class.java)
                         ArticleDetailScreen(newsItem = newsItem,
                             onBackClick = { navController.popBackStack() })
+                    }
+                    composable("user_settings") {
+                        SettingsScreenTemplate(
+                            navController = navController,
+                            userRole = "user",
+                            onLogout = {
+                                navController.navigate("login") {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            }
+                        )
                     }
                     composable("tutorial_screen0") {TutorialScreen0(navController = navController) }
                     composable("tutorial_screen1") {TutorialScreen1(navController) }
@@ -87,17 +105,72 @@ class MainActivity : ComponentActivity() {
                     composable("tutorial_screen3") { TutorialScreen3(navController) }
                     composable("tutorial_screen4") { TutorialScreen4(navController) }
                     composable("tutorial_screen5") { TutorialScreen5(navController) }
-                    composable("settings") { SettingsScreen(navController) }
-                    composable("profile") { ProfileScreen(navController) }
+                    composable("profile/{firstName}/{lastName}/{email}/{isGoogle}/{userRole}") { backStackEntry ->
+                        val firstName = backStackEntry.arguments?.getString("firstName") ?: ""
+                        val lastName = backStackEntry.arguments?.getString("lastName") ?: ""
+                        val email = backStackEntry.arguments?.getString("email") ?: ""
+                        val isGoogle = backStackEntry.arguments?.getString("isGoogle")?.toBoolean() ?: false
+                        val userRole = backStackEntry.arguments?.getString("userRole") ?: "user"
+
+                        ProfileScreenTemplate(navController, firstName, lastName, email, isGoogle, userRole)
+                    }
+
                     composable("about") { AboutScreen(navController) }
                     composable("clinic1") { FindClinic1Screen(navController) }
-                    composable("clinic2") { FindClinic2Screen(navController) }
                     composable("medicure") { MedicureClinicScreen(navController) }
                     composable("vitality") { VitalityClinicScreen(navController) }
                     composable("skin_health") { SkinHealthClinicScreen(navController) }
                     composable("vm") { VMClinicScreen(navController) }
                     composable("ortiz") { OrtizClinicScreen(navController) }
                     composable("skin_benefit") { SkinBenefitClinicScreen(navController) }
+
+                    composable("derma_home") {
+                        DermaHomeScreen(
+                            navController = navController,
+                            onPendingCasesClick = { navController.navigate("pending_cases") },
+                            onTotalCasesClick = { navController.navigate("case_history") },
+                            onNotifClick = { navController.navigate("notifications") },
+                            onSettingsClick = { navController.navigate("derma_settings") }
+                        )
+                    }
+
+                    composable("pending_cases") { PendingCasesScreen(navController) }
+                    composable("case_history") { CaseHistoryScreen(navController) }
+                    composable("assessment_report") { DermaAssessmentReportScreen(
+                        lesionImage = painterResource(id = R.drawable.sample_skin),
+                        onBackClick = { navController.popBackStack() },
+                        onSendReport = {},
+                        onCancel = {}
+                    ) }
+                    composable("assessment") {  DermaAssessmentScreen(
+                        scanTitle = "Scan 1",
+                        lesionImage = painterResource(id = R.drawable.sample_skin),
+                        onBackClick = { navController.popBackStack() },
+                        onSubmit = { _, _ -> },
+                        onCancel = {}
+                    )}
+                    composable("derma_settings") {
+                        SettingsScreenTemplate(
+                            navController = navController,
+                            userRole = "derma", // hides About section
+                            onLogout = {
+                                navController.navigate("login") {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            }
+                        )
+                    }
+                    composable("derma_home") {
+                        DermaHomeScreen(
+                            navController = navController,
+                            onPendingCasesClick = { navController.navigate("pending_cases") },
+                            onTotalCasesClick = { navController.navigate("case_history") },
+                            onNotifClick = { navController.navigate("notifications") },
+                            onSettingsClick = { navController.navigate("derma_settings") }
+                        )
+                    }
+
+
 
 
                 }

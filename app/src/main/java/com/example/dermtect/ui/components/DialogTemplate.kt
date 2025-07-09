@@ -112,7 +112,7 @@ fun DialogTemplate(
                                 contentColor = Color.White
                             )
                         ) {
-                            Text(it, style = MaterialTheme.typography.bodyLarge)
+                            Text(it, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
                         }
                     }
 
@@ -133,7 +133,7 @@ fun DialogTemplate(
                                     contentColor = Color.White
                                 )
                             ) {
-                                Text(it, style = MaterialTheme.typography.bodyLarge)
+                                Text(it, style = MaterialTheme.typography.bodyLarge,textAlign = TextAlign.Center)
                             }
                         } else {
                             OutlinedButton(
@@ -147,7 +147,7 @@ fun DialogTemplate(
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF0FB2B2)),
                                 border = BorderStroke(1.dp, Color(0xFF0FB2B2))
                             ) {
-                                Text(it, style = MaterialTheme.typography.bodyLarge)
+                                Text(it, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
                             }
                         }
                     }
@@ -169,7 +169,7 @@ fun DialogTemplate(
                                     contentColor = Color.White
                                 )
                             ) {
-                                Text(it, style = MaterialTheme.typography.bodyLarge)
+                                Text(it, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
                             }
                         } else {
                             TextButton(
@@ -181,7 +181,7 @@ fun DialogTemplate(
                                     .fillMaxWidth(0.9f)
                                     .wrapContentHeight()
                             ) {
-                                Text(it, style = MaterialTheme.typography.bodyLarge.copy(color = Color(0xFF0FB2B2)))
+                                Text(it, style = MaterialTheme.typography.bodyLarge.copy(color = Color(0xFF0FB2B2),textAlign = TextAlign.Center ))
                             }
                         }
                     }

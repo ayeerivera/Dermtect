@@ -37,7 +37,7 @@ val AppTypography = Typography(
     ),
     headlineSmall = TextStyle(
         fontFamily = Poppins,
-        fontWeight = FontWeight.Bold,
+        fontWeight = FontWeight.Medium,
         fontSize = 20.sp
     ),
     titleLarge = TextStyle(
@@ -59,12 +59,13 @@ val AppTypography = Typography(
         fontFamily = Poppins,
         fontWeight = FontWeight.Medium,
         fontSize = 12.sp
+    ),
+    labelSmall = TextStyle(
+        fontFamily = Poppins,
+        fontWeight = FontWeight.Medium,
+        fontSize = 8.sp
     )
+
 )
 
 
-val BodyThin = TextStyle(
-    fontFamily = Poppins,
-    fontWeight = FontWeight.Thin,
-    fontSize = 14.sp
-)

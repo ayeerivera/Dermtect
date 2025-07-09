@@ -104,7 +104,8 @@ fun UserHomeScreen(navController: NavController) {
             HomeFeatureButtonsRow(
                 hasConsented = hasConsented,
                 onShowConsentDialog = { showConsentDialog = true },
-                onSkinReportClick = { navController.navigate("questionnaire") }
+                onSkinReportClick = { navController.navigate("history") },
+                onNearbyClinicsClick = { navController.navigate("clinic1") }
             )
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -192,7 +193,8 @@ fun UserHomeScreen(navController: NavController) {
 fun HomeFeatureButtonsRow(
     hasConsented: Boolean,
     onShowConsentDialog: () -> Unit,
-    onSkinReportClick: () -> Unit
+    onSkinReportClick: () -> Unit,
+    onNearbyClinicsClick:  () -> Unit
 ) {
 
     Box(modifier = Modifier.fillMaxWidth()) {
@@ -224,7 +226,7 @@ fun HomeFeatureButtonsRow(
                         onShowConsentDialog()
                         return@HomeFeatureButton
                     }
-                    // TODO: Add clinic navigation
+                    onNearbyClinicsClick()
                 }
 
             )
@@ -400,7 +402,7 @@ fun BottomNavBar(
                                 onShowConsentDialog()
                                 return@clickable
                             }
-                            navController.navigate("profile")
+                            navController.navigate("user_settings")
                         }
                 )
 

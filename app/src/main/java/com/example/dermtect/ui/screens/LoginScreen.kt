@@ -50,8 +50,15 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.rememberCoroutineScope
+import com.example.dermtect.ui.components.CenteredSnackbar
 import com.example.dermtect.ui.components.DialogTemplate
 import com.example.dermtect.ui.components.GifImage
+import kotlinx.coroutines.launch
 
 @Composable
 fun Login(navController: NavController) {
@@ -62,6 +69,8 @@ fun Login(navController: NavController) {
     val authSuccess by viewModel.authSuccess.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
     val focusManager = LocalFocusManager.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
     val context = LocalContext.current
     val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -95,12 +104,16 @@ fun Login(navController: NavController) {
                                     }
                                 }
                                 .addOnFailureListener {
-                                    Toast.makeText(context, "Failed to fetch role", Toast.LENGTH_SHORT).show()
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("Failed to fetch role.")
+                                    }
                                 }
                         }
                     },
-                    onError = {
-                        Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+                    onError = { error ->
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar(error)
+                        }
                     }
                 )
             }
@@ -110,9 +123,18 @@ fun Login(navController: NavController) {
     }
 
     BubblesBackground {
-        Box(
+        Scaffold(
+            snackbarHost = {
+                SnackbarHost(hostState = snackbarHostState) { data ->
+                    CenteredSnackbar(data)
+                }
+            },
+            containerColor = Color.Transparent
+        ) { innerPadding ->
+            Box(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(innerPadding)
                 .clickable(
                     indication = null,
                     interactionSource = remember { MutableInteractionSource() }
@@ -190,7 +212,18 @@ fun Login(navController: NavController) {
                 // Login Button
                 Button(
                     onClick = {
-                        viewModel.login(email, password)
+                        viewModel.login(
+                            email = email,
+                            password = password,
+                            onSuccess = {
+                                // already handled in LaunchedEffect, no need to do anything here
+                            },
+                            onError = { error ->
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(error)
+                                }
+                            }
+                        )
                     },
                     modifier = Modifier
                         .width(299.dp)
@@ -269,13 +302,15 @@ fun Login(navController: NavController) {
                     }
                 }
             }
-            LaunchedEffect(errorMessage) {
-                errorMessage?.let {
-                    Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
-                    viewModel.clearError()
+                LaunchedEffect(errorMessage) {
+                    errorMessage?.let { message ->
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar(message)
+                        }
+                        viewModel.clearError()
+                    }
                 }
-            }
-            val navigateToHome by viewModel.navigateToHome.collectAsState()
+                val navigateToHome by viewModel.navigateToHome.collectAsState()
 
             LaunchedEffect(navigateToHome) {
                 if (navigateToHome) {
@@ -286,20 +321,20 @@ fun Login(navController: NavController) {
                 }
             }
 
-            DialogTemplate(
-                show = isLoading,
-                title = "Logging you in",
-                description = "Please wait ...",
-                imageContent = {
-                    GifImage(resId = R.drawable.loader, size = 150)
-                },
-                onDismiss = {},
-                autoDismiss = false
-            )
+                DialogTemplate(
+                    show = isLoading,
+                    title = "Logging you in",
+                    description = "Please wait ...",
+                    imageContent = {
+                        GifImage(resId = R.drawable.loader, size = 150)
+                    },
+                    onDismiss = {},
+                    autoDismiss = false
+                )
+            }
         }
     }
 }
-
 
 @Preview(showBackground = true)
 @Composable

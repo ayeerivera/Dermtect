@@ -22,6 +22,7 @@ import com.example.dermtect.ui.components.DialogTemplate
 import com.example.dermtect.ui.viewmodel.QuestionnaireViewModel
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.dermtect.ui.components.CenteredSnackbar
 
 @Composable
 fun QuestionnaireScreen(navController: NavController) {
@@ -77,14 +78,7 @@ fun QuestionnaireScreen(navController: NavController) {
         Scaffold(
             snackbarHost = {
                 SnackbarHost(hostState = snackbarHostState) { data ->
-                    Snackbar(
-                        snackbarData = data,
-                        containerColor = Color(0xFF0FB2B2),
-                        contentColor = Color.White,
-                        shape = RoundedCornerShape(8.dp),
-                        actionColor = Color.White,
-                        modifier = Modifier .fillMaxWidth(0.7f)
-                    )
+                    CenteredSnackbar(data)
                 }
             },
             containerColor = Color.Transparent

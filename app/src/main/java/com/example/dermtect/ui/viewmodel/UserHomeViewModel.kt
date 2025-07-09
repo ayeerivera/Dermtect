@@ -27,18 +27,33 @@ class UserHomeViewModel(application: Application) : AndroidViewModel(application
     private val _consentChecked = MutableStateFlow(false)
     val consentChecked: StateFlow<Boolean> = _consentChecked
 
+    private val _email = MutableStateFlow("")
+    val email: StateFlow<String> = _email
+
+    private val _lastName = MutableStateFlow("")
+    val lastName: StateFlow<String> = _lastName
+
+    private val _isGoogleAccount = MutableStateFlow(false)
+    val isGoogleAccount: StateFlow<Boolean> = _isGoogleAccount
 
 
     fun fetchUserInfo() {
         if (uid.isEmpty()) return
         viewModelScope.launch {
             val userDoc = db.collection("users").document(uid).get().await()
-            val name = userDoc.getString("firstName")?.replaceFirstChar {
-                if (it.isLowerCase()) it.titlecase() else it.toString()
-            } ?: "User"
-            _firstName.value = name
+            val first = userDoc.getString("firstName")?.replaceFirstChar { it.titlecase() } ?: "User"
+            val last = userDoc.getString("lastName")?.replaceFirstChar { it.titlecase() } ?: ""
+            val email = userDoc.getString("email") ?: ""
+            val providers = FirebaseAuth.getInstance().currentUser?.providerData?.map { it.providerId }
+            val isGoogle = providers?.contains("google.com") == true
+
+            _firstName.value = first
+            _lastName.value = last
+            _email.value = email
+            _isGoogleAccount.value = isGoogle
         }
     }
+
 
     fun checkConsentStatus() {
         if (uid.isEmpty()) return

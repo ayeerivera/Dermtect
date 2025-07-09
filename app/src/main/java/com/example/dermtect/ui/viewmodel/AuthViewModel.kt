@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import com.example.dermtect.domain.usecase.AuthUseCase
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -60,7 +61,6 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
                     val formattedFirstName = firstName.lowercase().replaceFirstChar { it.uppercaseChar().toString() }
                     val formattedLastName = lastName.lowercase().replaceFirstChar { it.uppercaseChar().toString() }
 
-
                     val userData = hashMapOf(
                         "uid" to user?.uid,
                         "email" to user?.email,
@@ -68,8 +68,10 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
                         "lastName" to formattedLastName,
                         "createdAt" to FieldValue.serverTimestamp(),
                         "emailVerified" to false,
-                        "role" to "patient"
+                        "role" to "patient",
+                        "provider" to "email" // ✅ Add this line
                     )
+
 
                     user?.let {
                         FirebaseFirestore.getInstance()
@@ -104,7 +106,7 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
             }
     }
 
-    fun login(email: String, password: String) {
+    fun login(email: String, password: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         _isLoading.value = true
 
         authUseCase.loginUser(email, password)
@@ -114,87 +116,115 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
                     val user = auth.currentUser
                     user?.reload()?.addOnCompleteListener { reloadTask ->
                         if (reloadTask.isSuccessful) {
-                            if (user.isEmailVerified) {
-                                FirebaseFirestore.getInstance()
-                                    .collection("users")
-                                    .document(user.uid)
-                                    .update("emailVerified", true)
-                                    .addOnSuccessListener {
-                                        logAudit(user.uid, user.email, "login")
-                                        _authSuccess.value = true
-                                        _isLoading.value = false
-                                        _navigateToHome.value = true
+                            FirebaseFirestore.getInstance()
+                                .collection("users")
+                                .document(user.uid)
+                                .get()
+                                .addOnSuccessListener { document ->
+                                    val role = document.getString("role") ?: "user"
+                                    val isVerified = user.isEmailVerified || role == "derma"
+
+                                    if (isVerified) {
+                                        document.reference.update(
+                                            mapOf(
+                                                "emailVerified" to true,
+                                                "provider" to "email"
+                                            )
+                                        ).addOnSuccessListener {
+                                            logAudit(user.uid, user.email, "login")
+                                            _authSuccess.value = true
+                                            _navigateToHome.value = true
+                                            onSuccess()
+                                        }.addOnFailureListener {
+                                            onError("Verified but failed to update Firestore.")
+                                        }
+                                    } else {
+                                        onError("Please verify your email first.")
+                                        auth.signOut()
                                     }
-                                    .addOnFailureListener {
-                                        _errorMessage.value = "Verified but failed to update Firestore."
-                                    }
-                            } else {
-                                _errorMessage.value = "Please verify your email first."
-                                auth.signOut()
-                            }
-                        } else {
-                            _errorMessage.value = "Failed to reload user info."
+                                }
+                                .addOnFailureListener {
+                                    onError("Failed to reload user info.")
+                                }
                         }
-                    }
+                        }
                 } else {
-                    _errorMessage.value = task.exception?.message ?: "Login failed"
+                    onError(task.exception?.message ?: "Login failed")
                 }
             }
     }
 
     fun signInWithGoogle(idToken: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         val credential = GoogleAuthProvider.getCredential(idToken, null)
+
         auth.signInWithCredential(credential)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
-                    val user = auth.currentUser
-                    val uid = user?.uid ?: return@addOnCompleteListener
+                    val user = auth.currentUser ?: return@addOnCompleteListener
+                    val uid = user.uid
+                    val email = user.email ?: ""
 
                     val db = FirebaseFirestore.getInstance()
-                    val userDoc = db.collection("users").document(uid)
+                    val userDocRef = db.collection("users").document(uid)
 
-                    userDoc.get()
+                    userDocRef.get()
                         .addOnSuccessListener { document ->
                             if (!document.exists()) {
-                                val names = user?.displayName?.split(" ") ?: listOf("", "")
-                                val firstName = names.firstOrNull() ?: ""
+                                // If no document, create one
+                                val names = user.displayName?.split(" ") ?: listOf("", "")
+                                val firstName = names.getOrNull(0) ?: ""
                                 val lastName = names.getOrNull(1) ?: ""
 
                                 val userData = mapOf(
                                     "uid" to uid,
-                                    "email" to user.email,
+                                    "email" to email,
                                     "firstName" to firstName,
                                     "lastName" to lastName,
                                     "role" to "patient",
+                                    "provider" to "google",
                                     "createdAt" to FieldValue.serverTimestamp()
                                 )
 
-                                userDoc.set(userData)
+                                userDocRef.set(userData)
                                     .addOnSuccessListener {
-                                        logAudit(uid, user.email, "google_sign_in")
+                                        logAudit(uid, email, "google_sign_in_created")
                                         onSuccess()
                                     }
-                                    .addOnFailureListener { onError("Failed to save user to Firestore") }
+                                    .addOnFailureListener { onError("Failed to save user data") }
                             } else {
-                                logAudit(uid, user.email, "google_sign_in")
+                                logAudit(uid, email, "google_sign_in_existing")
                                 onSuccess()
                             }
                         }
                         .addOnFailureListener {
-                            onError("Failed to check user document")
+                            onError("Failed to fetch user document")
                         }
+
                 } else {
-                    onError(task.exception?.message ?: "Google Sign-In Failed")
+                    val exception = task.exception
+                    if (exception is FirebaseAuthUserCollisionException) {
+                        // Email already exists: try to link Google to the existing email/password account
+                        val email = exception.email
+                        if (email != null) {
+                            onError("This email is already registered with another method. Please login with email/password first.")
+                        } else {
+                            onError("Email already in use. Try a different method.")
+                        }
+                    } else {
+                        onError(exception?.localizedMessage ?: "Google Sign-In Failed")
+                    }
                 }
             }
     }
+
     fun markNavigationDone() {
         _navigateToHome.value = false
     }
-    fun logout() {
+    fun logout(onComplete: () -> Unit) {
         val user = auth.currentUser
         logAudit(user?.uid, user?.email, "logout")
         auth.signOut()
+        onComplete()
     }
 
     fun clearError() {

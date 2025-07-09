@@ -38,11 +38,11 @@ fun ArticleTemplate(
                 modifier = Modifier.align(Alignment.CenterStart)
             )
         }
-
         Box(
             modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .padding(top = 50.dp, start = 80.dp, end = 20.dp, bottom = 10.dp)
+                .fillMaxWidth()
+                .height(75.dp),
+            contentAlignment = Alignment.Center
         ) {
             Text(
                 text = newsItem.title,
@@ -50,8 +50,7 @@ fun ArticleTemplate(
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .fillMaxWidth(),
-                maxLines = 2
+                    .fillMaxWidth()
             )
         }
 

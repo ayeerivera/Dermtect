@@ -28,9 +28,28 @@ import com.example.dermtect.ui.components.TopRightNotificationIcon
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import androidx.navigation.compose.rememberNavController
+import com.example.dermtect.ui.components.CaseData
+import com.example.dermtect.ui.components.CaseListItem
+import com.example.dermtect.ui.viewmodel.UserHomeViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 @Composable
-fun DermaHomeScreen(navController: NavController) {
+fun DermaHomeScreen(
+    navController: NavController,
+    onPendingCasesClick: () -> Unit,
+    onTotalCasesClick: () -> Unit,
+    onNotifClick: () -> Unit,
+    onSettingsClick: () -> Unit
+) {
+    fun getIndicatorColor(result: String?): Color = when (result?.lowercase()) {
+        "pending" -> Color(0xFFFFA500)
+        "benign" -> Color(0xFF4CAF50)
+        "malignant" -> Color(0xFFF44336)
+        else -> Color.Gray
+    }
+
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -38,16 +57,15 @@ fun DermaHomeScreen(navController: NavController) {
     ) {
         // Top Notification Button
         TopRightNotificationIcon(
-            onNotifClick = { navController.navigate("notifications") },
+            onNotifClick = onNotifClick,
             modifier = Modifier
+                .padding(top = 50.dp, end = 25.dp)
                 .align(Alignment.End)
-                .offset(x = -20.dp, y = 50.dp)
         )
 
         Column(
             modifier = Modifier
                 .weight(1f)
-                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.Start
         ) {
@@ -68,47 +86,69 @@ fun DermaHomeScreen(navController: NavController) {
                 )
 
             Spacer(modifier = Modifier.height(30.dp))
-            StatCardRow (onPendingCasesClick = {})
+            StatCardRow (
+                onPendingCasesClick = onPendingCasesClick,
+                onTotalCasesClick = onTotalCasesClick
+            )
 
                     Spacer(modifier = Modifier.height(20.dp))
 
             // Pending Cases Section
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth()
+
+                    .verticalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "Pending Cases",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Color.Gray,
                     fontWeight = FontWeight.SemiBold
                 )
                 Icon(
                     painter = painterResource(id = R.drawable.expand),
                     contentDescription = "Expand",
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clickable { navController.navigate("pending_cases") }
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(15.dp))
 
-            // Case Items
-            listOf(
-                Triple(R.drawable.sample_skin_1, "Scan 1", "May 8, 2025"),
-                Triple(R.drawable.sample_skin_1, "Scan 2", "May 9, 2025"),
-                Triple(R.drawable.sample_skin_1, "Scan 3", "May 10, 2025")
-            ).forEach { (img, title, date) ->
-                CaseItem(img, title, date)
+            val pendingCases = listOf(
+                CaseData(R.drawable.sample_skin_1, "Scan 1", "Pending", "May 8, 2025", null),
+                CaseData(R.drawable.sample_skin_1, "Scan 2", "Pending", "May 9, 2025",null ),
+                CaseData(R.drawable.sample_skin_1, "Scan 3", "Pending", "May 10, 2025",null )
+            )
+
+            pendingCases.forEach { case ->
+                CaseListItem(
+                    imageRes = case.imageRes,
+                    title = case.title,
+                    result = case.result,
+                    date = case.date,
+                    status = case.status,
+                    indicatorColor = getIndicatorColor(case.result),
+                    statusLabel = case.status,
+                    statusColor = null
+                )
                 Divider(modifier = Modifier.padding(vertical = 12.dp))
             }
 
             Spacer(modifier = Modifier.height(60.dp)) // Space for bottom nav
+
+
         }
+        BottomNavBar(onSettingsClick = onSettingsClick)
     }
 }
 
 @Composable
-fun StatCardRow (onPendingCasesClick: () -> Unit){
+fun StatCardRow ( onPendingCasesClick: () -> Unit,
+                  onTotalCasesClick: () -> Unit ){
     Box(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -122,14 +162,16 @@ fun StatCardRow (onPendingCasesClick: () -> Unit){
                 value = "20",
                 imageRes = R.drawable.pending_cases,
                 imageCardColor = Color(0xFFD7F2D6),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                onClick = onPendingCasesClick
             )
             StatCard(
                 label = "Total Cases",
                 value = "20",
                 imageRes = R.drawable.total_cases,
                 imageCardColor = Color(0xFFDCD2DE),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                onClick = onTotalCasesClick
             )
         }
     }
@@ -189,42 +231,48 @@ fun StatCard(
     }
 }
 
-fun onClick() {
-    TODO("Not yet implemented")
-}
-
 
 @Composable
-fun CaseItem(image: Int, title: String, date: String) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically
+fun BottomNavBar(
+    onSettingsClick: () -> Unit = {}
+) {
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(72.dp)
+            .background(Color.White)
     ) {
-        Box {
-            Image(
-                painter = painterResource(id = image),
-                contentDescription = null,
+        Surface(
+            color = Color(0xFFCDFFFF),
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+        ) {
+            Row(
                 modifier = Modifier
-                    .size(60.dp)
-                    .clip(RoundedCornerShape(12.dp))
-            )
-            Box(
-                modifier = Modifier
-                    .size(12.dp)
-                    .background(Color(0xFFFFA500), shape = CircleShape)
-                    .align(Alignment.TopStart)
-            )
+                    .fillMaxWidth()
+                    .height(60.dp)
+                    .padding(horizontal = 32.dp),
+                horizontalArrangement = Arrangement.spacedBy(200.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.home_vector),
+                    contentDescription = "Home",
+                    modifier = Modifier.size(26.dp)
+                )
+                Image(
+                    painter = painterResource(id = R.drawable.user_vector),
+                    contentDescription = "Settings",
+                    modifier = Modifier
+                        .size(26.dp)
+                        .clickable { onSettingsClick() }
+                )
+
+            }
         }
-        Spacer(modifier = Modifier.width(16.dp))
-        Column {
-            Text(title, fontWeight = FontWeight.Medium)
-            Text(date, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-        }
+
     }
 }
-
-@Preview(showBackground = true)
-@Composable
-fun DermaHomeScreenPreview() {
-    DermaHomeScreen(navController = rememberNavController())
-}
-

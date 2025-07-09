@@ -1,5 +1,6 @@
-package com.example.dermtect.ui.screens
+package com.example.dermtect.ui.components
 
+import com.example.dermtect.ui.viewmodel.AuthViewModel
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -8,6 +9,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AssignmentTurnedIn
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,20 +26,33 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.dermtect.R
-import com.example.dermtect.ui.components.BackButton
+import com.example.dermtect.ui.viewmodel.AuthViewModelFactory
 
 @Composable
-fun SettingsScreen(navController: NavController) {
+fun ProfileScreenTemplate(
+    navController: NavController,
+    firstName: String,
+    lastName: String,
+    email: String,
+    isGoogleAccount: Boolean,
+    userRole: String = "user" // new
+){
+
+    val fullName = "$firstName $lastName"
     var showPhoto by remember { mutableStateOf(false) }
-    var notificationsEnabled by remember { mutableStateOf(false) }
+    var showLogoutDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var showDeletedDialog by remember { mutableStateOf(false) }
+    val authViewModel: AuthViewModel = viewModel(factory = AuthViewModelFactory())
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .background(Color(0xFFEAFDFD))
+            .background(Color(0xFFF5F5F5))
     ) {
         Box(
             modifier = Modifier
@@ -60,7 +79,7 @@ fun SettingsScreen(navController: NavController) {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Settings",
+                    text = "Profile",
                     style = MaterialTheme.typography.headlineSmall
                 )
 
@@ -79,27 +98,23 @@ fun SettingsScreen(navController: NavController) {
                 Spacer(modifier = Modifier.height(15.dp))
 
                 Text(
-                    text = "Mikaela Manalang",
+                    text = fullName,
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
                 )
             }
-
         }
-
-        }
-
-
-
+    }
             Card(
                 modifier = Modifier
                     .offset(x = 25.dp, y = 344.dp)
-                    .size(width = 363.dp, height = 388.dp)
+                    .fillMaxWidth(0.9f)
+                    .wrapContentHeight()
                     .shadow(8.dp, RoundedCornerShape(36.dp)),
                 shape = RoundedCornerShape(36.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
             ) {
-                Column(modifier = Modifier.padding(0.dp)) {
+                Column{
                     Box(
                         modifier = Modifier
                             .offset(x = 19.dp, y = 18.dp)
@@ -107,77 +122,62 @@ fun SettingsScreen(navController: NavController) {
                             .clip(RoundedCornerShape(12.dp))
                             .background(Color(0xFFEDFFFF))
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(start = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(width = 62.dp, height = 57.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0xFFCDFFFF)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Image(
-                                    painter = painterResource(id = R.drawable.google_logo),
-                                    contentDescription = "Google Icon",
-                                    modifier = Modifier.size(28.dp)
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            Column {
-                                Text(
-                                    text = "mikaelasotto1@gmail.com",
-                                    fontSize = 14.sp,
-                                    color = Color(0xFF484848),
-                                    fontWeight = FontWeight.Normal
-                                )
-                                Text(
-                                    text = "Google Account",
-                                    fontSize = 12.sp,
-                                    color = Color.Gray,
-                                    fontWeight = FontWeight.Normal
-                                )
-                            }
-                        }
+                        AccountInfoRow(email = email, isGoogleAccount = isGoogleAccount)
                     }
 
-                    Spacer(modifier = Modifier.height(40.dp))
+                    Spacer(modifier = Modifier.height(30.dp))
 
-                    SettingsRow(
-                        icon = R.drawable.user_vector_settings,
-                        label = "Profile",
+                    ChangePasswordRow(
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Filled.Lock,
+                                contentDescription = "Change Password",
+                                tint = Color(0xFF0FB2B2),
+                                modifier = Modifier.size(28.dp)
+                            )
+                        },
+                        label = "Change Password",
                         onClick = {
-                            navController.navigate("profile")
+                            navController.navigate("forgot_pass1")
                         }
                     )
 
-                    SettingsRow(
-                        icon = R.drawable.info,
-                        label = "About/Credits",
+                    if (userRole == "user") {
+                        AssessmentRow(
+                            icon = {
+                                Icon(
+                                    imageVector = Icons.Filled.AssignmentTurnedIn,
+                                    contentDescription = "My Assessment Report",
+                                    tint = Color(0xFF0FB2B2),
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            },
+                            label = "My Assessment Report",
+                            onClick = {
+                                navController.navigate("questionnaire")
+                            }
+                        )
+                    }
+
+                    DeleteAccountRow(
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Filled.Delete,
+                                contentDescription = "Delete Account",
+                                tint = Color(0xFF0FB2B2),
+                                modifier = Modifier.size(28.dp)
+                            )
+                        },
+                        label = "Delete Account",
                         onClick = {
-                            navController.navigate("about")
+                            showDeleteDialog = true
                         }
                     )
 
-                    NotificationRow(
-                        icon = R.drawable.notifications_vector,
-                        label = "Notification",
-                        checked = notificationsEnabled,
-                        onCheckedChange = { notificationsEnabled = it },
-                        onClick = {
-                            navController.navigate("notifications")
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(15.dp))
 
                     LogoutRow {
-                        // Handle logout click
+                        showLogoutDialog = true
                     }
                 }
             }
@@ -186,7 +186,7 @@ fun SettingsScreen(navController: NavController) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(0x80000000)) // semi-transparent backdrop
+                        .background(Color(0x80000000))
                 ) {
                     Box(
                         modifier = Modifier
@@ -222,10 +222,50 @@ fun SettingsScreen(navController: NavController) {
                     }
                 }
             }
-
+        DialogTemplate(
+            show = showLogoutDialog,
+            title = "Confirm logout?",
+            primaryText = "Yes, Logout",
+            onPrimary = {
+                authViewModel.logout {
+                    navController.navigate("login") {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            },
+            secondaryText = "Stay logged in",
+            onSecondary = { showLogoutDialog = false },
+            onDismiss = { showLogoutDialog = false }
+        )
+        DialogTemplate(
+            show = showDeleteDialog,
+            title = "Delete Account?",
+            description = "All your data will be permanently removed and cannot be recovered.",
+            primaryText = "Yes, Delete my Account",
+            onPrimary = {
+                authViewModel.logout {
+                    navController.navigate("login") {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            },
+            secondaryText = "Cancel",
+            onSecondary = { showLogoutDialog = false },
+            onDismiss = { showLogoutDialog = false }
+        )
+            DialogTemplate(
+                show = showDeletedDialog,
+                title = "Your account has been permanently deleted!",
+                imageResId = R.drawable.success,
+                autoDismiss = true,
+                onDismiss = { showDeletedDialog = false }
+            )
         }
+
+
+
 @Composable
-fun SettingsRow(icon: Int, label: String, onClick: () -> Unit) {
+fun ChangePasswordRow(icon: @Composable () -> Unit, label: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -240,11 +280,7 @@ fun SettingsRow(icon: Int, label: String, onClick: () -> Unit) {
                 .background(Color(0xFFEDFFFF)),
             contentAlignment = Alignment.Center
         ) {
-            Image(
-                painter = painterResource(id = icon),
-                contentDescription = label,
-                modifier = Modifier.size(24.dp)
-            )
+            icon()
         }
 
         Spacer(modifier = Modifier.width(16.dp))
@@ -274,13 +310,7 @@ fun SettingsRow(icon: Int, label: String, onClick: () -> Unit) {
 }
 
 @Composable
-fun NotificationRow(
-    icon: Int,
-    label: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    onClick: () -> Unit
-) {
+fun AssessmentRow(icon: @Composable () -> Unit, label: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -295,57 +325,74 @@ fun NotificationRow(
                 .background(Color(0xFFEDFFFF)),
             contentAlignment = Alignment.Center
         ) {
-            Image(
-                painter = painterResource(id = icon),
-                contentDescription = label,
-                modifier = Modifier.size(24.dp)
-            )
+            icon()
         }
 
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width(15.dp))
 
         Text(
             text = label,
-            fontSize = 16.sp,
-            color = Color(0xFF484848),
-            fontWeight = FontWeight.Normal,
+            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal),
             modifier = Modifier.weight(1f)
         )
 
-        Image(
-            painter = painterResource(
-                id = if (checked) R.drawable.toggle_on else R.drawable.toggle_off
-            ),
-            contentDescription = if (checked) "Enabled" else "Disabled",
+        Box(
             modifier = Modifier
-                .size(width = 51.73.dp, height = 26.dp)
-                .clickable { onCheckedChange(!checked) }
-        )
+                .size(width = 26.dp, height = 24.dp)
+                .background(Color.White, shape = RoundedCornerShape(4.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.arrow_right),
+                contentDescription = "Navigate",
+                tint = Color(0xFF0FB2B2),
+                modifier = Modifier.size(15.dp)
+            )
+        }
     }
 }
 
 @Composable
-fun LogoutRow(onClick: () -> Unit) {
+fun DeleteAccountRow(icon: @Composable () -> Unit, label: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.End
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            painter = painterResource(id = R.drawable.logout_icon),
-            contentDescription = "Logout",
-            tint = Color(0xFF00B2B2),
-            modifier = Modifier.size(width = 18.66.dp, height = 13.09.dp)
-        )
-        Spacer(modifier = Modifier.width(6.dp))
+        Box(
+            modifier = Modifier
+                .size(width = 43.92.dp, height = 40.26.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFEDFFFF)),
+            contentAlignment = Alignment.Center
+        ) {
+
+            icon()
+        }
+
+        Spacer(modifier = Modifier.width(15.dp))
+
         Text(
-            text = "Logout",
-            color = Color(0xFF484848),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Normal
+            text = label,
+            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal),
+            modifier = Modifier.weight(1f)
         )
+
+        Box(
+            modifier = Modifier
+                .size(width = 26.dp, height = 24.dp)
+                .background(Color.White, shape = RoundedCornerShape(4.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.arrow_right),
+                contentDescription = "Navigate",
+                tint = Color(0xFF0FB2B2),
+                modifier = Modifier.size(15.dp)
+            )
+        }
     }
 }
+
