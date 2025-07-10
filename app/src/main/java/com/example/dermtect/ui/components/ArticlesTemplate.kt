@@ -28,37 +28,38 @@ fun ArticleTemplate(
     onBackClick: () -> Unit
 ) {
     BubblesBackground {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 50.dp, start = 23.dp)
-        ) {
-            BackButton(
-                onClick = onBackClick,
-                modifier = Modifier.align(Alignment.CenterStart)
-            )
-        }
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(75.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = newsItem.title,
-                textAlign = TextAlign.End,
-                style = MaterialTheme.typography.headlineSmall,
+        Column{
+            Box(
                 modifier = Modifier
-                    .align(Alignment.Center)
                     .fillMaxWidth()
-            )
+                    .padding(top = 50.dp, bottom = 10.dp)
+            ) {
+                BackButton(
+                    onClick = onBackClick,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 23.dp)
+                )
+            }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = newsItem.title,
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+            }
         }
 
-        Column(
+    Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight()
-                .padding(top = 110.dp, bottom = 20.dp)
+                .padding(top = 130.dp, bottom = 20.dp)
                 .padding(horizontal = 20.dp)
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.Top,
@@ -103,8 +104,6 @@ fun ArticleTemplate(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-
-                Spacer(modifier = Modifier.height(12.dp))
 
                 val body = newsItem.body
 

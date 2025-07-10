@@ -1,6 +1,5 @@
 package com.example.dermtect.ui.components
 
-import com.example.dermtect.ui.viewmodel.AuthViewModel
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -23,7 +22,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.dermtect.R
-import com.example.dermtect.ui.viewmodel.AuthViewModelFactory
 import com.example.dermtect.ui.viewmodel.UserHomeViewModel
 import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
@@ -32,24 +30,27 @@ import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.ui.graphics.ColorFilter
+import coil.compose.AsyncImage
+import androidx.compose.material.icons.filled.Close
+import com.example.dermtect.ui.viewmodel.SharedProfileViewModel
 
 
 @Composable
 fun SettingsScreenTemplate(
     navController: NavController,
     userRole: String = "user",
+    sharedProfileViewModel: SharedProfileViewModel,
     onLogout: () -> Unit = {}
 ) {
     var showPhoto by remember { mutableStateOf(false) }
     var notificationsEnabled by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
-    val authViewModel: AuthViewModel = viewModel(factory = AuthViewModelFactory())
     val userHomeViewModel: UserHomeViewModel = viewModel()
     val firstName by userHomeViewModel.firstName.collectAsState()
     val lastName by userHomeViewModel.lastName.collectAsState()
     val email by userHomeViewModel.email.collectAsState()
     val isGoogleAccount by userHomeViewModel.isGoogleAccount.collectAsState()
+    val selectedImageUri = sharedProfileViewModel.selectedImageUri.collectAsState().value
 
     LaunchedEffect(Unit) {
         userHomeViewModel.fetchUserInfo()
@@ -92,15 +93,34 @@ fun SettingsScreenTemplate(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                Image(
-                    painter = painterResource(id = R.drawable.profile),
-                    contentDescription = "Profile",
+                Box(
                     modifier = Modifier
                         .size(150.dp)
-                        .clip(CircleShape)
                         .clickable { showPhoto = true },
-                    contentScale = ContentScale.Crop
-                )
+                    contentAlignment = Alignment.BottomEnd
+                ) {
+                    // Only the image is clipped, not the whole box
+                    if (selectedImageUri != null) {
+                        AsyncImage(
+                            model = selectedImageUri,
+                            contentDescription = "Profile Photo",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape)
+                        )
+                    } else {
+                        Image(
+                            painter = painterResource(id = R.drawable.profilepicture),
+                            contentDescription = "Default Profile Photo",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape)
+                        )
+                    }
+                }
+
 
                 Spacer(modifier = Modifier.height(15.dp))
 
@@ -111,139 +131,154 @@ fun SettingsScreenTemplate(
             }
         }
     }
-            Card(
+    Card(
+        modifier = Modifier
+            .offset(x = 25.dp, y = 344.dp)
+            .fillMaxWidth(0.9f)
+            .wrapContentHeight()
+            .shadow(8.dp, RoundedCornerShape(36.dp)),
+        shape = RoundedCornerShape(36.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Column {
+            Box(
                 modifier = Modifier
-                    .offset(x = 25.dp, y = 344.dp)
-                    .fillMaxWidth(0.9f)
-                    .wrapContentHeight()
-                    .shadow(8.dp, RoundedCornerShape(36.dp)),
-                shape = RoundedCornerShape(36.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                    .offset(x = 19.dp, y = 18.dp)
+                    .size(width = 323.dp, height = 85.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFEDFFFF))
             ) {
-                Column {
-                    Box(
-                        modifier = Modifier
-                            .offset(x = 19.dp, y = 18.dp)
-                            .size(width = 323.dp, height = 85.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFFEDFFFF))
-                    ) {
-                            AccountInfoRow(email = email, isGoogleAccount = isGoogleAccount)
+                AccountInfoRow(email = email, isGoogleAccount = isGoogleAccount)
 
-                    }
-                    Spacer(modifier = Modifier.height(30.dp))
-
-
-                    SettingsRow(
-                        icon = {
-                            Icon(
-                                imageVector = Icons.Filled.Person,
-                                contentDescription = "User",
-                                tint = Color(0xFF0FB2B2),
-                                modifier = Modifier.size(28.dp)
-                            )
-                        },
-                        label = "Profile",
-                        onClick = {
-                            val encodedEmail = Uri.encode(email)
-                            navController.navigate("profile/${firstName}/${lastName}/${encodedEmail}/${isGoogleAccount}/$userRole")
-                        }
-                    )
-
-                    if (userRole == "user") {
-                        SettingsRow(
-                            icon = {
-                                Icon(
-                                    imageVector = Icons.Filled.Info,
-                                    contentDescription = "User",
-                                    tint = Color(0xFF0FB2B2),
-                                    modifier = Modifier.size(28.dp)
-                                )
-                            },
-                            label = "About",
-                            onClick = {
-                                navController.navigate("about")
-                            }
-                        )
-                    }
-
-
-                    NotificationRow(
-                        icon = {
-                            Icon(
-                                imageVector = 	Icons.Filled.Notifications,
-                                contentDescription = "Notifications",
-                                tint = Color(0xFF0FB2B2),
-                                modifier = Modifier.size(28.dp)
-                            )
-                        },
-                        label = "Notification",
-                        checked = notificationsEnabled,
-                        onCheckedChange = { notificationsEnabled = it },
-                        onClick = {
-                            navController.navigate("notifications")
-                        }
-                    )
-
-
-                    Spacer(modifier = Modifier.height(15.dp))
-
-                    LogoutRow {
-                        showLogoutDialog = true
-                    }
-                }
             }
+            Spacer(modifier = Modifier.height(30.dp))
 
-            if (showPhoto) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0x80000000)) // semi-transparent backdrop
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .offset(x = 60.dp, y = 300.dp)
-                            .size(width = 296.dp, height = 295.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.profile),
-                            contentDescription = "Full Photo",
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(CircleShape),
-                            contentScale = ContentScale.Crop
-                        )
-                    }
 
-                    Box(
-                        modifier = Modifier
-                            .offset(x = 56.dp, y = 296.dp)
-                            .size(width = 37.dp, height = 35.dp)
-                            .clip(CircleShape)
-                            .background(Color.White)
-                            .clickable { showPhoto = false },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.x_icon), // replace with your actual 'X' icon
-                            contentDescription = "Close",
-                            tint = Color.Black,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
+            SettingsRow(
+                icon = {
+                    Icon(
+                        imageVector = Icons.Filled.Person,
+                        contentDescription = "User",
+                        tint = Color(0xFF0FB2B2),
+                        modifier = Modifier.size(28.dp)
+                    )
+                },
+                label = "Profile",
+                onClick = {
+                    val encodedFirstName = Uri.encode(firstName)
+                    val encodedLastName = Uri.encode(lastName)
+                    val encodedEmail = Uri.encode(email)
+
+                    navController.navigate("profile/$encodedFirstName/$encodedLastName/$encodedEmail/$isGoogleAccount/$userRole")
                 }
-            }
-            DialogTemplate(
-                show = showLogoutDialog,
-                title = "Confirm logout?",
-                primaryText = "Yes, Logout",
-                onPrimary = onLogout,
-                secondaryText = "Stay logged in",
-                onSecondary = { showLogoutDialog = false },
-                onDismiss = { showLogoutDialog = false }
             )
+
+            if (userRole == "user") {
+                SettingsRow(
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Filled.Info,
+                            contentDescription = "User",
+                            tint = Color(0xFF0FB2B2),
+                            modifier = Modifier.size(28.dp)
+                        )
+                    },
+                    label = "About",
+                    onClick = {
+                        navController.navigate("about")
+                    }
+                )
+            }
+
+
+            NotificationRow(
+                icon = {
+                    Icon(
+                        imageVector = 	Icons.Filled.Notifications,
+                        contentDescription = "Notifications",
+                        tint = Color(0xFF0FB2B2),
+                        modifier = Modifier.size(28.dp)
+                    )
+                },
+                label = "Notification",
+                checked = notificationsEnabled,
+                onCheckedChange = { notificationsEnabled = it },
+                onClick = {
+                    navController.navigate("notifications")
+                }
+            )
+
+
+            Spacer(modifier = Modifier.height(15.dp))
+
+            LogoutRow {
+                showLogoutDialog = true
+            }
+        }
+    }
+
+    if (showPhoto) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0x80000000)) // semi-transparent backdrop
+        ) {
+            Box(
+                modifier = Modifier
+                    .offset(x = 60.dp, y = 300.dp)
+                    .size(width = 296.dp, height = 295.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (selectedImageUri != null) {
+                    AsyncImage(
+                        model = selectedImageUri,
+                        contentDescription = "Full Photo",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(id = R.drawable.profilepicture),
+                        contentDescription = "Default Full Photo",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .offset(x = 56.dp, y = 296.dp)
+                    .size(width = 37.dp, height = 35.dp)
+                    .clip(CircleShape)
+                    .background(Color.White)
+                    .clickable { showPhoto = false },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Close",
+                    tint = Color.Black,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+
+    DialogTemplate(
+        show = showLogoutDialog,
+        title = "Confirm logout?",
+        primaryText = "Yes, Logout",
+        onPrimary = onLogout,
+        secondaryText = "Stay logged in",
+        onSecondary = { showLogoutDialog = false },
+        onDismiss = { showLogoutDialog = false }
+    )
 }
 @Composable
 fun AccountInfoRow(email: String, isGoogleAccount: Boolean) {
@@ -379,7 +414,7 @@ fun NotificationRow(
             contentAlignment = Alignment.Center
         ) {
             icon()
-            }
+        }
         Spacer(modifier = Modifier.width(15.dp))
 
         Text(

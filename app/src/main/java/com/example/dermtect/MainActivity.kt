@@ -3,7 +3,9 @@ package com.example.dermtect
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.res.painterResource
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -46,6 +48,8 @@ import com.example.dermtect.ui.screens.SkinHealthClinicScreen
 import com.example.dermtect.ui.screens.VMClinicScreen
 import com.example.dermtect.ui.screens.VitalityClinicScreen
 import com.example.dermtect.ui.theme.DermtectTheme
+import com.example.dermtect.ui.viewmodel.DermaHomeViewModel
+import com.example.dermtect.ui.viewmodel.SharedProfileViewModel
 import com.google.firebase.FirebaseApp
 import com.google.gson.Gson
 
@@ -59,7 +63,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             DermtectTheme {
                 val navController = rememberNavController()
-                NavHost(navController = navController, startDestination = "assessment") {
+                val sharedProfileViewModel: SharedProfileViewModel = viewModel()
+
+                NavHost(navController = navController, startDestination = "splash") {
                     composable("splash") { SplashScreen(navController) }
                     composable("onboarding_screen1") { OnboardingScreen1(navController) }
                     composable("onboarding_screen2") { OnboardingScreen2(navController) }
@@ -92,6 +98,7 @@ class MainActivity : ComponentActivity() {
                         SettingsScreenTemplate(
                             navController = navController,
                             userRole = "user",
+                            sharedProfileViewModel = sharedProfileViewModel, // ✅ pass the same instance
                             onLogout = {
                                 navController.navigate("login") {
                                     popUpTo(0) { inclusive = true }
@@ -105,14 +112,23 @@ class MainActivity : ComponentActivity() {
                     composable("tutorial_screen3") { TutorialScreen3(navController) }
                     composable("tutorial_screen4") { TutorialScreen4(navController) }
                     composable("tutorial_screen5") { TutorialScreen5(navController) }
-                    composable("profile/{firstName}/{lastName}/{email}/{isGoogle}/{userRole}") { backStackEntry ->
+                    composable(
+                        route = "profile/{firstName}/{lastName}/{email}/{isGoogleAccount}/{userRole}"
+                    ) { backStackEntry ->
                         val firstName = backStackEntry.arguments?.getString("firstName") ?: ""
                         val lastName = backStackEntry.arguments?.getString("lastName") ?: ""
                         val email = backStackEntry.arguments?.getString("email") ?: ""
-                        val isGoogle = backStackEntry.arguments?.getString("isGoogle")?.toBoolean() ?: false
+                        val isGoogleAccount = backStackEntry.arguments?.getString("isGoogleAccount")?.toBooleanStrictOrNull() ?: false
                         val userRole = backStackEntry.arguments?.getString("userRole") ?: "user"
-
-                        ProfileScreenTemplate(navController, firstName, lastName, email, isGoogle, userRole)
+                        ProfileScreenTemplate(
+                            navController = navController,
+                            firstName = firstName,
+                            lastName = lastName,
+                            email = email,
+                            isGoogleAccount = isGoogleAccount,
+                            userRole = userRole,
+                            sharedProfileViewModel = sharedProfileViewModel
+                        )
                     }
 
                     composable("about") { AboutScreen(navController) }
@@ -125,12 +141,16 @@ class MainActivity : ComponentActivity() {
                     composable("skin_benefit") { SkinBenefitClinicScreen(navController) }
 
                     composable("derma_home") {
+                        val viewModel: DermaHomeViewModel = viewModel()
+                        val firstName by viewModel.firstName
+
                         DermaHomeScreen(
                             navController = navController,
                             onPendingCasesClick = { navController.navigate("pending_cases") },
                             onTotalCasesClick = { navController.navigate("case_history") },
                             onNotifClick = { navController.navigate("notifications") },
-                            onSettingsClick = { navController.navigate("derma_settings") }
+                            onSettingsClick = { navController.navigate("derma_settings") },
+                            firstName = firstName // ✅ Now resolved
                         )
                     }
 
@@ -152,21 +172,13 @@ class MainActivity : ComponentActivity() {
                     composable("derma_settings") {
                         SettingsScreenTemplate(
                             navController = navController,
+                            sharedProfileViewModel = sharedProfileViewModel,
                             userRole = "derma", // hides About section
                             onLogout = {
                                 navController.navigate("login") {
                                     popUpTo(0) { inclusive = true }
                                 }
                             }
-                        )
-                    }
-                    composable("derma_home") {
-                        DermaHomeScreen(
-                            navController = navController,
-                            onPendingCasesClick = { navController.navigate("pending_cases") },
-                            onTotalCasesClick = { navController.navigate("case_history") },
-                            onNotifClick = { navController.navigate("notifications") },
-                            onSettingsClick = { navController.navigate("derma_settings") }
                         )
                     }
 

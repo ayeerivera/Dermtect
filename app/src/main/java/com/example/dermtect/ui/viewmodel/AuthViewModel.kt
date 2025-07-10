@@ -1,8 +1,11 @@
 package com.example.dermtect.ui.viewmodel
 
+import android.net.Uri
 import android.util.Log
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import com.example.dermtect.domain.usecase.AuthUseCase
+import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.GoogleAuthProvider
@@ -14,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
 
     private val auth = FirebaseAuth.getInstance()
+    private val firestore = FirebaseFirestore.getInstance()
 
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading
@@ -26,6 +30,8 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
 
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage
+
+
 
     private fun logAudit(uid: String?, email: String?, action: String) {
         val db = FirebaseFirestore.getInstance()
@@ -227,6 +233,53 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
         onComplete()
     }
 
+    fun deleteUser(onSuccess: () -> Unit, onFailure: (String) -> Unit) {
+        val user = auth.currentUser
+        if (user != null) {
+            val uid = user.uid
+            val email = user.email
+
+            // Optional: Firestore cleanup
+            firestore.collection("users").document(uid).delete()
+
+            // Optional: Audit log
+            logAudit(uid, email, "Account Deleted")
+
+            user.delete()
+                .addOnSuccessListener { onSuccess() }
+                .addOnFailureListener { exception ->
+                    onFailure(exception.message ?: "Something went wrong")
+                }
+        } else {
+            onFailure("No authenticated user.")
+        }
+    }
+    fun reauthenticateAndDelete(
+        password: String,
+        onSuccess: () -> Unit,
+        onFailure: () -> Unit
+    ) {
+        val user = auth.currentUser
+        val email = user?.email
+
+        if (user != null && email != null) {
+            val credential = EmailAuthProvider.getCredential(email, password)
+            user.reauthenticate(credential)
+                .addOnSuccessListener {
+                    // Use your existing deleteUser function
+                    deleteUser(onSuccess, onFailure = { onFailure() })
+                }
+                .addOnFailureListener {
+                    onFailure()
+                }
+        } else {
+            onFailure()
+        }
+    }
+
+
+
+
     fun clearError() {
         _errorMessage.value = null
     }
@@ -235,4 +288,13 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
         _authSuccess.value = false
     }
 
+}
+
+class SharedProfileViewModel : ViewModel() {
+    private val _selectedImageUri = MutableStateFlow<Uri?>(null)
+    val selectedImageUri: StateFlow<Uri?> = _selectedImageUri
+
+    fun setImageUri(uri: Uri?) {
+        _selectedImageUri.value = uri
+    }
 }

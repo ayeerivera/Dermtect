@@ -40,7 +40,8 @@ fun DermaHomeScreen(
     onPendingCasesClick: () -> Unit,
     onTotalCasesClick: () -> Unit,
     onNotifClick: () -> Unit,
-    onSettingsClick: () -> Unit
+    onSettingsClick: () -> Unit,
+    firstName: String
 ) {
     fun getIndicatorColor(result: String?): Color = when (result?.lowercase()) {
         "pending" -> Color(0xFFFFA500)
@@ -76,11 +77,12 @@ fun DermaHomeScreen(
                     text = "Hello,",
                     style = MaterialTheme.typography.displayMedium.copy(fontWeight = FontWeight.Normal)
                 )
-                Text(
-                    text = "Doc Mika!",
-                    style = MaterialTheme.typography.displayLarge.copy(fontWeight = FontWeight.Bold)
-                )
-                Text(
+            Text(
+                text = "Dr. ${firstName}!",
+                style = MaterialTheme.typography.displayLarge.copy(fontWeight = FontWeight.Bold)
+            )
+
+            Text(
                     text = "Early Detection Saves Lives.",
                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal)
                 )

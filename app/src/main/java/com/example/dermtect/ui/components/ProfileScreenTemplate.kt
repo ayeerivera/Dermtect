@@ -1,5 +1,8 @@
 package com.example.dermtect.ui.components
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import com.example.dermtect.ui.viewmodel.AuthViewModel
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -11,8 +14,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AssignmentTurnedIn
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,12 +28,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.example.dermtect.R
 import com.example.dermtect.ui.viewmodel.AuthViewModelFactory
+import com.example.dermtect.ui.viewmodel.SharedProfileViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.collectAsState
 
 @Composable
 fun ProfileScreenTemplate(
@@ -38,7 +48,8 @@ fun ProfileScreenTemplate(
     lastName: String,
     email: String,
     isGoogleAccount: Boolean,
-    userRole: String = "user" // new
+    userRole: String = "user",
+    sharedProfileViewModel: SharedProfileViewModel,
 ){
 
     val fullName = "$firstName $lastName"
@@ -47,7 +58,16 @@ fun ProfileScreenTemplate(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showDeletedDialog by remember { mutableStateOf(false) }
     val authViewModel: AuthViewModel = viewModel(factory = AuthViewModelFactory())
-
+    val coroutineScope = rememberCoroutineScope()
+    var passwordInput by remember { mutableStateOf("") }
+    var showPasswordError by remember { mutableStateOf(false) }
+    var triggerNavigation by remember { mutableStateOf(false) }
+    val selectedImageUri = sharedProfileViewModel.selectedImageUri.collectAsState().value
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        sharedProfileViewModel.setImageUri(uri) // must call ViewModel
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -85,15 +105,50 @@ fun ProfileScreenTemplate(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                Image(
-                    painter = painterResource(id = R.drawable.profile),
-                    contentDescription = "Profile",
+                Box(
                     modifier = Modifier
                         .size(150.dp)
-                        .clip(CircleShape)
                         .clickable { showPhoto = true },
-                    contentScale = ContentScale.Crop
-                )
+                    contentAlignment = Alignment.BottomEnd
+                ) {
+                    // Only the image is clipped, not the whole box
+                    if (selectedImageUri != null) {
+                        AsyncImage(
+                            model = selectedImageUri,
+                            contentDescription = "Profile Photo",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape)
+                        )
+                    } else {
+                        Image(
+                            painter = painterResource(id = R.drawable.profilepicture),
+                            contentDescription = "Default Profile Photo",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape)
+                        )
+                    }
+
+                    // Edit icon outside the circle visually
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                            .clickable { imagePickerLauncher.launch("image/*") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit Photo",
+                            tint = Color(0xFF0FB2B2),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(15.dp))
 
@@ -182,47 +237,135 @@ fun ProfileScreenTemplate(
                 }
             }
 
-            if (showPhoto) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0x80000000))
-                ) {
-                    Box(
+    if (showPhoto) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0x80000000)) // semi-transparent backdrop
+        ) {
+            Box(
+                modifier = Modifier
+                    .offset(x = 60.dp, y = 300.dp)
+                    .size(width = 296.dp, height = 295.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (selectedImageUri != null) {
+                    AsyncImage(
+                        model = selectedImageUri,
+                        contentDescription = "Full Photo",
+                        contentScale = ContentScale.Crop,
                         modifier = Modifier
-                            .offset(x = 60.dp, y = 300.dp)
-                            .size(width = 296.dp, height = 295.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.profile),
-                            contentDescription = "Full Photo",
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(CircleShape),
-                            contentScale = ContentScale.Crop
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .offset(x = 56.dp, y = 296.dp)
-                            .size(width = 37.dp, height = 35.dp)
+                            .fillMaxSize()
                             .clip(CircleShape)
-                            .background(Color.White)
-                            .clickable { showPhoto = false },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.x_icon), // replace with your actual 'X' icon
-                            contentDescription = "Close",
-                            tint = Color.Black,
-                            modifier = Modifier.size(20.dp)
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(id = R.drawable.profilepicture),
+                        contentDescription = "Default Full Photo",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .offset(x = 56.dp, y = 296.dp)
+                    .size(width = 37.dp, height = 35.dp)
+                    .clip(CircleShape)
+                    .background(Color.White)
+                    .clickable { showPhoto = false },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Close",
+                    tint = Color.Black,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+
+    DialogTemplate(
+        show = showDeleteDialog,
+        title = "Delete Account?",
+        description = "Please enter your password to confirm. This action is irreversible.",
+        primaryText = "Yes, Delete my Account",
+        onPrimary = {
+            if (passwordInput.isBlank()) {
+                showPasswordError = true
+                showDeleteDialog = true // keep the dialog open
+            } else {
+                showPasswordError = false
+                coroutineScope.launch {
+                    try {
+                        authViewModel.reauthenticateAndDelete(
+                            password = passwordInput,
+                            onSuccess = {
+                                showDeleteDialog = false
+                                showDeletedDialog = true
+                                triggerNavigation = true
+                            },
+                            onFailure = {
+                                showPasswordError = true
+                                showDeleteDialog = true
+                            }
                         )
+                    } catch (_: Exception) {
+                        showPasswordError = true
+                        showDeleteDialog = true
                     }
                 }
             }
-        DialogTemplate(
+        },
+        secondaryText = "Cancel",
+        onSecondary = {
+            showDeleteDialog = false
+            passwordInput = ""
+            showPasswordError = false
+        },
+        onDismiss = {
+            showDeleteDialog = false
+            passwordInput = ""
+            showPasswordError = false
+        },
+        extraContent = {
+            Column {
+                OutlinedTextField(
+                    value = passwordInput,
+                    onValueChange = { passwordInput = it },
+                    label = { Text("Enter your password") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier
+                        .fillMaxWidth(0.9f)
+                        .padding(top = 8.dp)
+                )
+                if (showPasswordError) {
+                    Text(
+                        text = "Incorrect password. Please try again.",
+                        color = Color.Red,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
+        }
+    )
+    if (triggerNavigation) {
+        LaunchedEffect(Unit) {
+            delay(2000) // wait for dialog to show
+            navController.navigate("login") {
+                popUpTo("profile") { inclusive = true }
+            }
+            triggerNavigation = false
+        }
+    }
+
+    DialogTemplate(
             show = showLogoutDialog,
             title = "Confirm logout?",
             primaryText = "Yes, Logout",
@@ -237,22 +380,7 @@ fun ProfileScreenTemplate(
             onSecondary = { showLogoutDialog = false },
             onDismiss = { showLogoutDialog = false }
         )
-        DialogTemplate(
-            show = showDeleteDialog,
-            title = "Delete Account?",
-            description = "All your data will be permanently removed and cannot be recovered.",
-            primaryText = "Yes, Delete my Account",
-            onPrimary = {
-                authViewModel.logout {
-                    navController.navigate("login") {
-                        popUpTo(0) { inclusive = true }
-                    }
-                }
-            },
-            secondaryText = "Cancel",
-            onSecondary = { showLogoutDialog = false },
-            onDismiss = { showLogoutDialog = false }
-        )
+
             DialogTemplate(
                 show = showDeletedDialog,
                 title = "Your account has been permanently deleted!",

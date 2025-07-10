@@ -9,7 +9,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -18,10 +17,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
-import coil.ImageLoader
-import coil.compose.AsyncImage
-import coil.decode.GifDecoder
-import coil.request.ImageRequest
 import com.example.dermtect.R
 import kotlinx.coroutines.delay
 
@@ -41,8 +36,10 @@ fun DialogTemplate(
     onTertiary: (() -> Unit)? = null,
     autoDismiss: Boolean = false,
     dismissDelay: Long = 1000L,
-    onDismiss: () -> Unit
-) {
+    onDismiss: () -> Unit,
+    extraContent: @Composable (() -> Unit)? = null,
+    primaryEnabled: Boolean = true
+    ) {
     if (show) {
         LaunchedEffect(show) {
             if (autoDismiss && primaryText == null && secondaryText == null && tertiaryText == null) {
@@ -92,6 +89,12 @@ fun DialogTemplate(
                         )
                     }
 
+                    extraContent?.let {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        it()
+                    }
+
+
                     Spacer(modifier = Modifier.height(10.dp))
 
                     val buttonCount = listOfNotNull(primaryText, secondaryText, tertiaryText).size
@@ -104,12 +107,14 @@ fun DialogTemplate(
                                 onPrimary?.invoke()
                                 onDismiss()
                             },
+                            enabled = primaryEnabled,
                             modifier = Modifier
                                 .fillMaxWidth(0.9f)
                                 .wrapContentHeight(),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFF0FB2B2),
                                 contentColor = Color.White
+
                             )
                         ) {
                             Text(it, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
