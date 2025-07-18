@@ -17,12 +17,12 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
+import com.example.dermtect.ui.components.GifImage
 import com.example.dermtect.ui.components.ProgressIndicator
 
 @Composable
 fun TutorialScreenTemplate(
     navController: NavController,
-    imageResId: Int,
     title: String,
     description: String,
     nextRoute: String,
@@ -30,7 +30,9 @@ fun TutorialScreenTemplate(
     onBackClick: (() -> Unit)? = null, // ✅ optional
     nextButtonText: String = "Next",
     skipButtonText: String = "Skip",
-    currentIndex: Int? = null
+    currentIndex: Int? = null,
+    imageResId: Int? = null,
+    imageContent: (@Composable () -> Unit)? = null
 
 ) {
     Box(
@@ -65,12 +67,16 @@ fun TutorialScreenTemplate(
             ) {
                 Spacer(modifier = Modifier.height(80.dp)) // Leave space for back button
 
-                Image(
-                    painter = painterResource(id = imageResId),
-                    contentDescription = "Tutorial Image",
-                    modifier = Modifier
-                        .size(280.dp)
-                )
+                when {
+                    imageContent != null -> imageContent()
+                    imageResId != null -> {
+                        Image(
+                            painter = painterResource(id = imageResId),
+                            contentDescription = null,
+                            modifier = Modifier.size(280.dp)
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.height(60.dp))
 
                 Text(
@@ -192,7 +198,7 @@ fun TutorialScreen2(navController: NavController) {
 fun TutorialScreen3(navController: NavController) {
     TutorialScreenTemplate(
         navController = navController,
-        imageResId = R.drawable.tutorial_pic3,
+        imageContent = { GifImage(R.drawable.tutorial_pic3, size = 280) },
         title = "Keep It Clean",
         description = "Make sure the skin is well-lit and free of hair, jewelry, or makeup that may block the view.",
         nextRoute = "tutorial_screen4",
@@ -206,7 +212,7 @@ fun TutorialScreen3(navController: NavController) {
 fun TutorialScreen4(navController: NavController) {
     TutorialScreenTemplate(
         navController = navController,
-        imageResId = R.drawable.tutorial_pic4,
+        imageContent = { GifImage(R.drawable.tutorial_pic4, size = 280) },
         title = "Save and Track",
         description = "After scanning, your result is saved automatically. You can track your scan history and monitor changes.",
         nextRoute = "tutorial_screen5",
@@ -220,7 +226,7 @@ fun TutorialScreen4(navController: NavController) {
 fun TutorialScreen5(navController: NavController) {
     TutorialScreenTemplate(
         navController = navController,
-        imageResId = R.drawable.tutorial_pic5,
+        imageContent = { GifImage(R.drawable.tutorial_pic5, size = 280) },
         title = "Download & Consult",
         description = "Generate your PDF report anytime — and use the clinic locator to find a nearby dermatologist.",
         nextRoute = "questionnaire",

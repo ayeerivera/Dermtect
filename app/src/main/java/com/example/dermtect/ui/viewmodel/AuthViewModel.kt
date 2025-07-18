@@ -5,12 +5,9 @@ import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import com.example.dermtect.domain.usecase.AuthUseCase
-import com.google.firebase.auth.EmailAuthProvider
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseAuthUserCollisionException
-import com.google.firebase.auth.GoogleAuthProvider
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.auth.*
+import com.google.firebase.firestore.*
+import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -290,11 +287,5 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
 
 }
 
-class SharedProfileViewModel : ViewModel() {
-    private val _selectedImageUri = MutableStateFlow<Uri?>(null)
-    val selectedImageUri: StateFlow<Uri?> = _selectedImageUri
 
-    fun setImageUri(uri: Uri?) {
-        _selectedImageUri.value = uri
-    }
-}
+

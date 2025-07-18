@@ -1,5 +1,6 @@
 package com.example.dermtect
 
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -17,6 +18,7 @@ import com.example.dermtect.ui.screens.ArticleDetailScreen
 import com.example.dermtect.ui.screens.CaseHistoryScreen
 import com.example.dermtect.ui.screens.Register
 import com.example.dermtect.ui.screens.Login
+import com.example.dermtect.ui.screens.ChangePasswordScreen
 import com.example.dermtect.ui.screens.DermaHomeScreen
 import com.example.dermtect.ui.screens.ForgotPass1
 import com.example.dermtect.ui.screens.ForgotPass2
@@ -65,7 +67,7 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 val sharedProfileViewModel: SharedProfileViewModel = viewModel()
 
-                NavHost(navController = navController, startDestination = "login") {
+                NavHost(navController = navController, startDestination = "user_home") {
                     composable("splash") { SplashScreen(navController) }
                     composable("onboarding_screen1") { OnboardingScreen1(navController) }
                     composable("onboarding_screen2") { OnboardingScreen2(navController) }
@@ -79,6 +81,7 @@ class MainActivity : ComponentActivity() {
                     }
                     composable("forgot_pass3") { ForgotPass3(navController) }
                     composable("forgot_pass4") { ForgotPass4(navController) }
+                    composable("change_pass") { ChangePasswordScreen(navController) }
                     composable("user_home") {UserHomeScreen(navController = navController) }
                     composable("notifications") {NotificationScreen(navController = navController) }
                     composable("questionnaire") { QuestionnaireScreen(navController = navController)}
@@ -87,6 +90,7 @@ class MainActivity : ComponentActivity() {
                         val newsItem = Gson().fromJson(json, NewsItem::class.java)
                         HighlightArticle(newsItem = newsItem, onBackClick = { navController.popBackStack() })
                     }
+
                     composable("history") { HistoryScreen(navController = navController)}
                     composable("article_detail_screen/{newsJson}") { backStackEntry ->
                         val json = backStackEntry.arguments?.getString("newsJson") ?: ""

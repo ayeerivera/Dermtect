@@ -54,6 +54,9 @@ fun ProfileScreenTemplate(
 
     val fullName = "$firstName $lastName"
     var showPhoto by remember { mutableStateOf(false) }
+    var showPhotoOptions by remember { mutableStateOf(false) }
+    var showRemoveConfirmDialog by remember { mutableStateOf(false) }
+
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showDeletedDialog by remember { mutableStateOf(false) }
@@ -138,7 +141,7 @@ fun ProfileScreenTemplate(
                             .size(38.dp)
                             .clip(CircleShape)
                             .background(Color.White)
-                            .clickable { imagePickerLauncher.launch("image/*") },
+                            .clickable { showPhotoOptions = true },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -159,83 +162,83 @@ fun ProfileScreenTemplate(
             }
         }
     }
-            Card(
+    Card(
+        modifier = Modifier
+            .offset(x = 25.dp, y = 344.dp)
+            .fillMaxWidth(0.9f)
+            .wrapContentHeight()
+            .shadow(8.dp, RoundedCornerShape(36.dp)),
+        shape = RoundedCornerShape(36.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Column{
+            Box(
                 modifier = Modifier
-                    .offset(x = 25.dp, y = 344.dp)
-                    .fillMaxWidth(0.9f)
-                    .wrapContentHeight()
-                    .shadow(8.dp, RoundedCornerShape(36.dp)),
-                shape = RoundedCornerShape(36.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                    .offset(x = 19.dp, y = 18.dp)
+                    .size(width = 323.dp, height = 85.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFEDFFFF))
             ) {
-                Column{
-                    Box(
-                        modifier = Modifier
-                            .offset(x = 19.dp, y = 18.dp)
-                            .size(width = 323.dp, height = 85.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFFEDFFFF))
-                    ) {
-                        AccountInfoRow(email = email, isGoogleAccount = isGoogleAccount)
-                    }
-
-                    Spacer(modifier = Modifier.height(30.dp))
-
-                    ChangePasswordRow(
-                        icon = {
-                            Icon(
-                                imageVector = Icons.Filled.Lock,
-                                contentDescription = "Change Password",
-                                tint = Color(0xFF0FB2B2),
-                                modifier = Modifier.size(28.dp)
-                            )
-                        },
-                        label = "Change Password",
-                        onClick = {
-                            navController.navigate("forgot_pass1")
-                        }
-                    )
-
-                    if (userRole == "user") {
-                        AssessmentRow(
-                            icon = {
-                                Icon(
-                                    imageVector = Icons.Filled.AssignmentTurnedIn,
-                                    contentDescription = "My Assessment Report",
-                                    tint = Color(0xFF0FB2B2),
-                                    modifier = Modifier.size(28.dp)
-                                )
-                            },
-                            label = "My Assessment Report",
-                            onClick = {
-                                navController.navigate("questionnaire")
-                            }
-                        )
-                    }
-
-                    DeleteAccountRow(
-                        icon = {
-                            Icon(
-                                imageVector = Icons.Filled.Delete,
-                                contentDescription = "Delete Account",
-                                tint = Color(0xFF0FB2B2),
-                                modifier = Modifier.size(28.dp)
-                            )
-                        },
-                        label = "Delete Account",
-                        onClick = {
-                            showDeleteDialog = true
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(15.dp))
-
-                    LogoutRow {
-                        showLogoutDialog = true
-                    }
-                }
+                AccountInfoRow(email = email, isGoogleAccount = isGoogleAccount)
             }
+
+            Spacer(modifier = Modifier.height(30.dp))
+
+            ChangePasswordRow(
+                icon = {
+                    Icon(
+                        imageVector = Icons.Filled.Lock,
+                        contentDescription = "Change Password",
+                        tint = Color(0xFF0FB2B2),
+                        modifier = Modifier.size(28.dp)
+                    )
+                },
+                label = "Change Password",
+                onClick = {
+                    navController.navigate("change_pass")
+                }
+            )
+
+            if (userRole == "user") {
+                AssessmentRow(
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Filled.AssignmentTurnedIn,
+                            contentDescription = "My Assessment Report",
+                            tint = Color(0xFF0FB2B2),
+                            modifier = Modifier.size(28.dp)
+                        )
+                    },
+                    label = "My Assessment Report",
+                    onClick = {
+                        navController.navigate("questionnaire")
+                    }
+                )
+            }
+
+            DeleteAccountRow(
+                icon = {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = "Delete Account",
+                        tint = Color(0xFF0FB2B2),
+                        modifier = Modifier.size(28.dp)
+                    )
+                },
+                label = "Delete Account",
+                onClick = {
+                    showDeleteDialog = true
+                }
+            )
+
+            Spacer(modifier = Modifier.height(15.dp))
+
+            LogoutRow {
+                showLogoutDialog = true
+            }
+        }
+    }
 
     if (showPhoto) {
         Box(
@@ -288,6 +291,42 @@ fun ProfileScreenTemplate(
             }
         }
     }
+    // Edit photo options
+    DialogTemplate(
+        show = showPhotoOptions,
+        title = "Edit Profile Photo",
+        description = "Would you like to change or remove your profile photo?",
+        primaryText = "Change Photo",
+        onPrimary = {
+            imagePickerLauncher.launch("image/*")
+            showPhotoOptions = false
+        },
+        secondaryText = "Remove Photo",
+        onSecondary = {
+            showPhotoOptions = false
+            if (selectedImageUri != null) {
+                showRemoveConfirmDialog = true
+            }
+        },
+        tertiaryText = "Cancel",
+        onTertiary = { showPhotoOptions = false },
+        onDismiss = { showPhotoOptions = false }
+    )
+
+// Confirm remove photo
+    DialogTemplate(
+        show = showRemoveConfirmDialog,
+        title = "Remove Profile Photo?",
+        description = "This will reset your profile picture to the default image.",
+        primaryText = "Yes, Remove",
+        onPrimary = {
+            sharedProfileViewModel.clearImageUri()
+            showRemoveConfirmDialog = false
+        },
+        secondaryText = "Cancel",
+        onSecondary = { showRemoveConfirmDialog = false },
+        onDismiss = { showRemoveConfirmDialog = false }
+    )
 
     DialogTemplate(
         show = showDeleteDialog,
@@ -366,29 +405,29 @@ fun ProfileScreenTemplate(
     }
 
     DialogTemplate(
-            show = showLogoutDialog,
-            title = "Confirm logout?",
-            primaryText = "Yes, Logout",
-            onPrimary = {
-                authViewModel.logout {
-                    navController.navigate("login") {
-                        popUpTo(0) { inclusive = true }
-                    }
+        show = showLogoutDialog,
+        title = "Confirm logout?",
+        primaryText = "Yes, Logout",
+        onPrimary = {
+            authViewModel.logout {
+                navController.navigate("login") {
+                    popUpTo(0) { inclusive = true }
                 }
-            },
-            secondaryText = "Stay logged in",
-            onSecondary = { showLogoutDialog = false },
-            onDismiss = { showLogoutDialog = false }
-        )
+            }
+        },
+        secondaryText = "Stay logged in",
+        onSecondary = { showLogoutDialog = false },
+        onDismiss = { showLogoutDialog = false }
+    )
 
-            DialogTemplate(
-                show = showDeletedDialog,
-                title = "Your account has been permanently deleted!",
-                imageResId = R.drawable.success,
-                autoDismiss = true,
-                onDismiss = { showDeletedDialog = false }
-            )
-        }
+    DialogTemplate(
+        show = showDeletedDialog,
+        title = "Your account has been permanently deleted!",
+        imageResId = R.drawable.success,
+        autoDismiss = true,
+        onDismiss = { showDeletedDialog = false }
+    )
+}
 
 
 
@@ -523,4 +562,3 @@ fun DeleteAccountRow(icon: @Composable () -> Unit, label: String, onClick: () ->
         }
     }
 }
-
