@@ -62,15 +62,21 @@ fun DialogTemplate(
                 ) {
                     Text(
                         text = title,
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = Color(0xFF0FB2B2)
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center // ✅ center text within the Text block
+                        ),
+                        textAlign = TextAlign.Center, // ✅ center the whole Text block
+                        color = Color(0xFF0FB2B2),
+                        modifier = Modifier.fillMaxWidth() // ✅ allows it to center within parent
                     )
 
+
                     imageContent?.let {
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(15.dp))
                         it()
                     } ?: imageResId?.let {
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(15.dp))
                         Image(
                             painter = painterResource(id = it),
                             contentDescription = null,
@@ -80,7 +86,7 @@ fun DialogTemplate(
 
 
                     description?.let {
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(15.dp))
                         Text(
                             text = it,
                             style = MaterialTheme.typography.bodyMedium,
@@ -95,7 +101,7 @@ fun DialogTemplate(
                     }
 
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
                     val buttonCount = listOfNotNull(primaryText, secondaryText, tertiaryText).size
                     val allFilled = buttonCount == 3

@@ -1,5 +1,6 @@
 package com.example.dermtect.ui.components
 
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -18,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import com.google.gson.Gson
 
 
 data class CaseData(
@@ -90,7 +92,12 @@ fun HistoryScreenTemplate(
                     status = case.status,
                     indicatorColor = indicatorColor,
                     statusLabel = statusLabel,
-                    statusColor = statusColor
+                    statusColor = statusColor,
+                    onClick = {
+                        val gson = Gson()
+                        val caseJson = Uri.encode(gson.toJson(case))
+                        navController.navigate("derma_assessment_screen/$caseJson")
+                    }
                 )
                 Divider(modifier = Modifier.padding(vertical = 12.dp))
             }
@@ -109,7 +116,8 @@ fun CaseListItem(
     status: String?,
     indicatorColor: Color,
     statusLabel: String? = null, // Show "Pending" or "Completed"
-    statusColor: Color? = null
+    statusColor: Color? = null,
+    onClick: () -> Unit
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,

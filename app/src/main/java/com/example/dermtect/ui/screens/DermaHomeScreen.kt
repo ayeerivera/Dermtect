@@ -1,38 +1,28 @@
 package com.example.dermtect.ui.screens
 
+import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.dermtect.R
 import com.example.dermtect.ui.components.TopRightNotificationIcon
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import androidx.navigation.compose.rememberNavController
 import com.example.dermtect.ui.components.CaseData
 import com.example.dermtect.ui.components.CaseListItem
-import com.example.dermtect.ui.viewmodel.UserHomeViewModel
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
+import com.google.gson.Gson
 
 @Composable
 fun DermaHomeScreen(
@@ -135,7 +125,12 @@ fun DermaHomeScreen(
                     status = case.status,
                     indicatorColor = getIndicatorColor(case.result),
                     statusLabel = case.status,
-                    statusColor = null
+                    statusColor = null,
+                    onClick = {
+                        val gson = Gson()
+                        val caseJson = Uri.encode(gson.toJson(case))
+                        navController.navigate("derma_assessment_screen/$caseJson")
+                    }
                 )
                 Divider(modifier = Modifier.padding(vertical = 12.dp))
             }

@@ -1,13 +1,10 @@
 package com.example.dermtect.ui.viewmodel
 
-import android.net.Uri
 import android.util.Log
-import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import com.example.dermtect.domain.usecase.AuthUseCase
 import com.google.firebase.auth.*
 import com.google.firebase.firestore.*
-import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 

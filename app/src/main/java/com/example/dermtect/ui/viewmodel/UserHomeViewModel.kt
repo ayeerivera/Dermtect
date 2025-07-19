@@ -1,6 +1,7 @@
 package com.example.dermtect.ui.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -10,6 +11,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import com.example.dermtect.model.NewsItem
 import androidx.lifecycle.AndroidViewModel
+import com.example.dermtect.model.Clinic
+import com.google.firebase.Firebase
+import com.google.firebase.firestore.firestore
 
 
 class UserHomeViewModel(application: Application) : AndroidViewModel(application) {
@@ -97,6 +101,9 @@ class UserHomeViewModel(application: Application) : AndroidViewModel(application
     private val _isLoadingNews = MutableStateFlow(false)
     val isLoadingNews: StateFlow<Boolean> = _isLoadingNews
 
+    private val _highlightItem = MutableStateFlow<NewsItem?>(null)
+    val highlightItem: StateFlow<NewsItem?> = _highlightItem
+
     fun fetchNews() {
         viewModelScope.launch {
             _isLoadingNews.value = true
@@ -115,17 +122,110 @@ class UserHomeViewModel(application: Application) : AndroidViewModel(application
                         description = doc.getString("description") ?: "",
                         body = doc.getString("body") ?: "",
                         source = doc.getString("source") ?: "",
-                        date = doc.getString("date") ?: ""
+                        date = doc.getString("date") ?: "",
+                        isHighlight = doc.getBoolean("isHighlight") ?: false // 👈 Add this
                     )
                 }
-                _newsItems.value = items
+
+                // Split highlight vs normal
+                _highlightItem.value = items.find { it.isHighlight }
+                _newsItems.value = items.filter { !it.isHighlight }
             } catch (_: Exception) {
-                _newsItems.value = emptyList() // fallback
+                _highlightItem.value = null
+                _newsItems.value = emptyList()
             } finally {
                 _isLoadingNews.value = false
             }
         }
     }
+    private val _clinics = MutableStateFlow<List<Clinic>>(emptyList())
+    val clinics: StateFlow<List<Clinic>> = _clinics
+
+    private val _savedClinicIds = MutableStateFlow<List<String>>(emptyList())
+    val savedClinicIds: StateFlow<List<String>> = _savedClinicIds
+
+    private val _clinicList = MutableStateFlow<List<Clinic>>(emptyList())
+    val clinicList: StateFlow<List<Clinic>> = _clinicList
+
+    private val _isLoadingClinics = MutableStateFlow(true)
+    val isLoadingClinics: StateFlow<Boolean> = _isLoadingClinics
+
+    init {
+        fetchClinics()
+        fetchSavedClinics()
+    }
+
+    fun fetchClinics() {
+        viewModelScope.launch {
+            _isLoadingClinics.value = true
+            try {
+                val result = db.collection("clinics").get().await()
+
+                val clinics = result.map { doc ->
+                    Clinic(
+                        id = doc.id,
+                        name = doc.getString("name") ?: "",
+                        subtitle = doc.getString("subtitle") ?: "",
+                        description = doc.getString("description") ?: "",
+                        address = doc.getString("address") ?: "",
+                        contact = doc.getString("contact") ?: "",
+                        schedule = doc.getString("schedule") ?: "",
+                        mapImage = doc.getString("mapImage") ?: ""
+                    )
+                }.filter { it.name.isNotBlank() }
+                Log.d("FirestoreFetch", "Clinics fetched: ${clinics.map { it.name }}")
+
+                Log.d("FETCH_CLINICS", "Fetched ${clinics.size} clinics: $clinics")
+                _clinicList.value = clinics
+
+            } catch (e: Exception) {
+                Log.e("FETCH_CLINICS", "Failed to fetch clinics: ${e.message}")
+                _clinicList.value = emptyList()
+            } finally {
+                _isLoadingClinics.value = false
+            }
+        }
+    }
+
+    fun fetchSavedClinics() {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+
+        Firebase.firestore.collection("users")
+            .document(userId)
+            .get()
+            .addOnSuccessListener { document ->
+                val savedIds = document.get("savedClinics") as? List<String> ?: emptyList()
+                Log.d("SavedClinics", "Fetched: $savedIds")
+                _savedClinicIds.value = savedIds
+
+            }
+
+            .addOnFailureListener { e ->
+                Log.e("FIRESTORE", "Failed to fetch savedClinics", e)
+            }
+    }
+
+    fun toggleClinicSave(clinicId: String) {
+        val currentUserId = auth.currentUser?.uid ?: return
+        val savedRef = db.collection("users").document(currentUserId)
+
+        db.runTransaction { transaction ->
+            val snapshot = transaction.get(savedRef)
+            val savedList = snapshot.get("savedClinics") as? List<String> ?: emptyList()
+            val newList = if (clinicId in savedList) {
+                savedList - clinicId
+            } else {
+                savedList + clinicId
+            }
+            transaction.update(savedRef, "savedClinics", newList)
+        }.addOnSuccessListener {
+            fetchSavedClinics()
+        }
+    }
+
+
+
+
 
 
 }

@@ -37,7 +37,9 @@ android {
     }
     buildFeatures {
         compose = true
+        viewBinding = true
     }
+
 }
 
 dependencies {
@@ -69,6 +71,9 @@ dependencies {
 
     // Google sign-in
     implementation("com.google.android.gms:play-services-auth:21.0.0")
+
+    // mapbox
+    //implementation ("com.mapbox.maps:android:10.15.1")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")

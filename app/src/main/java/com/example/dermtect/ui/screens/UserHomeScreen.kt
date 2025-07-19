@@ -49,6 +49,7 @@ fun UserHomeScreen(navController: NavController) {
     var pendingCameraAction by remember { mutableStateOf(false) }
     val newsItems by viewModel.newsItems.collectAsState()
     val isLoadingNews by viewModel.isLoadingNews.collectAsState()
+    val highlightItem by viewModel.highlightItem.collectAsState()
     val gson = remember { Gson() }
     LaunchedEffect(Unit) {
         viewModel.fetchUserInfo()
@@ -61,6 +62,7 @@ fun UserHomeScreen(navController: NavController) {
             showConsentDialog = true
         }
     }
+
 
     Column(
         modifier = Modifier
@@ -136,24 +138,21 @@ fun UserHomeScreen(navController: NavController) {
                 hasConsented = hasConsented,
                 onShowConsentDialog = { showConsentDialog = true },
                 onSkinReportClick = { navController.navigate("questionnaire") },
-                onNearbyClinicsClick = { navController.navigate("clinic1") }
+                onNearbyClinicsClick = { navController.navigate("nearby_clinics") }
             )
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            HighlightCard(onHighlightClick = {
-                val highlightItem = NewsItem( //sample lang
-                    imageResId = R.drawable.sample_skin,
-                    title = "Skin Tone & Cancer Risk",
-                    description =
-                        "Skin cancer is among the most prevalent cancers globally, with millions of new cases diagnosed each year. While much attention has been given to sun protection, the role of skin tone in cancer risk is often overlooked.Individuals with lighter skin tones have less melanin, making them more vulnerable to ultraviolet (UV) radiation damage. This can increase the chances of developing basal cell carcinoma, squamous cell carcinoma, or melanoma. However, having a darker skin tone doesn’t make one immune — it often leads to delayed diagnoses because early signs are harder to detect.Dermatologists emphasize the importance of regular skin checks for everyone, regardless of skin color. Using sunscreen with at least SPF 30, avoiding tanning beds, and wearing protective clothing are essential preventive steps.Understanding your unique risk factors, including skin tone, is the first step toward early detection and treatment. Awareness saves lives, and it's time to include all skin types in the conversation" +
-                                "Skin cancer is among the most prevalent cancers globally, with millions of new cases diagnosed each year. While much attention has been given to sun protection, the role of skin tone in cancer risk is often overlooked.Individuals with lighter skin tones have less melanin, making them more vulnerable to ultraviolet (UV) radiation damage. This can increase the chances of developing basal cell carcinoma, squamous cell carcinoma, or melanoma. However, having a darker skin tone doesn’t make one immune — it often leads to delayed diagnoses because early signs are harder to detect.Dermatologists emphasize the importance of regular skin checks for everyone, regardless of skin color. Using sunscreen with at least SPF 30, avoiding tanning beds, and wearing protective clothing are essential preventive steps.Understanding your unique risk factors, including skin tone, is the first step toward early detection and treatment. Awareness saves lives, and it's time to include all skin types in the conversation.",
-                    source = "Health Times",
-                    date = "2025-07-02"
+            highlightItem?.let { item ->
+                HighlightCard(
+                    item = item,
+                    onHighlightClick = {
+                        val json = Uri.encode(Gson().toJson(item))
+                        navController.navigate("highlightarticle?newsJson=$json")
+                    }
                 )
-                val json = Uri.encode(Gson().toJson(highlightItem))
-                navController.navigate("highlightarticle/$json")
-            })
+            }
+
 
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -298,7 +297,7 @@ fun HomeFeatureButton(
 }
 
 @Composable
-fun HighlightCard(onHighlightClick: () -> Unit) {
+fun HighlightCard(onHighlightClick: () -> Unit, item: NewsItem) {
     Box(modifier = Modifier.fillMaxWidth()) {
         Card(
             modifier = Modifier
@@ -315,12 +314,12 @@ fun HighlightCard(onHighlightClick: () -> Unit) {
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Skin Tone & Cancer Risk",
+                        text = item.title,
                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Understand the link between\nskin tone and cancer risk.",
+                        text = item.description,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }

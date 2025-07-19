@@ -1,7 +1,6 @@
 package com.example.dermtect.ui.screens
 
 import androidx.compose.foundation.*
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -11,16 +10,13 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.*
-import androidx.compose.ui.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.*
 import com.example.dermtect.R
 import com.example.dermtect.ui.components.BackButton
@@ -29,7 +25,7 @@ import com.example.dermtect.ui.components.BubblesBackground
 @Composable
 fun DermaAssessmentScreen(
     scanTitle: String = "Scan 1",
-    lesionImage: Painter,
+    lesionImage: Int,
     onBackClick: () -> Unit,
     onSubmit: (diagnosis: String, notes: String) -> Unit,
     onCancel: () -> Unit
@@ -72,7 +68,7 @@ fun DermaAssessmentScreen(
             Spacer(modifier = Modifier.height(18.dp))
 
             Image(
-                painter = lesionImage,
+                painter = painterResource(id = lesionImage),
                 contentDescription = "Lesion Photo",
                 modifier = Modifier
                     .fillMaxWidth()

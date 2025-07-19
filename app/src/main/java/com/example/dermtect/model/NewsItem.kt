@@ -7,5 +7,6 @@ data class NewsItem(
     val description: String = "",
     val source: String = "",
     val date: String = "",
-    val body: String = ""
+    val body: String = "",
+    val isHighlight: Boolean = false
 )

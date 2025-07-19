@@ -1,7 +1,6 @@
 package com.example.dermtect.ui.screens
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 import androidx.navigation.NavController
 import com.example.dermtect.ui.components.CaseData
 import com.example.dermtect.ui.components.HistoryScreenTemplate

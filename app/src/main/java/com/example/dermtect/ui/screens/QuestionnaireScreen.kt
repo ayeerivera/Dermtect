@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.Row
 import com.example.dermtect.ui.components.DialogTemplate
 import com.example.dermtect.ui.viewmodel.QuestionnaireViewModel
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.shape.RoundedCornerShape
 import com.example.dermtect.ui.components.CenteredSnackbar
 
 @Composable

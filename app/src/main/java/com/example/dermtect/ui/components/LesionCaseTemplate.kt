@@ -20,15 +20,9 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.navigation.compose.rememberNavController
 import com.example.dermtect.ui.components.BubblesBackground
 import com.example.dermtect.ui.components.BackButton
 import com.example.dermtect.R
-import androidx.navigation.NavController
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 
 @Composable
