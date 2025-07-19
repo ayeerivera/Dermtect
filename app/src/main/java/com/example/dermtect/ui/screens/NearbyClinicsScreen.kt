@@ -38,7 +38,7 @@ import androidx.compose.runtime.setValue
 fun NearbyClinicsScreen(
     navController: NavController,
     onBackClick: () -> Unit,
-    viewModel: UserHomeViewModel // ✅ Add this
+    viewModel: UserHomeViewModel
 ) {
     LaunchedEffect(Unit) {
         viewModel.fetchClinics()

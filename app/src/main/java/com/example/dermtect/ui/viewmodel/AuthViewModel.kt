@@ -69,7 +69,7 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
                         "createdAt" to FieldValue.serverTimestamp(),
                         "emailVerified" to false,
                         "role" to "patient",
-                        "provider" to "email" // ✅ Add this line
+                        "provider" to "email"
                     )
 
 

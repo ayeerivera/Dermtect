@@ -68,9 +68,9 @@ class MainActivity : ComponentActivity() {
             DermtectTheme {
                 val navController = rememberNavController()
                 val sharedProfileViewModel: SharedProfileViewModel = viewModel()
-                val userHomeViewModel: UserHomeViewModel = viewModel() // ✅ Hoisted here
+                val userHomeViewModel: UserHomeViewModel = viewModel()
 
-                NavHost(navController = navController, startDestination = "login") {
+                NavHost(navController = navController, startDestination = "splash") {
                     composable("splash") { SplashScreen(navController) }
                     composable("onboarding_screen1") { OnboardingScreen1(navController) }
                     composable("onboarding_screen2") { OnboardingScreen2(navController) }
@@ -111,7 +111,7 @@ class MainActivity : ComponentActivity() {
                         SettingsScreenTemplate(
                             navController = navController,
                             userRole = "user",
-                            sharedProfileViewModel = sharedProfileViewModel, // ✅ pass the same instance
+                            sharedProfileViewModel = sharedProfileViewModel,
                             onLogout = {
                                 navController.navigate("login") {
                                     popUpTo(0) { inclusive = true }
@@ -183,7 +183,7 @@ class MainActivity : ComponentActivity() {
                             onTotalCasesClick = { navController.navigate("case_history") },
                             onNotifClick = { navController.navigate("notifications") },
                             onSettingsClick = { navController.navigate("derma_settings") },
-                            firstName = firstName // ✅ Now resolved
+                            firstName = firstName
                         )
                     }
                     composable(

@@ -303,7 +303,7 @@ fun HighlightCard(onHighlightClick: () -> Unit, item: NewsItem) {
             modifier = Modifier
                 .fillMaxWidth(0.9f)
                 .align(Alignment.Center)
-                .clickable { onHighlightClick() }, // ✅ add comma here
+                .clickable { onHighlightClick() },
             colors = CardDefaults.cardColors(
                 containerColor = Color(0xFFFFF2E8)
             ),
@@ -408,7 +408,7 @@ fun BottomNavBar(
     onShowConsentDialog: () -> Unit,
     setPendingCameraAction: (Boolean) -> Unit,
     coroutineScope: CoroutineScope,
-    viewModel: UserHomeViewModel, // ✅ add this
+    viewModel: UserHomeViewModel,
     modifier: Modifier = Modifier
 ) {
 
@@ -454,7 +454,7 @@ fun BottomNavBar(
 
             }
         }
-        // ✅ Floating Camera Icon with Navigation
+
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)

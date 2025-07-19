@@ -11,7 +11,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             DermtectTheme {
-                WeightTestRow()  // Run your weight test here
+                WeightTestRow()
             }
         }
     }

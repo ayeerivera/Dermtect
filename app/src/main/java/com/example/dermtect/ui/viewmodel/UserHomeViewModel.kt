@@ -123,7 +123,7 @@ class UserHomeViewModel(application: Application) : AndroidViewModel(application
                         body = doc.getString("body") ?: "",
                         source = doc.getString("source") ?: "",
                         date = doc.getString("date") ?: "",
-                        isHighlight = doc.getBoolean("isHighlight") ?: false // 👈 Add this
+                        isHighlight = doc.getBoolean("isHighlight") ?: false
                     )
                 }
 

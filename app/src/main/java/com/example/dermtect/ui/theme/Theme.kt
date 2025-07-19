@@ -19,7 +19,7 @@ fun DermtectTheme(
 ) {
     MaterialTheme(
         colorScheme = AppColorScheme,
-        typography = AppTypography,  // ✅ reference your custom typography
+        typography = AppTypography,
         content = content
     )
 }

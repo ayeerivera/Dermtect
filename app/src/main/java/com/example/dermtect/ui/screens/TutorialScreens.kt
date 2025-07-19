@@ -26,8 +26,8 @@ fun TutorialScreenTemplate(
     title: String,
     description: String,
     nextRoute: String,
-    onSkipClick: () -> Unit, // ✅ fixed: added missing type + comma
-    onBackClick: (() -> Unit)? = null, // ✅ optional
+    onSkipClick: () -> Unit,
+    onBackClick: (() -> Unit)? = null,
     nextButtonText: String = "Next",
     skipButtonText: String = "Skip",
     currentIndex: Int? = null,
@@ -41,7 +41,7 @@ fun TutorialScreenTemplate(
             .background(Color.White),
         contentAlignment = Alignment.Center
     ) {
-        // ✅ Optional back button
+
         if (onBackClick != null) {
             BackButton(
                 onClick = onBackClick,

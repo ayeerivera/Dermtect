@@ -64,11 +64,11 @@ fun DialogTemplate(
                         text = title,
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center // ✅ center text within the Text block
+                            textAlign = TextAlign.Center
                         ),
-                        textAlign = TextAlign.Center, // ✅ center the whole Text block
+                        textAlign = TextAlign.Center,
                         color = Color(0xFF0FB2B2),
-                        modifier = Modifier.fillMaxWidth() // ✅ allows it to center within parent
+                        modifier = Modifier.fillMaxWidth()
                     )
 
 

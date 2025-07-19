@@ -81,7 +81,7 @@ fun PrimaryButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true // ✅ support 'enabled'
+    enabled: Boolean = true
 ) {
     Button(
         onClick = onClick,
@@ -92,7 +92,7 @@ fun PrimaryButton(
             containerColor = if (enabled) Color(0xFF0FB2B2) else Color(0xFFBDBDBD),
             contentColor = Color.White
         ),
-        enabled = enabled // ✅ built-in control
+        enabled = enabled
     ) {
         Text(
             text = text,

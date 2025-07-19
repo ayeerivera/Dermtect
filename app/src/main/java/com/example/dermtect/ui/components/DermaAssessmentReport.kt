@@ -49,7 +49,7 @@ fun DermaAssessmentReportScreen(
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier
-                    .align(Alignment.Center) // This ensures the title is centered in the Box
+                    .align(Alignment.Center)
                     .fillMaxWidth()
             )
         }
