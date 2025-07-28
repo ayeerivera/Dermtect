@@ -13,6 +13,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.cameradermtect.TakePhotoScreen
 import com.example.dermtect.model.Clinic
 import com.example.dermtect.model.NewsItem
 import com.example.dermtect.ui.components.CaseData
@@ -70,7 +71,7 @@ class MainActivity : ComponentActivity() {
                 val sharedProfileViewModel: SharedProfileViewModel = viewModel()
                 val userHomeViewModel: UserHomeViewModel = viewModel()
 
-                NavHost(navController = navController, startDestination = "splash") {
+                NavHost(navController = navController, startDestination = "camera") {
                     composable("splash") { SplashScreen(navController) }
                     composable("onboarding_screen1") { OnboardingScreen1(navController) }
                     composable("onboarding_screen2") { OnboardingScreen2(navController) }
@@ -88,6 +89,7 @@ class MainActivity : ComponentActivity() {
                     composable("user_home") {UserHomeScreen(navController = navController) }
                     composable("notifications") {NotificationScreen(navController = navController) }
                     composable("questionnaire") { QuestionnaireScreen(navController = navController)}
+                    composable("camera") { TakePhotoScreen(onBackClick = { navController.popBackStack() }) }
                     composable(
                         route = "highlightarticle?newsJson={newsJson}",
                         arguments = listOf(

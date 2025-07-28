@@ -229,7 +229,7 @@ fun TutorialScreen5(navController: NavController) {
         imageContent = { GifImage(R.drawable.tutorial_pic5, size = 280) },
         title = "Download & Consult",
         description = "Generate your PDF report anytime — and use the clinic locator to find a nearby dermatologist.",
-        nextRoute = "questionnaire",
+        nextRoute = "camera",
         onBackClick = { navController.popBackStack() },
         onSkipClick = { navController.navigate("user_home") },
         currentIndex = 3

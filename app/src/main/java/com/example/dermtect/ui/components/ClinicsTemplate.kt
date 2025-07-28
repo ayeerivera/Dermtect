@@ -89,7 +89,9 @@ fun ClinicTemplateScreen(
                             text = clinic.name,
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f)
+                            modifier =
+                                Modifier.weight(1f)
+                                .fillMaxWidth(0.9f)
                         )
                         Icon(
                             imageVector = if (isSaved) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,                            contentDescription = "Favorite",
