@@ -40,6 +40,8 @@ import com.example.dermtect.ui.viewmodel.SharedProfileViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.collectAsState
+import com.example.dermtect.ui.viewmodel.DermaHomeViewModel
+import com.example.dermtect.ui.viewmodel.UserHomeViewModel
 
 @Composable
 fun ProfileScreenTemplate(
@@ -51,17 +53,29 @@ fun ProfileScreenTemplate(
     userRole: String = "user",
     sharedProfileViewModel: SharedProfileViewModel,
 ){
+    val userHomeViewModel: UserHomeViewModel = viewModel()
+    val dermaHomeViewModel: DermaHomeViewModel = viewModel()
 
-    val fullName = "$firstName $lastName"
+    val firstNameState by userHomeViewModel.firstName.collectAsState()
+    val lastNameState  by userHomeViewModel.lastName.collectAsState()
+    LaunchedEffect(Unit) {
+        userHomeViewModel.fetchUserInfo()
+    }
+    val fullName = "$firstNameState $lastNameState"
     var showPhoto by remember { mutableStateOf(false) }
     var showPhotoOptions by remember { mutableStateOf(false) }
     var showRemoveConfirmDialog by remember { mutableStateOf(false) }
+    var showEditNameDialog by remember { mutableStateOf(false) }
+    var editedFirstName by remember { mutableStateOf(firstName) }
+    var editedLastName by remember { mutableStateOf(lastName) }
 
+    var showDiscardDialog by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showDeletedDialog by remember { mutableStateOf(false) }
     val authViewModel: AuthViewModel = viewModel(factory = AuthViewModelFactory())
     val coroutineScope = rememberCoroutineScope()
+
     var passwordInput by remember { mutableStateOf("") }
     var showPasswordError by remember { mutableStateOf(false) }
     var triggerNavigation by remember { mutableStateOf(false) }
@@ -71,6 +85,9 @@ fun ProfileScreenTemplate(
     ) { uri: Uri? ->
         sharedProfileViewModel.setImageUri(uri) // must call ViewModel
     }
+
+
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -155,12 +172,31 @@ fun ProfileScreenTemplate(
 
                 Spacer(modifier = Modifier.height(15.dp))
 
-                Text(
-                    text = fullName,
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = fullName,
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Edit Name",
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clickable {
+                                // 🔄 reset edit fields to current ViewModel values
+                                editedFirstName = firstNameState
+                                editedLastName = lastNameState
+                                showEditNameDialog = true
+                            }
+                    )
+
+                }
+}
             }
-        }
     }
     Card(
         modifier = Modifier
@@ -427,6 +463,81 @@ fun ProfileScreenTemplate(
         autoDismiss = true,
         onDismiss = { showDeletedDialog = false }
     )
+    if (showEditNameDialog) {
+        DialogTemplate(
+            show = true,
+            title = "Edit Name",
+            primaryText = "Save",
+            onPrimary = {
+                // Save
+                if (userRole == "user") {
+                    userHomeViewModel.updateName(editedFirstName, editedLastName)
+                } else {
+                    dermaHomeViewModel.updateName(editedFirstName, editedLastName)
+                }
+                editedFirstName = firstNameState
+                editedLastName  = lastNameState
+                showEditNameDialog = false
+
+                showEditNameDialog = false
+            },
+            secondaryText = "Cancel",
+            onSecondary = {
+                // ❗️only test discard on Cancel
+                if (editedFirstName != firstNameState || editedLastName != lastNameState) {
+                    showDiscardDialog = true
+                } else {
+                    showEditNameDialog = false
+                }
+            },
+            onDismiss = {
+                // ❗️also here (outside click / back press)
+                if (editedFirstName != firstNameState || editedLastName != lastNameState) {
+                    showDiscardDialog = true
+                } else {
+                    showEditNameDialog = false
+                }
+            },
+            extraContent = {
+                Column {
+                    OutlinedTextField(
+                        value = editedFirstName,
+                        onValueChange = { editedFirstName = it },
+                        label = { Text("First Name") }
+                    )
+                    OutlinedTextField(
+                        value = editedLastName,
+                        onValueChange = { editedLastName = it },
+                        label = { Text("Last Name") }
+                    )
+                }
+            }
+        )
+    }
+
+    if (showDiscardDialog) {
+        DialogTemplate(
+            show = true,
+            title = "Discard changes?",
+            description = "Your edits will not be saved.",
+            primaryText = "Discard",
+            onPrimary = {
+                showDiscardDialog = false
+                showEditNameDialog = false
+                // reset edited fields
+                editedFirstName = firstNameState
+                editedLastName  = lastNameState
+            },
+            secondaryText = "Keep Editing",
+            onSecondary = {
+                showDiscardDialog = false
+            },
+            onDismiss = {
+                showDiscardDialog = false
+            }
+        )
+    }
+
 }
 
 

@@ -22,7 +22,6 @@ class QuestionnaireViewModel : ViewModel() {
         _loading.value = true
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return onError()
         val db = FirebaseFirestore.getInstance()
-
         val answerMap = answers.mapIndexed { index, value ->
             "question_${index + 1}" to value
         }.toMap()

@@ -22,6 +22,7 @@ import com.example.dermtect.ui.components.DialogTemplate
 import com.example.dermtect.ui.viewmodel.QuestionnaireViewModel
 import androidx.activity.compose.BackHandler
 import com.example.dermtect.ui.components.CenteredSnackbar
+import kotlinx.coroutines.flow.collectLatest
 
 @Composable
 fun QuestionnaireScreen(navController: NavController) {
@@ -61,10 +62,23 @@ fun QuestionnaireScreen(navController: NavController) {
 
     LaunchedEffect(saveSuccess) {
         if (saveSuccess) {
-            snackbarHostState.showSnackbar("Answers saved successfully!")
-            questionnaireViewModel.resetSuccessFlag()
+            // Reload from Firestore
+            questionnaireViewModel.loadQuestionnaireAnswers()
+
+            // Collect once, until we get the updated answers
+            questionnaireViewModel.existingAnswers.collectLatest { newAnswers ->
+                if (newAnswers != null) {
+                    answers.clear()
+                    answers.addAll(newAnswers)
+                    snackbarHostState.showSnackbar("Answers saved successfully!")
+                    questionnaireViewModel.resetSuccessFlag()
+                    isEditMode = false
+                    return@collectLatest
+                }
+            }
         }
     }
+
     LaunchedEffect(existingAnswers) {
         if (existingAnswers != null && !isEditMode) {
             answers.clear()
@@ -226,11 +240,22 @@ fun QuestionnaireScreen(navController: NavController) {
                                             questionnaireViewModel.saveQuestionnaireAnswers(
                                                 answers = answers,
                                                 onSuccess = {
+                                                    // 1. Save completed
                                                     isEditMode = false
-                                                    questionnaireViewModel.loadQuestionnaireAnswers() // 🔁 Reload the saved data
-                                                },
-                                                        onError = { showWarning = true }
+
+                                                    // 2. Reload the latest answers
+                                                    questionnaireViewModel.loadQuestionnaireAnswers()
+
+                                                    // 3. Immediately update the local answers list from existingAnswers
+                                                    existingAnswers?.let {
+                                                        answers.clear()
+                                                        answers.addAll(it)
+                                                    }
+                                                }
+                                                ,
+                                                onError = { showWarning = true }
                                             )
+
                                         }
                                     },
                                     enabled = !loading,

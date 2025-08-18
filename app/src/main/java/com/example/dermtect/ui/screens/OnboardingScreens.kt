@@ -32,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import com.example.dermtect.ui.components.BackButton
 import com.example.dermtect.ui.components.ProgressIndicator
 
 
@@ -42,7 +43,8 @@ fun OnboardingScreen(
     description: String,
     buttonText: String = "Next",
     onNextClick: () -> Unit,
-    currentIndex: Int? = null
+    currentIndex: Int? = null,
+    onBackClick: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val imageLoader = ImageLoader.Builder(context)
@@ -51,6 +53,7 @@ fun OnboardingScreen(
         }
         .build()
 
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -58,6 +61,18 @@ fun OnboardingScreen(
         contentAlignment = Alignment.Center
     )
     {
+        // ✅ Place BackButton at top start if provided
+        if (onBackClick != null) {
+            BackButton(
+                onClick = onBackClick,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(top = 50.dp, start = 24.dp)
+
+            )
+        }
+
+
         Column(
             modifier = Modifier
                 .fillMaxSize(0.9f)
@@ -70,7 +85,7 @@ fun OnboardingScreen(
                     .padding(top = 70.dp)
                     .verticalScroll(rememberScrollState()), // Add scroll support
                 horizontalAlignment = Alignment.CenterHorizontally
-                ) {
+            ) {
                 AsyncImage(
                     model = ImageRequest.Builder(context)
                         .data(imageRes)
@@ -88,7 +103,9 @@ fun OnboardingScreen(
                     textAlign = TextAlign.Center
                 )
 
+
                 Spacer(modifier = Modifier.height(20.dp))
+
 
                 Text(
                     text = description,
@@ -96,6 +113,7 @@ fun OnboardingScreen(
                     color = Color(0xFF1D1D1D),
                     textAlign = TextAlign.Center
                 )
+
 
             }
             Column(
@@ -132,39 +150,47 @@ fun OnboardingScreen(
 }
 
 
+
+
 @Composable
 fun OnboardingScreen1(navController: NavController) {
     OnboardingScreen(
-        imageRes = com.example.dermtect.R.drawable.welcome,
+        imageRes = com.example.dermtect.R.drawable.onboarding_1,
         title = "Welcome to DermTect!",
-        description = "Your AI-powered companion for\nearly skin health checks.",
+        description = "Your AI-powered tool for early skin health checks.",
         onNextClick = { navController.navigate("onboarding_screen2") },
         currentIndex = 0
     )
 }
 
+
 @Composable
 fun OnboardingScreen2(navController: NavController) {
     OnboardingScreen(
-        imageRes = com.example.dermtect.R.drawable.scan,
+        imageRes = com.example.dermtect.R.drawable.onboarding_2,
         title = "Scan. Assess. Find Help",
-        description = "Snap a photo, answer a few\nquestions, and get instant results.",
+        description = "Take a photo, answer quick questions, and see instant insights.",
         onNextClick = { navController.navigate("onboarding_screen3") },
+        onBackClick = { navController.popBackStack() }, // ✅ back to previous
         currentIndex = 1
     )
 }
+
 
 @Composable
 fun OnboardingScreen3(navController: NavController) {
     OnboardingScreen(
         imageRes = com.example.dermtect.R.drawable.skin_health,
         title = "Your Skin Health,\nJust a Tap Away",
-        description = "Fast, simple, and secure skin\nassessments anytime.",
+        description = "Easy, private, and reliable early detection—anytime, anywhere.",
         onNextClick = { navController.navigate("login") },
+        onBackClick = { navController.popBackStack() }, // ✅ back to previous
         currentIndex = 2
+
 
     )
 }
+
 
 @Preview(showBackground = true)
 @Composable

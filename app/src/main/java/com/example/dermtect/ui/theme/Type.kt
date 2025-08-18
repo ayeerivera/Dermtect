@@ -18,53 +18,54 @@ val AppTypography = Typography(
     displayLarge = TextStyle(
         fontFamily = Poppins,
         fontWeight = FontWeight.Normal,
-        fontSize = 30.sp
+        fontSize = 34.sp
     ),
     displayMedium = TextStyle(
         fontFamily = Poppins,
         fontWeight = FontWeight.Bold,
-        fontSize = 26.sp
+        fontSize = 30.sp
     ),
     displaySmall = TextStyle(
         fontFamily = Poppins,
         fontWeight = FontWeight.Normal,
-        fontSize = 24.sp
+        fontSize = 28.sp
     ),
     headlineMedium = TextStyle(
         fontFamily = Poppins,
         fontWeight = FontWeight.Bold,
-        fontSize = 22.sp
+        fontSize = 26.sp
     ),
     headlineSmall = TextStyle(
         fontFamily = Poppins,
-        fontWeight = FontWeight.Medium,
-        fontSize = 20.sp
+        fontWeight = FontWeight.Bold,
+        fontSize = 24.sp
     ),
     titleLarge = TextStyle(
         fontFamily = Poppins,
         fontWeight = FontWeight.Bold,
-        fontSize = 18.sp
+        fontSize = 20.sp
     ),
     bodyLarge = TextStyle(
         fontFamily = Poppins,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 16.sp
+        fontSize = 20.sp
     ),
     bodyMedium = TextStyle(
         fontFamily = Poppins,
         fontWeight = FontWeight.Normal,
-        fontSize = 14.sp
+        fontSize = 18.sp
     ),
     labelMedium = TextStyle(
         fontFamily = Poppins,
         fontWeight = FontWeight.Medium,
-        fontSize = 12.sp
+        fontSize = 16.sp
     ),
     labelSmall = TextStyle(
         fontFamily = Poppins,
         fontWeight = FontWeight.Medium,
-        fontSize = 8.sp
+        fontSize = 12.sp
     )
+
 
 )
 

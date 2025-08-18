@@ -175,7 +175,7 @@ fun TutorialScreen1(navController: NavController) {
         description = "Take a square photo with the mole or lesion centered in the frame.",
         nextRoute = "tutorial_screen2",
         onBackClick = { navController.popBackStack() },
-        onSkipClick = { navController.navigate("user_home") },
+        onSkipClick = { navController.navigate("camera") },
         currentIndex = 0
     )
 }
@@ -189,7 +189,7 @@ fun TutorialScreen2(navController: NavController) {
         description = "Hold your camera 2–4 inches (5–10 cm) away for a clear, focused image.",
         nextRoute = "tutorial_screen3",
         onBackClick = { navController.popBackStack() },
-        onSkipClick = { navController.navigate("user_home") },
+        onSkipClick = { navController.navigate("camera") },
         currentIndex = 1
     )
 }
@@ -203,7 +203,7 @@ fun TutorialScreen3(navController: NavController) {
         description = "Make sure the skin is well-lit and free of hair, jewelry, or makeup that may block the view.",
         nextRoute = "tutorial_screen4",
         onBackClick = { navController.popBackStack() },
-        onSkipClick = { navController.navigate("user_home") },
+        onSkipClick = { navController.navigate("camera") },
         currentIndex = 2
     )
 }
@@ -217,7 +217,7 @@ fun TutorialScreen4(navController: NavController) {
         description = "After scanning, your result is saved automatically. You can track your scan history and monitor changes.",
         nextRoute = "tutorial_screen5",
         onBackClick = { navController.popBackStack() },
-        onSkipClick = { navController.navigate("user_home") },
+        onSkipClick = { navController.navigate("camera") },
         currentIndex = 3
     )
 }
@@ -231,7 +231,7 @@ fun TutorialScreen5(navController: NavController) {
         description = "Generate your PDF report anytime — and use the clinic locator to find a nearby dermatologist.",
         nextRoute = "camera",
         onBackClick = { navController.popBackStack() },
-        onSkipClick = { navController.navigate("user_home") },
+        onSkipClick = { navController.navigate("camera") },
         currentIndex = 3
     )
 }

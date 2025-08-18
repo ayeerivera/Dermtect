@@ -71,7 +71,7 @@ class MainActivity : ComponentActivity() {
                 val sharedProfileViewModel: SharedProfileViewModel = viewModel()
                 val userHomeViewModel: UserHomeViewModel = viewModel()
 
-                NavHost(navController = navController, startDestination = "camera") {
+                NavHost(navController = navController, startDestination = "splash") {
                     composable("splash") { SplashScreen(navController) }
                     composable("onboarding_screen1") { OnboardingScreen1(navController) }
                     composable("onboarding_screen2") { OnboardingScreen2(navController) }
@@ -89,7 +89,12 @@ class MainActivity : ComponentActivity() {
                     composable("user_home") {UserHomeScreen(navController = navController) }
                     composable("notifications") {NotificationScreen(navController = navController) }
                     composable("questionnaire") { QuestionnaireScreen(navController = navController)}
-                    composable("camera") { TakePhotoScreen(onBackClick = { navController.popBackStack() }) }
+                    composable("camera") { TakePhotoScreen(onBackClick = {
+                        navController.navigate("user_home") {
+                            popUpTo("user_home") { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }) }
                     composable(
                         route = "highlightarticle?newsJson={newsJson}",
                         arguments = listOf(

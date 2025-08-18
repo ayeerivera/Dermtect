@@ -37,6 +37,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import androidx.exifinterface.media.ExifInterface
 import androidx.compose.ui.input.pointer.pointerInput
+import com.example.dermtect.ui.components.BackButton
 
 @Composable
 fun TakePhotoScreen(
@@ -113,16 +114,17 @@ fun TakePhotoScreen(
                 }
         )
 
-        // Back Button
-        Image(
-            painter = painterResource(id = R.drawable.back),
-            contentDescription = "Back",
+        Box(
             modifier = Modifier
-                .padding(16.dp)
-                .size(56.dp)
-                .align(Alignment.TopStart)
-                .clickable { onBackClick() }
-        )
+                .fillMaxWidth()
+                .padding(top = 50.dp, start = 23.dp)
+        ) {
+            BackButton(
+                modifier = Modifier
+                    .align(Alignment.CenterStart),
+                    onClick = { onBackClick() }
+            )
+        }
 
         Column(
             modifier = Modifier

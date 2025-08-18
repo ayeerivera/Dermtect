@@ -23,4 +23,17 @@ class DermaHomeViewModel : ViewModel() {
                 _firstName.value = doc.getString("firstName") ?: ""
             }
     }
+    fun updateName(firstName: String, lastName: String) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        FirebaseFirestore.getInstance()
+            .collection("users")
+            .document(uid)
+            .update(
+                mapOf(
+                    "firstName" to firstName,
+                    "lastName" to lastName
+                )
+            )
+    }
+
 }

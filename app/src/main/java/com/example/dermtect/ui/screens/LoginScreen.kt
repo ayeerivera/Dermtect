@@ -54,6 +54,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.rememberCoroutineScope
+import com.example.dermtect.ui.components.BackButton
 import com.example.dermtect.ui.components.CenteredSnackbar
 import com.example.dermtect.ui.components.DialogTemplate
 import com.example.dermtect.ui.components.GifImage
@@ -63,6 +64,7 @@ import kotlinx.coroutines.launch
 fun Login(navController: NavController) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var showBackDialog by remember { mutableStateOf(false) }
     val isEmailValid = remember(email) { android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches() }
     val viewModel: AuthViewModel = viewModel(factory = AuthViewModelFactory())
     val authSuccess by viewModel.authSuccess.collectAsState()
@@ -122,6 +124,7 @@ fun Login(navController: NavController) {
     }
 
     BubblesBackground {
+
         Scaffold(
             snackbarHost = {
                 SnackbarHost(hostState = snackbarHostState) { data ->
@@ -141,6 +144,23 @@ fun Login(navController: NavController) {
                     focusManager.clearFocus()
                 }
         ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 26.dp, start = 24.dp)
+                ) {
+                    BackButton(
+                        modifier = Modifier.align(Alignment.CenterStart),
+                        onClick = {
+                            if (email.isNotBlank() || password.isNotBlank()) {
+                                showBackDialog = true
+                            } else {
+                                navController.popBackStack()
+                            }
+                        }
+                    )
+
+                }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -279,7 +299,23 @@ fun Login(navController: NavController) {
                     )
                 }
             }
-            LaunchedEffect(authSuccess) {
+                if (showBackDialog) {
+                    DialogTemplate(
+                        show = showBackDialog,
+                        title = "Go Back?",
+                        description = "You’re about to leave this page. Any information you’ve entered will be lost.",
+                        primaryText = "Yes, go back",
+                        onPrimary = {
+                            showBackDialog = false
+                            navController.popBackStack()
+                        },
+                        secondaryText = "Cancel",
+                        onSecondary = { showBackDialog = false },
+                        onDismiss = { showBackDialog = false }
+                    )
+                }
+
+                LaunchedEffect(authSuccess) {
                 if (authSuccess) {
                     val uid = FirebaseAuth.getInstance().currentUser?.uid
                     if (uid != null) {

@@ -105,6 +105,12 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
                 }
             }
     }
+    fun isPasswordStrong(password: String): Boolean {
+        val passwordRegex =
+            Regex("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@\$!%*#?&])[A-Za-z\\d@\$!%*#?&]{8,}\$")
+        return passwordRegex.matches(password)
+    }
+
 
     fun login(email: String, password: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         _isLoading.value = true

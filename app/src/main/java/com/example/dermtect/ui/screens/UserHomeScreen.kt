@@ -137,7 +137,7 @@ fun UserHomeScreen(navController: NavController) {
             HomeFeatureButtonsRow(
                 hasConsented = hasConsented,
                 onShowConsentDialog = { showConsentDialog = true },
-                onSkinReportClick = { navController.navigate("questionnaire") },
+                onSkinReportClick = { navController.navigate("history") },
                 onNearbyClinicsClick = { navController.navigate("nearby_clinics") }
             )
 

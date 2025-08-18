@@ -37,6 +37,7 @@ import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FirebaseFirestore
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import com.example.dermtect.ui.components.BackButton
 
 @Composable
 fun Register(navController: NavController) {
@@ -58,14 +59,16 @@ fun Register(navController: NavController) {
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var showSuccessDialog by remember { mutableStateOf(false) }
+    var showBackDialog by remember { mutableStateOf(false) }
+
 
     val isEmailValid = email.isNotBlank() &&
             Patterns.EMAIL_ADDRESS.matcher(email).matches() &&
             !email.contains(" ")
 
-    val isPasswordValid = password.isNotBlank() &&
-            password == confirmPassword &&
-            !password.contains(" ")
+    val isPasswordValid = remember(password, confirmPassword) {
+        password == confirmPassword && viewModel.isPasswordStrong(password)
+    }
 
     val isFormValid = firstName.isNotBlank() && lastName.isNotBlank() && isEmailValid && isPasswordValid
 
@@ -132,6 +135,7 @@ fun Register(navController: NavController) {
 
 
     BubblesBackground {
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -142,6 +146,24 @@ fun Register(navController: NavController) {
                     focusManager.clearFocus()
                 }
         ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 50.dp, start = 24.dp)
+            ) {
+                BackButton(
+                    modifier = Modifier.align(Alignment.CenterStart),
+                    onClick = {
+                        if (firstName.isNotBlank() || lastName.isNotBlank() || email.isNotBlank() || password.isNotBlank() || confirmPassword.isNotBlank()) {
+                            showBackDialog = true
+                        } else {
+                            navController.popBackStack()
+                        }
+                    }
+                )
+
+            }
+
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -215,7 +237,11 @@ fun Register(navController: NavController) {
                     iconRes = R.drawable.icon_pass,
                     textColor = Color.Black,
                     isPassword = true,
-                    errorMessage = if (password.contains(" ")) "Password must not contain spaces" else null
+                    errorMessage = when {
+                        password.isNotBlank() && !viewModel.isPasswordStrong(password) ->
+                            "Use at least 8 characters with uppercase, lowercase, number and special character (e.g. DermTect@2024)"
+                        else -> null
+                    }
                 )
 
 
@@ -289,7 +315,25 @@ fun Register(navController: NavController) {
                     )
                 }
             }
-
+            if (showBackDialog) {
+                DialogTemplate(
+                    show = showBackDialog,
+                    title = "Go Back?",
+                    description = "Your details won’t be saved.",
+                    primaryText = "Yes, go back",
+                    onPrimary = {
+                        showBackDialog = false
+                        navController.popBackStack()
+                    },
+                    secondaryText = "Cancel",
+                    onSecondary = {
+                        showBackDialog = false
+                    },
+                    onDismiss = {
+                        showBackDialog = false
+                    }
+                )
+            }
             // Show dialog when registration is successful
             if (showSuccessDialog) {
                 DialogTemplate(
@@ -329,7 +373,9 @@ fun Register(navController: NavController) {
                     Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
                     viewModel.clearError()
                 }
+
             }
+
         }
     }
 }
