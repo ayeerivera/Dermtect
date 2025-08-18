@@ -159,7 +159,7 @@ fun TutorialScreen0(navController: NavController) {
         title = "Quick Skin Check First!",
         description = "Your answers give context to the scan, helping us assess your skin more accurately and with care.",
         nextRoute = "questionnaire",
-        onSkipClick = { navController.navigate("tutorial_screen1") }, // temporarily go to home
+        onSkipClick = { navController.navigate("tutorial_screen1") },
         onBackClick = { navController.popBackStack() },
         nextButtonText = "Answer Questionnaire",
         skipButtonText = "Skip to tutorial"
