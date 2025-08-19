@@ -18,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontStyle
@@ -35,6 +36,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.dermtect.ui.viewmodel.UserHomeViewModel
 import com.example.dermtect.model.NewsItem
 import com.google.gson.Gson
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.shadow
 
 
 @Composable
@@ -70,7 +77,7 @@ fun UserHomeScreen(navController: NavController) {
             .background(Color.White)
     ) {
         // Add vertical space above the welcome section
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         Box(
             modifier = Modifier
@@ -270,68 +277,135 @@ fun HomeFeatureButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {}
 ) {
-    Card(
+    val cornerRadius = 15.dp
+
+    Box(
         modifier = modifier
             .height(150.dp)
-            .clickable { onClick() },
-        shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFCDFFFF))
+            .clickable { onClick() }
+            .shadow(
+                elevation = 8.dp,
+                shape = RoundedCornerShape(cornerRadius),
+                clip = false
+            )
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.fillMaxSize()
-        ) {
-            Image(
-                painter = painterResource(id = imageRes),
-                contentDescription = label,
-                modifier = Modifier.size(80.dp)
-            )
-            Spacer(modifier = Modifier.height(15.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
-            )
-        }
-    }
-}
-
-@Composable
-fun HighlightCard(onHighlightClick: () -> Unit, item: NewsItem) {
-    Box(modifier = Modifier.fillMaxWidth()) {
-        Card(
+        Box(
             modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .align(Alignment.Center)
-                .clickable { onHighlightClick() },
-            colors = CardDefaults.cardColors(
-                containerColor = Color(0xFFFFF2E8)
-            ),
+                .fillMaxSize()
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xFFBFFDFD), // slightly darker than 0xFFCCFFFF
+                            Color(0xFF88E7E7), // slightly darker than 0xFF99EEEE
+                            Color(0xFF55BFBF)  // slightly darker than 0xFF66CCCC
+                        )
+                    ),
+                    shape = RoundedCornerShape(cornerRadius)
+                )
+                .border(
+                    width = 1.dp,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.6f),
+                            Color.Black.copy(alpha = 0.3f)
+                        )
+                    ),
+                    shape = RoundedCornerShape(cornerRadius)
+                )
+                .drawWithContent {
+                    drawContent()
+                    drawRoundRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.15f),
+                                Color.Transparent
+                            )
+                        ),
+                        cornerRadius = CornerRadius(cornerRadius.toPx(), cornerRadius.toPx()),
+                        blendMode = BlendMode.Lighten
+                    )
+                },
+            contentAlignment = Alignment.Center
         ) {
-            Row(
-                modifier = Modifier.padding(15.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = item.title,
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = item.description,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
                 Image(
-                    painter = painterResource(id = R.drawable.risk_image),
-                    contentDescription = "Skin Check Icon",
-                    modifier = Modifier.size(100.dp)
+                    painter = painterResource(id = imageRes),
+                    contentDescription = label,
+                    modifier = Modifier.size(80.dp)
+                )
+                Spacer(modifier = Modifier.height(15.dp))
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        shadow = Shadow(
+                            color = Color.Black.copy(alpha = 0.4f),
+                            offset = Offset(1f, 2f),
+                            blurRadius = 4f
+                        )
+                    )
                 )
             }
         }
     }
 }
+
+
+@Composable
+fun HighlightCard(onHighlightClick: () -> Unit, item: NewsItem) {
+    val gradient = Brush.verticalGradient(
+        colors = listOf(
+            Color(0xFFFFE5D0), // lighter peach
+            Color(0xFFFFD1A3)  // slightly darker peach/orange
+        )
+    )
+    val cornerRadius = 12.dp
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp, horizontal = 16.dp)
+            .clickable { onHighlightClick() }
+            .height(150.dp)
+            .shadow(4.dp, RoundedCornerShape(cornerRadius)) // 3D embossed effect
+            .background(gradient, RoundedCornerShape(cornerRadius))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(15.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.Black
+                    )
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = item.description,
+                    style = MaterialTheme.typography.bodyMedium.copy(color = Color.Black)
+                )
+            }
+            Image(
+                painter = painterResource(id = R.drawable.risk_image),
+                contentDescription = "Skin Check Icon",
+                modifier = Modifier.size(100.dp)
+            )
+        }
+    }
+}
+
+
+
+
 
 @Composable
 fun NewsSection(modifier: Modifier = Modifier) {
@@ -350,15 +424,18 @@ fun NewsCarousel(newsItems: List<NewsItem>, onItemClick: (NewsItem) -> Unit) {
         contentPadding = PaddingValues(horizontal = 20.dp)
     ) {
         items(newsItems) { item ->
-            Card(
+            Box(
                 modifier = Modifier
                     .width(240.dp)
-                    .clickable { onItemClick(item) },
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FA))
+                    .clickable { onItemClick(item) }
+                    .shadow(4.dp, RoundedCornerShape(16.dp)) // embossed effect
+                    .background(
+                        color = Color(0xFFF8F9FA), // original grey/light background
+                        shape = RoundedCornerShape(16.dp)
+                    )
             ) {
                 Column {
-                    // Image at the top with rounded corners (shared with card)
+                    // Image at the top with rounded corners
                     item.imageResId?.let { resId ->
                         Image(
                             painter = painterResource(id = resId),
@@ -399,6 +476,7 @@ fun NewsCarousel(newsItems: List<NewsItem>, onItemClick: (NewsItem) -> Unit) {
         }
     }
 }
+
 
 
 @Composable

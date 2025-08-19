@@ -1,9 +1,11 @@
 package com.example.dermtect.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,8 +29,16 @@ import coil.request.ImageRequest
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
@@ -128,26 +138,94 @@ fun OnboardingScreen(
                         selectedIndex = currentIndex
                     )
                 }
-                Spacer(modifier = Modifier.height(20.dp))
-                Button(
-                    onClick = onNextClick,
+                Spacer(modifier = Modifier.height(40.dp))
+                Box(
                     modifier = Modifier
                         .fillMaxWidth(0.9f)
-                        .wrapContentHeight(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF0FB2B2),
-                        contentColor = Color.White
-                    )
+                        .height(56.dp)
+                        .shadow(
+                            elevation = 10.dp, // outer shadow strength
+                            shape = RoundedCornerShape(15.dp),
+                            clip = false
+                        )
                 ) {
-                    Text(
-                        text = buttonText,
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                    )
+                    Button(
+                        onClick = onNextClick,
+                        modifier = Modifier.matchParentSize(),
+                        shape = RoundedCornerShape(15.dp),
+                        elevation = ButtonDefaults.buttonElevation(0.dp), // disable default button shadow
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Transparent,
+                            contentColor = Color.White
+                        ),
+                        contentPadding = PaddingValues()
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                // Background gradient
+                                .background(
+                                    brush = Brush.linearGradient(
+                                        colors = listOf(
+                                            Color(0xFF5FEAEA),
+                                            Color(0xFF2A9D9D),
+                                            Color(0xFF187878)
+                                        ),
+                                        start = Offset(0f, 0f),
+                                        end = Offset(0f, Float.POSITIVE_INFINITY)
+                                    ),
+                                    shape = RoundedCornerShape(15.dp)
+                                )
+                                // Emboss border
+                                .border(
+                                    width = 1.dp,
+                                    brush = Brush.linearGradient(
+                                        colors = listOf(
+                                            Color.White.copy(alpha = 0.6f),
+                                            Color.Black.copy(alpha = 0.3f)
+                                        ),
+                                        start = Offset(0f, 0f),
+                                        end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+                                    ),
+                                    shape = RoundedCornerShape(15.dp)
+                                )
+                                // Inner shine overlay
+                                .drawWithContent {
+                                    drawContent()
+                                    drawRoundRect(
+                                        brush = Brush.verticalGradient(
+                                            colors = listOf(
+                                                Color.White.copy(alpha = 0.15f), // lowered a bit
+                                                Color.Transparent
+                                            )
+                                        ),
+                                        cornerRadius = CornerRadius(15.dp.toPx(), 15.dp.toPx()),
+                                        blendMode = BlendMode.Lighten
+                                    )
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = buttonText,
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    shadow = Shadow(
+                                        color = Color.Black.copy(alpha = 0.4f),
+                                        offset = Offset(1f, 2f),
+                                        blurRadius = 4f
+                                    )
+                                )
+                            )
+                        }
+                    }
                 }
+
+
+            }
             }
         }
     }
-}
 
 
 

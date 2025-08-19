@@ -50,6 +50,8 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -59,6 +61,18 @@ import com.example.dermtect.ui.components.CenteredSnackbar
 import com.example.dermtect.ui.components.DialogTemplate
 import com.example.dermtect.ui.components.GifImage
 import kotlinx.coroutines.launch
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.draw.drawWithContent
+
+
 
 @Composable
 fun Login(navController: NavController) {
@@ -228,35 +242,115 @@ fun Login(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // Login Button
-                Button(
-                    onClick = {
-                        viewModel.login(
-                            email = email,
-                            password = password,
-                            onSuccess = {
-                                // already handled in LaunchedEffect, no need to do anything here
-                            },
-                            onError = { error ->
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar(error)
-                                }
-                            }
-                        )
-                    },
+                val buttonEnabled = isEmailValid && password.isNotBlank()
+
+                Box(
                     modifier = Modifier
                         .width(299.dp)
-                        .height(50.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF0FB2B2),
-                        contentColor = Color.White
-                    ),
-                    enabled = isEmailValid && password.isNotBlank()
+                        .height(50.dp)
+                        .shadow(
+                            elevation = if (buttonEnabled) 10.dp else 2.dp,
+                            shape = RoundedCornerShape(12.dp),
+                            clip = false
+                        )
                 ) {
-                    Text(
-                        text = "Login",
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                    )
+                    Button(
+                        onClick = {
+                            viewModel.login(
+                                email = email,
+                                password = password,
+                                onSuccess = { /* handled */ },
+                                onError = { error ->
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(error)
+                                    }
+                                }
+                            )
+                        },
+                        modifier = Modifier.matchParentSize(),
+                        shape = RoundedCornerShape(12.dp),
+                        elevation = ButtonDefaults.buttonElevation(0.dp), // shadow handled by outer Box
+                        enabled = buttonEnabled,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Transparent,
+                            contentColor = Color.White,
+                            disabledContainerColor = Color(0xFFB0B0B0), // grey gradient for disabled
+                            disabledContentColor = Color.White.copy(alpha = 0.7f)
+                        ),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    brush = if (buttonEnabled) {
+                                        Brush.linearGradient(
+                                            colors = listOf(
+                                                Color(0xFF5FEAEA),
+                                                Color(0xFF2A9D9D),
+                                                Color(0xFF187878)
+                                            )
+                                        )
+                                    } else {
+                                        Brush.linearGradient(
+                                            colors = listOf(
+                                                Color(0xFFC0C0C0),
+                                                Color(0xFF9E9E9E)
+                                            )
+                                        )
+                                    },
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    brush = if (buttonEnabled) {
+                                        Brush.linearGradient(
+                                            colors = listOf(
+                                                Color.White.copy(alpha = 0.6f),
+                                                Color.Black.copy(alpha = 0.3f)
+                                            )
+                                        )
+                                    } else {
+                                        Brush.linearGradient(
+                                            colors = listOf(
+                                                Color.White.copy(alpha = 0.2f),
+                                                Color.Black.copy(alpha = 0.2f)
+                                            )
+                                        )
+                                    },
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .drawWithContent {
+                                    drawContent()
+                                    if (buttonEnabled) {
+                                        drawRoundRect(
+                                            brush = Brush.verticalGradient(
+                                                colors = listOf(
+                                                    Color.White.copy(alpha = 0.15f),
+                                                    Color.Transparent
+                                                )
+                                            ),
+                                            cornerRadius = CornerRadius(12.dp.toPx(), 12.dp.toPx()),
+                                            blendMode = BlendMode.Lighten
+                                        )
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Login",
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (buttonEnabled) Color.White else Color.White.copy(alpha = 0.7f),
+                                    shadow = if (buttonEnabled) Shadow(
+                                        color = Color.Black.copy(alpha = 0.4f),
+                                        offset = Offset(1f, 2f),
+                                        blurRadius = 4f
+                                    ) else null
+                                )
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))
