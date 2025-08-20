@@ -25,6 +25,7 @@ import com.example.dermtect.R
 import com.example.dermtect.ui.viewmodel.UserHomeViewModel
 import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Info
@@ -129,18 +130,23 @@ fun SettingsScreenTemplate(
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
                 )
             }
-        }
+
     }
-    Card(
-        modifier = Modifier
-            .offset(x = 25.dp, y = 344.dp)
-            .fillMaxWidth(0.9f)
-            .wrapContentHeight()
-            .shadow(8.dp, RoundedCornerShape(36.dp)),
-        shape = RoundedCornerShape(36.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-    ) {
+    Box(
+            modifier = Modifier
+                .fillMaxSize(),
+        contentAlignment = Alignment.Center
+        ) {
+        Card(
+            modifier = Modifier
+                .offset(y = (-20).dp)
+                .fillMaxWidth(0.9f)
+                .wrapContentHeight()
+                .shadow(8.dp, RoundedCornerShape(36.dp)),
+            shape = RoundedCornerShape(36.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
         Column {
             Box(
                 modifier = Modifier
@@ -195,7 +201,7 @@ fun SettingsScreenTemplate(
             NotificationRow(
                 icon = {
                     Icon(
-                        imageVector = 	Icons.Filled.Notifications,
+                        imageVector = Icons.Filled.Notifications,
                         contentDescription = "Notifications",
                         tint = Color(0xFF0FB2B2),
                         modifier = Modifier.size(28.dp)
@@ -216,7 +222,9 @@ fun SettingsScreenTemplate(
                 showLogoutDialog = true
             }
         }
+            }
     }
+}
 
     if (showPhoto) {
         Box(

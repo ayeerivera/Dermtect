@@ -71,7 +71,7 @@ class MainActivity : ComponentActivity() {
                 val sharedProfileViewModel: SharedProfileViewModel = viewModel()
                 val userHomeViewModel: UserHomeViewModel = viewModel()
 
-                NavHost(navController = navController, startDestination = "splash") {
+                NavHost(navController = navController, startDestination = "login") {
                     composable("splash") { SplashScreen(navController) }
                     composable("onboarding_screen1") { OnboardingScreen1(navController) }
                     composable("onboarding_screen2") { OnboardingScreen2(navController) }

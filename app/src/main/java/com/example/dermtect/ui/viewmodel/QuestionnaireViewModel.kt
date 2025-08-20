@@ -37,17 +37,28 @@ class QuestionnaireViewModel : ViewModel() {
             .set(data)
             .addOnSuccessListener {
                 _loading.value = false
+
+                // ✅ do NOT clear _existingAnswers here
+                // _existingAnswers.value = null   ❌ remove this
+
+                // reload from Firestore
+                loadQuestionnaireAnswers()
+
                 _saveSuccess.value = true
-                val action = if (existingAnswers.value == null) "questionnaire_answered" else "questionnaire_updated"
-                logQuestionnaireAudit(action)
+                logQuestionnaireAudit("questionnaire_updated")
                 onSuccess()
             }
-            .addOnFailureListener { e ->
+            .addOnFailureListener {
                 _loading.value = false
                 onError()
             }
 
     }
+
+    fun setExistingAnswers(newAnswers: List<Boolean?>) {
+        _existingAnswers.value = newAnswers
+    }
+
 
     fun resetSuccessFlag() {
         _saveSuccess.value = false
