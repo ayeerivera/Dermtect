@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material3.*
 import androidx.compose.ui.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -19,6 +20,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
 import com.example.dermtect.ui.components.GifImage
 import com.example.dermtect.ui.components.ProgressIndicator
+import com.example.dermtect.ui.components.EmbossedButton
 
 @Composable
 fun TutorialScreenTemplate(
@@ -77,7 +79,7 @@ fun TutorialScreenTemplate(
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(60.dp))
+                Spacer(modifier = Modifier.height(30.dp))
 
                 Text(
                     text = title,
@@ -110,42 +112,31 @@ fun TutorialScreenTemplate(
                         selectedIndex = currentIndex
                     )
                 }
-                Spacer(modifier = Modifier.height(15.dp))
+                Spacer(modifier = Modifier.height(35.dp))
 
-                    Button(
-                        onClick = { navController.navigate(nextRoute) },
-                        modifier = Modifier
-                            .fillMaxWidth(0.9f)
-                            .wrapContentHeight(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF0FB2B2),
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Text(
-                            nextButtonText,
-                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal)
-                        )
-                    }
+                EmbossedButton(
+                    text = nextButtonText,
+                    onClick = { navController.navigate(nextRoute) },
+                    modifier = Modifier
+                        .fillMaxWidth(0.9f)
+                        .wrapContentHeight()
+                )
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    OutlinedButton(
-                        onClick = onSkipClick,
-                        modifier = Modifier
-                            .fillMaxWidth(0.9f)
-                            .wrapContentHeight(),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFF0FB2B2)
-                        ),
-                        border = BorderStroke(1.dp, Color(0xFF0FB2B2))
-                    ) {
-                        Text(
-                            skipButtonText,
-                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal)
-                        )
-                    }
-                }
+                EmbossedButton(
+                    onClick = onSkipClick,
+                    text = skipButtonText,
+                    modifier = Modifier
+                        .fillMaxWidth(0.9f)
+                        .wrapContentHeight(),
+                    backgroundColor = Brush.linearGradient(
+                        colors = listOf(Color(0xFFF0F0F0), Color(0xFFF0F0F0)) // light grey "flat" style
+                    ),
+                    textColor = Color(0xFF666666) // slightly darker grey for contrast
+                )
+
+            }
 
             }
     }

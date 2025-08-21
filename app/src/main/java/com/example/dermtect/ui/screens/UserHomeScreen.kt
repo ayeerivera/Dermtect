@@ -18,7 +18,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontStyle
@@ -36,7 +35,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.dermtect.ui.viewmodel.UserHomeViewModel
 import com.example.dermtect.model.NewsItem
 import com.google.gson.Gson
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.draw.drawWithContent
@@ -140,7 +138,6 @@ fun UserHomeScreen(navController: NavController) {
             horizontalAlignment = Alignment.Start
         ) {
 
-            Spacer(modifier = Modifier.height(10.dp))
             HomeFeatureButtonsRow(
                 hasConsented = hasConsented,
                 onShowConsentDialog = { showConsentDialog = true },
@@ -148,7 +145,7 @@ fun UserHomeScreen(navController: NavController) {
                 onNearbyClinicsClick = { navController.navigate("nearby_clinics") }
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(15.dp))
 
             highlightItem?.let { item ->
                 HighlightCard(
@@ -162,8 +159,8 @@ fun UserHomeScreen(navController: NavController) {
 
 
 
-            Spacer(modifier = Modifier.height(20.dp))
-            NewsSection()
+            Spacer(modifier = Modifier.height(5.dp))
+
             Spacer(modifier = Modifier.height(10.dp))
             when {
                 isLoadingNews -> {
@@ -341,12 +338,7 @@ fun HomeFeatureButton(
                     text = label,
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        shadow = Shadow(
-                            color = Color.Black.copy(alpha = 0.4f),
-                            offset = Offset(1f, 2f),
-                            blurRadius = 4f
-                        )
+                        color = Color.Black
                     )
                 )
             }
@@ -407,15 +399,6 @@ fun HighlightCard(onHighlightClick: () -> Unit, item: NewsItem) {
 
 
 
-@Composable
-fun NewsSection(modifier: Modifier = Modifier) {
-    Column(modifier = modifier) {
-        Text(
-            text = "Infos & News",
-            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
-        )
-    }
-}
 
 @Composable
 fun NewsCarousel(newsItems: List<NewsItem>, onItemClick: (NewsItem) -> Unit) {
