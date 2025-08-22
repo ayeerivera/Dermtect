@@ -349,48 +349,79 @@ fun HomeFeatureButton(
 
 @Composable
 fun HighlightCard(onHighlightClick: () -> Unit, item: NewsItem) {
-    val gradient = Brush.verticalGradient(
+    val cornerRadius = 15.dp
+    val gradient = Brush.linearGradient(
         colors = listOf(
             Color(0xFFFFE5D0), // lighter peach
             Color(0xFFFFD1A3)  // slightly darker peach/orange
         )
     )
-    val cornerRadius = 12.dp
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp, horizontal = 16.dp)
-            .clickable { onHighlightClick() }
             .height(150.dp)
-            .shadow(4.dp, RoundedCornerShape(cornerRadius)) // 3D embossed effect
-            .background(gradient, RoundedCornerShape(cornerRadius))
+            .clickable { onHighlightClick() }
+            .shadow(
+                elevation = 8.dp,
+                shape = RoundedCornerShape(cornerRadius),
+                clip = false
+            )
     ) {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(15.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = item.title,
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.Black
-                    )
+                .background(gradient, RoundedCornerShape(cornerRadius))
+                .border(
+                    width = 1.dp,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.6f),
+                            Color.Black.copy(alpha = 0.3f)
+                        )
+                    ),
+                    shape = RoundedCornerShape(cornerRadius)
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = item.description,
-                    style = MaterialTheme.typography.bodyMedium.copy(color = Color.Black)
+                .drawWithContent {
+                    drawContent()
+                    drawRoundRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.15f),
+                                Color.Transparent
+                            )
+                        ),
+                        cornerRadius = CornerRadius(cornerRadius.toPx(), cornerRadius.toPx()),
+                        blendMode = BlendMode.Lighten
+                    )
+                }
+                .padding(15.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.Black
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = item.description,
+                        style = MaterialTheme.typography.bodyMedium.copy(color = Color.Black)
+                    )
+                }
+                Image(
+                    painter = painterResource(id = R.drawable.risk_image),
+                    contentDescription = "Skin Check Icon",
+                    modifier = Modifier.size(100.dp)
                 )
             }
-            Image(
-                painter = painterResource(id = R.drawable.risk_image),
-                contentDescription = "Skin Check Icon",
-                modifier = Modifier.size(100.dp)
-            )
         }
     }
 }
@@ -400,8 +431,11 @@ fun HighlightCard(onHighlightClick: () -> Unit, item: NewsItem) {
 
 
 
+
 @Composable
 fun NewsCarousel(newsItems: List<NewsItem>, onItemClick: (NewsItem) -> Unit) {
+    val cornerRadius = 15.dp
+
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(horizontal = 20.dp)
@@ -411,54 +445,82 @@ fun NewsCarousel(newsItems: List<NewsItem>, onItemClick: (NewsItem) -> Unit) {
                 modifier = Modifier
                     .width(240.dp)
                     .clickable { onItemClick(item) }
-                    .shadow(4.dp, RoundedCornerShape(16.dp)) // embossed effect
-                    .background(
-                        color = Color(0xFFF8F9FA), // original grey/light background
-                        shape = RoundedCornerShape(16.dp)
+                    .shadow(
+                        elevation = 3.dp,
+                        shape = RoundedCornerShape(cornerRadius),
+                        clip = false
                     )
             ) {
-                Column {
-                    // Image at the top with rounded corners
-                    item.imageResId?.let { resId ->
-                        Image(
-                            painter = painterResource(id = resId),
-                            contentDescription = item.title,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(120.dp)
-                                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            color = Color(0xFFF8F9FA),
+                            shape = RoundedCornerShape(cornerRadius)
                         )
-                    }
-
-                    // Text content
-                    Column(
-                        modifier = Modifier
-                            .padding(12.dp)
-                    ) {
-                        Text(
-                            text = item.title,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFF1D1D1D)
-                            )
-                        )
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Text(
-                            text = item.description,
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontWeight = FontWeight.Normal,
-                                color = Color(0xFF1D1D1D)
+                        .border(
+                            width = 1.dp,
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = 0.6f),
+                                    Color.Black.copy(alpha = 0.3f)
+                                )
                             ),
-                            maxLines = 2
+                            shape = RoundedCornerShape(cornerRadius)
                         )
+                        .drawWithContent {
+                            drawContent()
+                            drawRoundRect(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.White.copy(alpha = 0.15f),
+                                        Color.Transparent
+                                    )
+                                ),
+                                cornerRadius = CornerRadius(cornerRadius.toPx(), cornerRadius.toPx()),
+                                blendMode = BlendMode.Lighten
+                            )
+                        }
+                ) {
+                    Column {
+                        item.imageResId?.let { resId ->
+                            Image(
+                                painter = painterResource(id = resId),
+                                contentDescription = item.title,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(120.dp)
+                                    .clip(RoundedCornerShape(topStart = cornerRadius, topEnd = cornerRadius))
+                            )
+                        }
+
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = item.title,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.Black
+                                )
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                text = item.description,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontWeight = FontWeight.Normal,
+                                    color = Color.Black
+                                ),
+                                maxLines = 2
+                            )
+                        }
                     }
                 }
             }
         }
     }
 }
+
 
 
 

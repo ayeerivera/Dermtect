@@ -119,7 +119,8 @@ fun TutorialScreenTemplate(
                     onClick = { navController.navigate(nextRoute) },
                     modifier = Modifier
                         .fillMaxWidth(0.9f)
-                        .wrapContentHeight()
+                        .wrapContentHeight(),
+                    textColor = Color(0xFF666666)
                 )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -130,7 +131,7 @@ fun TutorialScreenTemplate(
                     modifier = Modifier
                         .fillMaxWidth(0.9f)
                         .wrapContentHeight(),
-                    backgroundColor = Brush.linearGradient(
+                    backgroundBrush = Brush.linearGradient(
                         colors = listOf(Color(0xFFF0F0F0), Color(0xFFF0F0F0)) // light grey "flat" style
                     ),
                     textColor = Color(0xFF666666) // slightly darker grey for contrast
