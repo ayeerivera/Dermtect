@@ -1,5 +1,6 @@
 package com.example.dermtect.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,21 +22,23 @@ import androidx.compose.foundation.layout.Row
 import com.example.dermtect.ui.components.DialogTemplate
 import com.example.dermtect.ui.viewmodel.QuestionnaireViewModel
 import androidx.activity.compose.BackHandler
-import com.example.dermtect.ui.components.CenteredSnackbar
-import kotlinx.coroutines.flow.collectLatest
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun QuestionnaireScreen(navController: NavController) {
     val questionnaireViewModel = remember { QuestionnaireViewModel() }
     val loading by questionnaireViewModel.loading.collectAsState()
     val saveSuccess by questionnaireViewModel.saveSuccess.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     val answers = remember { mutableStateListOf<Boolean?>().apply { repeat(8) { add(null) } } }
 
     var showWarning by remember { mutableStateOf(false) }
     var showBackDialog by remember { mutableStateOf(false) }
     var showCancelDialog by remember { mutableStateOf(false) }
+    var showLoading by remember { mutableStateOf(false) }
 
     val existingAnswers by questionnaireViewModel.existingAnswers.collectAsState()
     var isEditMode by remember { mutableStateOf(false) }
@@ -60,24 +63,7 @@ fun QuestionnaireScreen(navController: NavController) {
     }
 
 
-    LaunchedEffect(saveSuccess) {
-        if (saveSuccess) {
-            // Reload from Firestore
-            questionnaireViewModel.loadQuestionnaireAnswers()
 
-            // Collect once, until we get the updated answers
-            questionnaireViewModel.existingAnswers.collectLatest { newAnswers ->
-                if (newAnswers != null) {
-                    answers.clear()
-                    answers.addAll(newAnswers)
-                    snackbarHostState.showSnackbar("Answers saved successfully!")
-                    questionnaireViewModel.resetSuccessFlag()
-                    isEditMode = false
-                    return@collectLatest
-                }
-            }
-        }
-    }
 
     LaunchedEffect(existingAnswers) {
         if (existingAnswers != null && !isEditMode) {
@@ -89,11 +75,6 @@ fun QuestionnaireScreen(navController: NavController) {
 
     BubblesBackground {
         Scaffold(
-            snackbarHost = {
-                SnackbarHost(hostState = snackbarHostState) { data ->
-                    CenteredSnackbar(data)
-                }
-            },
             containerColor = Color.Transparent
 
         ) { innerPadding ->
@@ -146,13 +127,15 @@ fun QuestionnaireScreen(navController: NavController) {
 
                         Spacer(modifier = Modifier.height(15.dp))
 
-                        Text(
-                            text = "Before we scan your skin, please answer a few short questions for additional context.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center
-                        )
+                        if (!isEditMode) {
+                            Text(
+                                text = "Before we scan your skin, please answer a few short questions for additional context.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center
+                            )
 
-                        Spacer(modifier = Modifier.height(20.dp))
+                            Spacer(modifier = Modifier.height(20.dp))
+                        }
 
                         LazyColumn(
                             modifier = Modifier
@@ -233,6 +216,7 @@ fun QuestionnaireScreen(navController: NavController) {
                             // 🔹 1. First-time user (no existing answers)
                             existingAnswers == null -> {
                                 Button(
+
                                     onClick = {
                                         val allAnswered = answers.all { it != null }
                                         showWarning = !allAnswered
@@ -240,22 +224,14 @@ fun QuestionnaireScreen(navController: NavController) {
                                             questionnaireViewModel.saveQuestionnaireAnswers(
                                                 answers = answers,
                                                 onSuccess = {
-                                                    // 1. Save completed
-                                                    isEditMode = false
-
-                                                    // 2. Reload the latest answers
-                                                    questionnaireViewModel.loadQuestionnaireAnswers()
-
-                                                    // 3. Immediately update the local answers list from existingAnswers
-                                                    existingAnswers?.let {
-                                                        answers.clear()
-                                                        answers.addAll(it)
-                                                    }
-                                                }
-                                                ,
+                                                    Toast.makeText(
+                                                        context,
+                                                        "Answers saved successfully!",
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                },
                                                 onError = { showWarning = true }
                                             )
-
                                         }
                                     },
                                     enabled = !loading,
@@ -267,7 +243,7 @@ fun QuestionnaireScreen(navController: NavController) {
                                         contentColor = Color.White
                                     )
                                 ) {
-                                    Text(if (loading) "Submitting..." else "Submit")
+                                    Text(if (loading) "Submitting..." else "Submit", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal))
                                 }
 
                                 Spacer(modifier = Modifier.height(8.dp))
@@ -280,7 +256,7 @@ fun QuestionnaireScreen(navController: NavController) {
                                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF0FB2B2)),
                                     border = BorderStroke(1.dp, Color(0xFF0FB2B2))
                                 ) {
-                                    Text("Skip")
+                                    Text("Skip", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal))
                                 }
                             }
 
@@ -293,7 +269,14 @@ fun QuestionnaireScreen(navController: NavController) {
                                         if (allAnswered) {
                                             questionnaireViewModel.saveQuestionnaireAnswers(
                                                 answers = answers,
-                                                onSuccess = { isEditMode = false },
+                                                onSuccess = {
+                                                    Toast.makeText(
+                                                        context,
+                                                        "Answers saved successfully!",
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                    questionnaireViewModel.loadQuestionnaireAnswers()
+                                                },
                                                 onError = { showWarning = true }
                                             )
                                         }
@@ -307,7 +290,7 @@ fun QuestionnaireScreen(navController: NavController) {
                                         contentColor = Color.White
                                     )
                                 ) {
-                                    Text(if (loading) "Submitting..." else "Submit")
+                                    Text(if (loading) "Submitting..." else "Submit", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal))
                                 }
 
                                 Spacer(modifier = Modifier.height(8.dp))
@@ -315,14 +298,14 @@ fun QuestionnaireScreen(navController: NavController) {
                                 OutlinedButton(
                                     onClick = {
                                         showCancelDialog = true
-                                                                            },
+                                    },
                                     modifier = Modifier
                                         .fillMaxWidth(0.8f)
                                         .wrapContentHeight(),
                                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF0FB2B2)),
                                     border = BorderStroke(1.dp, Color(0xFF0FB2B2))
                                 ) {
-                                    Text("Cancel")
+                                    Text("Cancel", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal))
                                 }
                             }
 
@@ -338,7 +321,7 @@ fun QuestionnaireScreen(navController: NavController) {
                                         contentColor = Color.White
                                     )
                                 ) {
-                                    Text("Edit")
+                                    Text("Edit", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal))
                                 }
                             }
                         }

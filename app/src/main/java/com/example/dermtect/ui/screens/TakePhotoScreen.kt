@@ -9,8 +9,10 @@ import android.util.Log
 import android.util.Size
 import android.widget.Toast
 import androidx.camera.core.*
+import com.example.dermtect.R
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -23,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
@@ -31,13 +34,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import com.example.dermtect.R
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import androidx.exifinterface.media.ExifInterface
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Size as GeometrySize
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.example.dermtect.ui.components.BackButton
+
+
+// ✅ Constant for square size
+val FOCUS_BOX_WIDTH = 280.dp
+val FOCUS_BOX_HEIGHT = 340.dp // mas mahaba para skin lesion focus
 
 @Composable
 fun TakePhotoScreen(
@@ -58,6 +71,9 @@ fun TakePhotoScreen(
     var cameraInfo: CameraInfo? by remember { mutableStateOf(null) }
 
     var capturedImage by remember { mutableStateOf<Bitmap?>(null) }
+
+    // Save square region for cropping
+    var squareRect by remember { mutableStateOf<Rect?>(null) }
 
     DisposableEffect(Unit) {
         val cameraProvider = cameraProviderFuture.get()
@@ -98,6 +114,7 @@ fun TakePhotoScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
 
+        // Camera Preview
         AndroidView(
             factory = { previewView },
             modifier = Modifier
@@ -114,6 +131,54 @@ fun TakePhotoScreen(
                 }
         )
 
+        // Focus guide overlay (square + dimmed outside + corner lines)
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .offset(y = (-80).dp) // move square higher
+            ) {
+                // Dim background
+                drawRect(
+                    color = Color.Black.copy(alpha = 0.7f),
+                    size = size
+                )
+
+                // Use constants for dimensions
+                val rectWidth = FOCUS_BOX_WIDTH.toPx()
+                val rectHeight = FOCUS_BOX_HEIGHT.toPx()
+
+                val left = (size.width - rectWidth) / 2
+                val top = (size.height - rectHeight) / 2
+                val right = left + rectWidth
+                val bottom = top + rectHeight
+
+                squareRect = Rect(left, top, right, bottom)
+
+                // Transparent cut-out
+                drawRect(
+                    color = Color.Transparent,
+                    topLeft = Offset(left, top),
+                    size = GeometrySize(rectWidth, rectHeight),
+                    blendMode = androidx.compose.ui.graphics.BlendMode.Clear
+                )
+
+                // Corner lines
+                val lineLength = 40.dp.toPx()
+                val strokeWidth = 6f
+
+                drawLine(Color.Cyan, Offset(left, top), Offset(left + lineLength, top), strokeWidth)
+                drawLine(Color.Cyan, Offset(left, top), Offset(left, top + lineLength), strokeWidth)
+                drawLine(Color.Cyan, Offset(right, top), Offset(right - lineLength, top), strokeWidth)
+                drawLine(Color.Cyan, Offset(right, top), Offset(right, top + lineLength), strokeWidth)
+                drawLine(Color.Cyan, Offset(left, bottom), Offset(left + lineLength, bottom), strokeWidth)
+                drawLine(Color.Cyan, Offset(left, bottom), Offset(left, bottom - lineLength), strokeWidth)
+                drawLine(Color.Cyan, Offset(right, bottom), Offset(right - lineLength, bottom), strokeWidth)
+                drawLine(Color.Cyan, Offset(right, bottom), Offset(right, bottom - lineLength), strokeWidth)
+            }
+        }
+
+        // Back Button
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -122,10 +187,11 @@ fun TakePhotoScreen(
             BackButton(
                 modifier = Modifier
                     .align(Alignment.CenterStart),
-                    onClick = { onBackClick() }
+                onClick = { onBackClick() }
             )
         }
 
+        // Title + instructions
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -146,7 +212,7 @@ fun TakePhotoScreen(
             )
         }
 
-        // Bottom Controls
+        // === BOTTOM CONTROLS (unchanged) ===
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -163,6 +229,7 @@ fun TakePhotoScreen(
 
                 Spacer(modifier = Modifier.width(75.dp))
 
+                // Camera Button
                 Box(
                     modifier = Modifier
                         .size(65.dp)
@@ -173,83 +240,134 @@ fun TakePhotoScreen(
                                 "${System.currentTimeMillis()}.jpg"
                             )
 
-                            val outputOptions =
-                                ImageCapture.OutputFileOptions.Builder(file).build()
+                            val outputOptions = ImageCapture.OutputFileOptions.Builder(file).build()
 
                             imageCapture?.takePicture(
                                 outputOptions,
                                 ContextCompat.getMainExecutor(context),
                                 object : ImageCapture.OnImageSavedCallback {
                                     override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                                        capturedImage =
-                                            rotateBitmapAccordingToExif(context, file)
+                                        val fullBitmap = rotateBitmapAccordingToExif(context, file)
+
+                                        squareRect?.let { rect ->
+                                            val scaleX = fullBitmap.width.toFloat() / previewView.width.toFloat()
+                                            val scaleY = fullBitmap.height.toFloat() / previewView.height.toFloat()
+
+                                            val cropLeft = (rect.left * scaleX).toInt().coerceAtLeast(0)
+                                            val cropTop = (rect.top * scaleY).toInt().coerceAtLeast(0)
+                                            val cropWidth = (rect.width * scaleX).toInt().coerceAtMost(fullBitmap.width - cropLeft)
+                                            val cropHeight = (rect.height * scaleY).toInt().coerceAtMost(fullBitmap.height - cropTop)
+
+                                            capturedImage = Bitmap.createBitmap(fullBitmap, cropLeft, cropTop, cropWidth, cropHeight)
+                                        } ?: run {
+                                            capturedImage = fullBitmap
+                                        }
                                     }
 
                                     override fun onError(exception: ImageCaptureException) {
-                                        Toast.makeText(
-                                            context,
-                                            "Capture failed",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                        Log.e(
-                                            "CameraX",
-                                            "Photo capture failed: ${exception.message}",
-                                            exception
-                                        )
+                                        Toast.makeText(context, "Capture failed", Toast.LENGTH_SHORT).show()
+                                        Log.e("CameraX", "Photo capture failed: ${exception.message}", exception)
                                     }
                                 }
                             )
-                        },
-                    contentAlignment = Alignment.Center
+                        }, contentAlignment = Alignment.Center
                 ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.camera_vector),
-                                contentDescription = "Capture",
-                                modifier = Modifier
-                                    .size(24.dp)
-                            )
-                        }
+                    Image(
+                        painter = painterResource(id = R.drawable.camera_vector),
+                        contentDescription = "Capture",
+                        modifier = Modifier
+                            .size(24.dp)
+                    )
+                }
 
-                Spacer(modifier = Modifier.width(45.dp))
 
-                // Flash Toggle
-                Image(
-                    painter = painterResource(id = if (flashEnabled) R.drawable.flash_on else R.drawable.flash_off),
-                    contentDescription = "Flash Toggle",
-                    modifier = Modifier
-                        .size(25.dp)
-                        .clickable {
-                            flashEnabled = !flashEnabled
-                            imageCapture?.flashMode =
-                                if (flashEnabled) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF
-                        }
-                )
+                Spacer(modifier = Modifier.width(65.dp))
+
             }
         }
 
-        // Show captured image popup
+        // === Show captured image popup (with buttons) ===
         capturedImage?.let { image ->
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.7f))
-                    .clickable { capturedImage = null },
+                    .background(Color.White),
                 contentAlignment = Alignment.Center
             ) {
-                Box(
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceBetween,
                     modifier = Modifier
-                        .size(300.dp)
-                        .background(Color.Transparent),
-                    contentAlignment = Alignment.Center
+                        .fillMaxSize()
+                        .padding(24.dp)
                 ) {
+                    Spacer(modifier = Modifier.height(40.dp))
+
+                    // Captured Image same as focus box
                     Image(
                         bitmap = image.asImageBitmap(),
                         contentDescription = "Captured",
-                        modifier = Modifier.size(300.dp)
+                        modifier = Modifier
+                            .size(width = FOCUS_BOX_WIDTH, height = FOCUS_BOX_HEIGHT)
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                            .background(Color.LightGray),
+                        contentScale = ContentScale.Crop
                     )
+
+                    Spacer(modifier = Modifier.height(60.dp))
+
+                    // Retake + Proceed side by side
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        GradientButton(
+                            text = "Retake",
+                            onClick = { capturedImage = null },
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        GradientButton(
+                            text = "Proceed",
+                            onClick = {
+                                // TODO: handle proceed
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+fun GradientButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .height(56.dp)
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF4DD0E1), // light cyan
+                        Color(0xFF00796B)  // teal
+                    )
+                ),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
+            )
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            fontSize = 18.sp
+        )
     }
 }
 
