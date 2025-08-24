@@ -124,12 +124,14 @@ fun EmbossedButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     cornerRadius: Dp = 15.dp,
-    backgroundBrush: Brush? = Brush.linearGradient( // ✅ nullable now
+    backgroundBrush: Brush? = Brush.linearGradient(
         colors = listOf(
             Color(0xFF5FEAEA),
             Color(0xFF2A9D9D),
             Color(0xFF187878)
-        )
+        ),
+        start = Offset(0f, 0f),
+        end = Offset(0f, Float.POSITIVE_INFINITY)
     ),
     disabledBrush: Brush? = Brush.linearGradient(
         colors = listOf(
@@ -143,16 +145,14 @@ fun EmbossedButton(
         modifier = modifier
             .height(56.dp)
             .shadow(
-                elevation = if (enabled) 10.dp else 2.dp,
+                elevation = if (enabled) 0.dp else 2.dp, // remove default shadow for enabled to match original
                 shape = RoundedCornerShape(cornerRadius),
                 clip = false
             )
             .clip(RoundedCornerShape(cornerRadius))
-            .then(
-                if (backgroundBrush != null) Modifier.background(
-                    brush = if (enabled) backgroundBrush else disabledBrush!!,
-                    shape = RoundedCornerShape(cornerRadius)
-                ) else Modifier
+            .background(
+                brush = if (enabled) backgroundBrush!! else disabledBrush!!,
+                shape = RoundedCornerShape(cornerRadius)
             )
             .clickable(
                 enabled = enabled,
@@ -161,7 +161,7 @@ fun EmbossedButton(
                 interactionSource = remember { MutableInteractionSource() }
             )
     ) {
-        // Border + highlight overlay
+        // Border + shine overlay
         Box(
             modifier = Modifier
                 .matchParentSize()
@@ -172,7 +172,9 @@ fun EmbossedButton(
                             colors = listOf(
                                 Color.White.copy(alpha = 0.6f),
                                 Color.Black.copy(alpha = 0.3f)
-                            )
+                            ),
+                            start = Offset(0f, 0f),
+                            end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
                         )
                     } else {
                         Brush.linearGradient(
@@ -216,6 +218,7 @@ fun EmbossedButton(
         }
     }
 }
+
 
 
 

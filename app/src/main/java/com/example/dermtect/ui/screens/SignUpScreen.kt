@@ -38,6 +38,13 @@ import com.google.firebase.firestore.FirebaseFirestore
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import com.example.dermtect.ui.components.BackButton
+import kotlinx.coroutines.launch
+import com.example.dermtect.ui.components.EmbossedButton
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.unit.sp
 
 @Composable
 fun Register(navController: NavController) {
@@ -259,24 +266,48 @@ fun Register(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(30.dp))
 
-                Button(
-                    onClick = {
-                        viewModel.register(email, password, firstName, lastName)
-                    },
-                    enabled = isFormValid && !loading,
+                Box(
                     modifier = Modifier
-                        .width(299.dp)
-                        .height(50.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isFormValid) Color(0xFF0FB2B2) else Color(0xFFB0B0B0),
-                        contentColor = Color.White
-                    )
+                        .width(320.dp)
+                        .height(50.dp)
+                        .shadow(
+                            elevation = 8.dp,
+                            shape = RoundedCornerShape(12.dp),
+                            clip = false
+                        )
+                        .background(
+                            brush = if (isFormValid && !loading) {
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color(0xFF5FEAEA), // top lighter shade
+                                        Color(0xFF2A9D9D), // middle shade
+                                        Color(0xFF187878)  // bottom darker shade
+                                    )
+                                )
+                            } else {
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color(0xFFBDBDBD), // top light grey
+                                        Color(0xFF9E9E9E), // middle grey
+                                        Color(0xFF757575)  // bottom dark grey
+                                    )
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .clickable(enabled = isFormValid && !loading) {
+                            viewModel.register(email, password, firstName, lastName)
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        if (loading) "Registering..." else "Register",
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
+                        text = if (loading) "Registering..." else "Register",
+                        color = if (isFormValid && !loading) Color.White else Color.LightGray,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
+
 
 
                 Spacer(modifier = Modifier.height(32.dp))

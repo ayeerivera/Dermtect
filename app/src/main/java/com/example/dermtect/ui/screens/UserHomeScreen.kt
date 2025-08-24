@@ -125,7 +125,34 @@ fun UserHomeScreen(navController: NavController) {
                 },
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = 8.dp)
+                    .padding(top = 15.dp)
+                    .size(50.dp)
+                    .shadow(
+                        elevation = 6.dp,
+                        shape = CircleShape,
+                        clip = false
+                    )
+                    .background(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xFFBFFDFD),
+                                Color(0xFF88E7E7),
+                                Color(0xFF55BFBF)
+                            )
+                        ),
+                        shape = CircleShape
+                    )
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.6f),
+                                Color.Black.copy(alpha = 0.3f)
+                            )
+                        ),
+                        shape = CircleShape
+                    )
+                    .padding(5.dp) // inner padding for the icon
             )
         }
 
@@ -156,8 +183,6 @@ fun UserHomeScreen(navController: NavController) {
                     }
                 )
             }
-
-
 
             Spacer(modifier = Modifier.height(5.dp))
 
@@ -538,28 +563,54 @@ fun BottomNavBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(90.dp) // Outer Box
             .background(Color.White)
     ) {
+        // Embossed BottomNav background
         Surface(
-            color = Color(0xFFCDFFFF),
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .align(Alignment.BottomCenter)
+                .align(Alignment.BottomCenter) // <- stick it to bottom
+                .shadow(
+                    elevation = 8.dp,
+                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+                    clip = false
+                )
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xFFBFFDFD),
+                            Color(0xFF88E7E7),
+                            Color(0xFF55BFBF)
+                        )
+                    ),
+                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+                )
+                .border(
+                    width = 1.dp,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.6f),
+                            Color.Black.copy(alpha = 0.3f)
+                        )
+                    ),
+                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+                ),
+            color = Color.Transparent,
+            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+            tonalElevation = 0.dp
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(74.dp) // Inner Row
+                    .height(74.dp)
                     .padding(horizontal = 65.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.home_vector),
+                    painter = painterResource(id = R.drawable.home_icon),
                     contentDescription = "Home",
-                    modifier = Modifier.size(26.dp)
+                    modifier = Modifier.size(30.dp)
                 )
                 Image(
                     painter = painterResource(id = R.drawable.user_vector),
@@ -574,17 +625,50 @@ fun BottomNavBar(
                             navController.navigate("user_settings")
                         }
                 )
-
             }
         }
 
+        // Embossed floating camera button with notification-style border
+        // Floating camera button fully styled like notification
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .offset(y = (-12).dp)
-                .size(65.dp)
-                .background(Color(0xFF0FB2B2), shape = CircleShape)
-                .border(3.dp, Color.White, shape = CircleShape)
+                .offset(y = (-28).dp)
+                .size(70.dp)
+                .shadow(
+                    elevation = 6.dp,
+                    shape = CircleShape,
+                    clip = false
+                )
+                .background(
+                    color = Color(0xFFCDFFFF), // Solid light blue background
+                    shape = CircleShape
+                )
+                // Outer border for a thicker, more visible stroke effect
+                .border(
+                    width = 1.dp, // Thicker outer border for more visibility
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xFFBFFDFD), // Lighter outer shade
+                            Color(0xFF88E7E7), // Medium teal
+                            Color(0xFF41A6A6)  // Darker teal
+                        )
+                    ),
+                    shape = CircleShape
+                )
+                // Inner gradient border to maintain the original style
+                .border(
+                    width = 5.dp, // Inner border thickness
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xFFBFFDFD), // Lighter outer shade
+                            Color(0xFF88E7E7), // Medium teal
+                            Color(0xFF55BFBF)  // Darker teal
+                        )
+                    ),
+                    shape = CircleShape
+                )
+                .padding(5.dp) // Inner padding for the icon
                 .clickable {
                     if (!hasConsented) {
                         setPendingCameraAction(true)
@@ -601,19 +685,23 @@ fun BottomNavBar(
                         }
                     }
                 },
-
             contentAlignment = Alignment.Center
         ) {
             Image(
-                painter = painterResource(id = R.drawable.camera_vector),
+                painter = painterResource(id = R.drawable.camera_fill),
                 contentDescription = "Camera",
-                modifier = Modifier.size(23.dp)
+                modifier = Modifier.size(30.dp)
             )
         }
+
+
+
+
+
     }
 }
 
-@Preview(showBackground = true)
+        @Preview(showBackground = true)
 @Composable
 fun UserHomeScreenPreview() {
     UserHomeScreen(navController = rememberNavController())

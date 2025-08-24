@@ -28,83 +28,82 @@ fun ArticleTemplate(
     onBackClick: () -> Unit
 ) {
     BubblesBackground {
-        Column{
-            Box(
+        Column(modifier = Modifier.fillMaxSize()) {
+
+            // --- FIXED HEADER SECTION ---
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 50.dp, bottom = 10.dp)
+                    .wrapContentHeight()
+                    .padding(top = 50.dp, start = 20.dp, end = 20.dp)
             ) {
+                // Back Button
                 BackButton(
                     onClick = onBackClick,
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .padding(start = 23.dp)
+                    modifier = Modifier.padding(bottom = 10.dp)
                 )
-            }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = newsItem.title,
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.headlineSmall
-                    )
-            }
-        }
 
-    Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight()
-                .padding(top = 130.dp, bottom = 20.dp)
-                .padding(horizontal = 20.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.Top,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(modifier = Modifier.height(20.dp))
-
-            newsItem.imageResId?.let { resId ->
-                Image(
-                    painter = painterResource(id = resId),
-                    contentDescription = "Article Image",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 180.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth(0.9f)
-                    .padding(bottom = 15.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "✎ ${newsItem.source}",
-                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = Color.Gray)
-                )
-                Text(
-                    text = newsItem.date,
-                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = Color(0xFFFFA726))
-                )
-            }
-
-            Column(modifier = Modifier.fillMaxWidth(0.9f)) {
+                // Title
                 Text(
                     text = newsItem.title,
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 28.sp
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp)
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                // Image
+                newsItem.imageResId?.let { resId ->
+                    Image(
+                        painter = painterResource(id = resId),
+                        contentDescription = "Article Image",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 200.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                    )
+                }
 
+                // Source and Date
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "✎ ${newsItem.source}",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontWeight = FontWeight.Medium,
+                            color = Color.Gray
+                        )
+                    )
+                    Text(
+                        text = newsItem.date,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFFFA726)
+                        )
+                    )
+                }
 
+                Divider(
+                    color = Color.LightGray.copy(alpha = 0.5f),
+                    thickness = 1.dp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            // --- SCROLLABLE BODY ONLY ---
+            Column(
+                modifier = Modifier
+                    .weight(1f) // takes remaining space
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 16.dp)
+            ) {
                 val body = newsItem.body
 
                 Text(
@@ -121,10 +120,19 @@ fun ArticleTemplate(
                         }
                         append(body.substring(lastIndex))
                     },
-                    style = MaterialTheme.typography.bodyMedium,
-                    lineHeight = 20.sp
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        lineHeight = 27.sp,
+                        color = Color(0xFF1D1D1D)
+                    ),
+                    textAlign = TextAlign.Justify
                 )
             }
         }
     }
 }
+
+
+
+
+
+

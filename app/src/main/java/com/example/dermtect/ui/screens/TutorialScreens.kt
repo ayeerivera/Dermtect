@@ -79,7 +79,7 @@ fun TutorialScreenTemplate(
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(30.dp))
+                Spacer(modifier = Modifier.height(35.dp))
 
                 Text(
                     text = title,
@@ -120,7 +120,7 @@ fun TutorialScreenTemplate(
                     modifier = Modifier
                         .fillMaxWidth(0.9f)
                         .wrapContentHeight(),
-                    textColor = Color(0xFF666666)
+                    textColor = Color(0xFFFFFFFF)
                 )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -131,10 +131,13 @@ fun TutorialScreenTemplate(
                     modifier = Modifier
                         .fillMaxWidth(0.9f)
                         .wrapContentHeight(),
-                    backgroundBrush = Brush.linearGradient(
-                        colors = listOf(Color(0xFFF0F0F0), Color(0xFFF0F0F0)) // light grey "flat" style
-                    ),
-                    textColor = Color(0xFF666666) // slightly darker grey for contrast
+                    backgroundBrush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xFFBDBDBD), // top light grey
+                                Color(0xFF9E9E9E), // middle grey
+                                Color(0xFF757575)  // bottom dark grey
+                            )
+                        )
                 )
 
             }
@@ -177,8 +180,8 @@ fun TutorialScreen2(navController: NavController) {
     TutorialScreenTemplate(
         navController = navController,
         imageResId = R.drawable.tutorial_pic2,
-        title = "Get Close, But Not Too Close",
-        description = "Hold your camera 2–4 inches (5–10 cm) away for a clear, focused image.",
+        title = "Keep the Right Distance",
+        description = "Hold the camera 2–4 inches (5–10 cm) from the skin for a clear image.",
         nextRoute = "tutorial_screen3",
         onBackClick = { navController.popBackStack() },
         onSkipClick = { navController.navigate("camera") },
@@ -191,8 +194,8 @@ fun TutorialScreen3(navController: NavController) {
     TutorialScreenTemplate(
         navController = navController,
         imageContent = { GifImage(R.drawable.tutorial_pic3, size = 280) },
-        title = "Keep It Clean",
-        description = "Make sure the skin is well-lit and free of hair, jewelry, or makeup that may block the view.",
+        title = "Clear View of Skin",
+        description = "Ensure the skin is well-lit and free of hair, jewelry, or makeup that could block the view.",
         nextRoute = "tutorial_screen4",
         onBackClick = { navController.popBackStack() },
         onSkipClick = { navController.navigate("camera") },
@@ -206,7 +209,7 @@ fun TutorialScreen4(navController: NavController) {
         navController = navController,
         imageContent = { GifImage(R.drawable.tutorial_pic4, size = 280) },
         title = "Save and Track",
-        description = "After scanning, your result is saved automatically. You can track your scan history and monitor changes.",
+        description = "Your scan is saved automatically. View your history to monitor changes over time.",
         nextRoute = "tutorial_screen5",
         onBackClick = { navController.popBackStack() },
         onSkipClick = { navController.navigate("camera") },
@@ -220,11 +223,11 @@ fun TutorialScreen5(navController: NavController) {
         navController = navController,
         imageContent = { GifImage(R.drawable.tutorial_pic5, size = 280) },
         title = "Download & Consult",
-        description = "Generate your PDF report anytime — and use the clinic locator to find a nearby dermatologist.",
+        description = "Generate a PDF report anytime and use the clinic locator to find a nearby dermatologist.",
         nextRoute = "camera",
         onBackClick = { navController.popBackStack() },
         onSkipClick = { navController.navigate("camera") },
-        currentIndex = 3
+        currentIndex = 4
     )
 }
 
