@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.AssignmentTurnedIn
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -86,8 +87,6 @@ fun ProfileScreenTemplate(
         sharedProfileViewModel.setImageUri(uri) // must call ViewModel
     }
 
-
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -97,7 +96,7 @@ fun ProfileScreenTemplate(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(360.dp) // adjust as needed
+                .height(360.dp)
                 .background(
                     color = Color(0xFFCDFFFF)
                 )
@@ -131,7 +130,6 @@ fun ProfileScreenTemplate(
                         .clickable { showPhoto = true },
                     contentAlignment = Alignment.BottomEnd
                 ) {
-                    // Only the image is clipped, not the whole box
                     if (selectedImageUri != null) {
                         AsyncImage(
                             model = selectedImageUri,
@@ -152,7 +150,6 @@ fun ProfileScreenTemplate(
                         )
                     }
 
-                    // Edit icon outside the circle visually
                     Box(
                         modifier = Modifier
                             .size(38.dp)
@@ -181,97 +178,113 @@ fun ProfileScreenTemplate(
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
                     )
                     Spacer(Modifier.width(6.dp))
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Edit Name",
-                        modifier = Modifier
-                            .size(20.dp)
-                            .clickable {
-                                // 🔄 reset edit fields to current ViewModel values
-                                editedFirstName = firstNameState
-                                editedLastName = lastNameState
-                                showEditNameDialog = true
-                            }
-                    )
-
+                    // Removed pencil icon as requested
                 }
-}
             }
-    }
-    Card(
-        modifier = Modifier
-            .offset(x = 25.dp, y = 344.dp)
-            .fillMaxWidth(0.9f)
-            .wrapContentHeight()
-            .shadow(8.dp, RoundedCornerShape(36.dp)),
-        shape = RoundedCornerShape(36.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-    ) {
-        Column{
-            Box(
-                modifier = Modifier
-                    .offset(x = 19.dp, y = 18.dp)
-                    .size(width = 323.dp, height = 85.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFEDFFFF))
-            ) {
-                AccountInfoRow(email = email, isGoogleAccount = isGoogleAccount)
-            }
-
-            Spacer(modifier = Modifier.height(30.dp))
-
-            ChangePasswordRow(
-                icon = {
-                    Icon(
-                        imageVector = Icons.Filled.Lock,
-                        contentDescription = "Change Password",
-                        tint = Color(0xFF0FB2B2),
-                        modifier = Modifier.size(28.dp)
-                    )
-                },
-                label = "Change Password",
-                onClick = {
-                    navController.navigate("change_pass")
+        }
+        Card(
+            modifier = Modifier
+                .offset(x = 25.dp, y = -20.dp) // matched to Settings
+                .fillMaxWidth(0.9f)
+                .wrapContentHeight()
+                .shadow(8.dp, RoundedCornerShape(36.dp)), // matched to Settings
+            shape = RoundedCornerShape(36.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column {
+                Box(
+                    modifier = Modifier
+                        .offset(x = 19.dp, y = 18.dp)
+                        .size(width = 323.dp, height = 85.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFFEDFFFF))
+                ) {
+                    AccountInfoRow(email = email, isGoogleAccount = isGoogleAccount)
                 }
-            )
 
-            if (userRole == "user") {
-                AssessmentRow(
+                Spacer(modifier = Modifier.height(30.dp))
+
+                // Edit Name row (using font size from Settings)
+                EditName(
                     icon = {
                         Icon(
-                            imageVector = Icons.Filled.AssignmentTurnedIn,
-                            contentDescription = "My Assessment Report",
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit Name",
                             tint = Color(0xFF0FB2B2),
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(28.dp) // 28.dp to match Settings icon size
                         )
                     },
-                    label = "My Assessment Report",
+                    label = "Edit Name",
                     onClick = {
-                        navController.navigate("questionnaire")
+                        editedFirstName = firstNameState
+                        editedLastName = lastNameState
+                        showEditNameDialog = true
                     }
                 )
-            }
 
-            DeleteAccountRow(
-                icon = {
-                    Icon(
-                        imageVector = Icons.Filled.Delete,
-                        contentDescription = "Delete Account",
-                        tint = Color(0xFF0FB2B2),
-                        modifier = Modifier.size(28.dp)
+                ChangePasswordRow(
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Filled.Lock,
+                            contentDescription = "Change Password",
+                            tint = Color(0xFF0FB2B2),
+                            modifier = Modifier.size(28.dp) // matched Settings icon size
+                        )
+                    },
+                    label = "Change Password",
+                    onClick = {
+                        navController.navigate("change_pass")
+                    }
+                )
+
+                if (userRole == "user") {
+                    AssessmentRow(
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Filled.AssignmentTurnedIn,
+                                contentDescription = "My Assessment Report",
+                                tint = Color(0xFF0FB2B2),
+                                modifier = Modifier.size(28.dp) // matched Settings icon size
+                            )
+                        },
+                        label = "My Assessment Report",
+                        onClick = {
+                            navController.navigate("questionnaire")
+                        },
+                        fontSize = 16.sp // added parameter for font size in AssessmentRow
                     )
-                },
-                label = "Delete Account",
-                onClick = {
-                    showDeleteDialog = true
                 }
-            )
 
-            Spacer(modifier = Modifier.height(15.dp))
+                DeleteAccountRow(
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Filled.Delete,
+                            contentDescription = "Deactivate Account",
+                            tint = Color(0xFF0FB2B2),
+                            modifier = Modifier.size(28.dp) // matched Settings icon size
+                        )
+                    },
+                    label = "Deactivate Account",
+                    onClick = {
+                        showDeleteDialog = true
+                    }
+                )
 
-            LogoutRow {
-                showLogoutDialog = true
+                ChangePasswordRow(
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.ExitToApp,
+                            contentDescription = "Logout",
+                            tint = Color(0xFF0FB2B2),
+                            modifier = Modifier.size(28.dp) // matched Settings icon size
+                        )
+                    },
+                    label = "Logout",
+                    onClick = {
+                        showLogoutDialog = true
+                    }
+                )
             }
         }
     }
@@ -280,7 +293,7 @@ fun ProfileScreenTemplate(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0x80000000)) // semi-transparent backdrop
+                .background(Color(0x80000000))
         ) {
             Box(
                 modifier = Modifier
@@ -327,7 +340,7 @@ fun ProfileScreenTemplate(
             }
         }
     }
-    // Edit photo options
+
     DialogTemplate(
         show = showPhotoOptions,
         title = "Edit Profile Photo",
@@ -349,7 +362,6 @@ fun ProfileScreenTemplate(
         onDismiss = { showPhotoOptions = false }
     )
 
-// Confirm remove photo
     DialogTemplate(
         show = showRemoveConfirmDialog,
         title = "Remove Profile Photo?",
@@ -372,7 +384,7 @@ fun ProfileScreenTemplate(
         onPrimary = {
             if (passwordInput.isBlank()) {
                 showPasswordError = true
-                showDeleteDialog = true // keep the dialog open
+                showDeleteDialog = true
             } else {
                 showPasswordError = false
                 coroutineScope.launch {
@@ -430,9 +442,10 @@ fun ProfileScreenTemplate(
             }
         }
     )
+
     if (triggerNavigation) {
         LaunchedEffect(Unit) {
-            delay(2000) // wait for dialog to show
+            delay(2000)
             navController.navigate("login") {
                 popUpTo("profile") { inclusive = true }
             }
@@ -469,7 +482,6 @@ fun ProfileScreenTemplate(
             title = "Edit Name",
             primaryText = "Save",
             onPrimary = {
-                // Save
                 if (userRole == "user") {
                     userHomeViewModel.updateName(editedFirstName, editedLastName)
                 } else {
@@ -478,12 +490,9 @@ fun ProfileScreenTemplate(
                 editedFirstName = firstNameState
                 editedLastName  = lastNameState
                 showEditNameDialog = false
-
-                showEditNameDialog = false
             },
             secondaryText = "Cancel",
             onSecondary = {
-                // ❗️only test discard on Cancel
                 if (editedFirstName != firstNameState || editedLastName != lastNameState) {
                     showDiscardDialog = true
                 } else {
@@ -491,7 +500,6 @@ fun ProfileScreenTemplate(
                 }
             },
             onDismiss = {
-                // ❗️also here (outside click / back press)
                 if (editedFirstName != firstNameState || editedLastName != lastNameState) {
                     showDiscardDialog = true
                 } else {
@@ -524,7 +532,6 @@ fun ProfileScreenTemplate(
             onPrimary = {
                 showDiscardDialog = false
                 showEditNameDialog = false
-                // reset edited fields
                 editedFirstName = firstNameState
                 editedLastName  = lastNameState
             },
@@ -537,58 +544,12 @@ fun ProfileScreenTemplate(
             }
         )
     }
-
 }
 
-
+// Reusing existing composables below with no changes needed
 
 @Composable
 fun ChangePasswordRow(icon: @Composable () -> Unit, label: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(width = 43.92.dp, height = 40.26.dp)
-                .clip(CircleShape)
-                .background(Color(0xFFEDFFFF)),
-            contentAlignment = Alignment.Center
-        ) {
-            icon()
-        }
-
-        Spacer(modifier = Modifier.width(16.dp))
-
-        Text(
-            text = label,
-            fontSize = 16.sp,
-            color = Color(0xFF484848),
-            fontWeight = FontWeight.Normal,
-            modifier = Modifier.weight(1f)
-        )
-
-        Box(
-            modifier = Modifier
-                .size(width = 26.dp, height = 24.dp)
-                .background(Color.White, shape = RoundedCornerShape(4.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                painter = painterResource(id = R.drawable.arrow_right),
-                contentDescription = "Navigate",
-                tint = Color(0xFF0FB2B2),
-                modifier = Modifier.size(width = 8.03.dp, height = 12.dp)
-            )
-        }
-    }
-}
-
-@Composable
-fun AssessmentRow(icon: @Composable () -> Unit, label: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -611,6 +572,57 @@ fun AssessmentRow(icon: @Composable () -> Unit, label: String, onClick: () -> Un
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal),
+            color = Color(0xFF484848),
+            modifier = Modifier.weight(1f)
+        )
+
+        Box(
+            modifier = Modifier
+                .size(width = 26.dp, height = 24.dp)
+                .background(Color.White, shape = RoundedCornerShape(4.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.arrow_right),
+                contentDescription = "Navigate",
+                tint = Color(0xFF0FB2B2),
+                modifier = Modifier.size(15.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun AssessmentRow(
+    icon: @Composable () -> Unit,
+    label: String,
+    onClick: () -> Unit,
+    fontSize: androidx.compose.ui.unit.TextUnit = 16.sp
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(width = 43.92.dp, height = 40.26.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFEDFFFF)),
+            contentAlignment = Alignment.Center
+        ) {
+            icon()
+        }
+
+        Spacer(modifier = Modifier.width(15.dp))
+
+        Text(
+            text = label,
+            fontSize = fontSize,
+            color = Color(0xFF484848),
+            fontWeight = FontWeight.Normal,
             modifier = Modifier.weight(1f)
         )
 
@@ -646,7 +658,6 @@ fun DeleteAccountRow(icon: @Composable () -> Unit, label: String, onClick: () ->
                 .background(Color(0xFFEDFFFF)),
             contentAlignment = Alignment.Center
         ) {
-
             icon()
         }
 
@@ -655,6 +666,51 @@ fun DeleteAccountRow(icon: @Composable () -> Unit, label: String, onClick: () ->
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal),
+            color = Color(0xFF484848),
+            modifier = Modifier.weight(1f)
+        )
+
+        Box(
+            modifier = Modifier
+                .size(width = 26.dp, height = 24.dp)
+                .background(Color.White, shape = RoundedCornerShape(4.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.arrow_right),
+                contentDescription = "Navigate",
+                tint = Color(0xFF0FB2B2),
+                modifier = Modifier.size(15.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun EditName(icon: @Composable () -> Unit, label: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(width = 43.92.dp, height = 40.26.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFEDFFFF)),
+            contentAlignment = Alignment.Center
+        ) {
+            icon()
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal),
+            color = Color(0xFF484848),
             modifier = Modifier.weight(1f)
         )
 
