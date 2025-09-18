@@ -1,5 +1,6 @@
 package com.example.cameradermtect
 
+import com.example.dermtect.ui.screens.ResultScreen
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Matrix
@@ -18,6 +19,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -47,6 +49,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.example.dermtect.ui.components.BackButton
 
+import com.example.dermtect.tflt.TfLiteService
+import com.example.dermtect.tflt.DermtectResult
+
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.rememberCoroutineScope
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+
 
 // ✅ Constant for square size
 val FOCUS_BOX_WIDTH = 280.dp
@@ -59,6 +72,10 @@ fun TakePhotoScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
+
+    val tfService = remember { TfLiteService.get(context) }        // one instance
+    val scope = rememberCoroutineScope()
+
     var lensFacing = CameraSelector.LENS_FACING_BACK
     val cameraExecutor: ExecutorService = remember { Executors.newSingleThreadExecutor() }
 
@@ -74,6 +91,9 @@ fun TakePhotoScreen(
 
     // Save square region for cropping
     var squareRect by remember { mutableStateOf<Rect?>(null) }
+
+    var isRunning by remember { mutableStateOf(false) }
+    var inferenceResult by remember { mutableStateOf<DermtectResult?>(null) }
 
     DisposableEffect(Unit) {
         val cameraProvider = cameraProviderFuture.get()
@@ -288,55 +308,50 @@ fun TakePhotoScreen(
 
         // === Show captured image popup (with buttons) ===
         capturedImage?.let { image ->
+
+            // Auto-run inference when a new image is captured
+            LaunchedEffect(image) {
+                if (!isRunning && inferenceResult == null) {
+                    isRunning = true
+                    val r = withContext(Dispatchers.Default) { tfService.infer(image) }
+                    inferenceResult = r
+                    isRunning = false
+                }
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.White),
-                contentAlignment = Alignment.Center
+                    .background(Color.White)
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(24.dp)
-                ) {
-                    Spacer(modifier = Modifier.height(40.dp))
+                when {
+                    isRunning -> {
+                        Column(
+                            modifier = Modifier.align(Alignment.Center),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            CircularProgressIndicator()
+                            Spacer(Modifier.height(8.dp))
+                            Text("Analyzing...", color = Color.Gray)
+                        }
+                    }
+                    inferenceResult != null -> {
+                        val r = inferenceResult!!
+                        val prediction = if (r.isMalignant) "Malignant" else "Benign"
 
-                    // Captured Image same as focus box
-                    Image(
-                        bitmap = image.asImageBitmap(),
-                        contentDescription = "Captured",
-                        modifier = Modifier
-                            .size(width = FOCUS_BOX_WIDTH, height = FOCUS_BOX_HEIGHT)
-                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
-                            .background(Color.LightGray),
-                        contentScale = ContentScale.Crop
-                    )
-
-                    Spacer(modifier = Modifier.height(60.dp))
-
-                    // Retake + Proceed side by side
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        GradientButton(
-                            text = "Retake",
-                            onClick = { capturedImage = null },
-                            modifier = Modifier.weight(1f)
-                        )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        GradientButton(
-                            text = "Proceed",
-                            onClick = {
-                                // TODO: handle proceed
-                            },
-                            modifier = Modifier.weight(1f)
+                        // ResultScreen is in ui.screens package; since TakePhotoScreen is also in that package,
+                        // you can call it directly.
+                        ResultScreen(
+                            imageBitmap = image,
+                            prediction = prediction,
+                            probability = r.probability,
+                            riskMessage = "Sample message: No serious risks detected. Please monitor for changes and consult a dermatologist if needed.",
+                            camBitmap   = r.heatmap
                         )
                     }
                 }
             }
+
         }
     }
 }

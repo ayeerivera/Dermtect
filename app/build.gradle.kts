@@ -40,6 +40,18 @@ android {
         viewBinding = true
     }
 
+    androidResources {
+        noCompress += "tflite"
+    }
+
+    packaging {
+        resources {
+            // usual boilerplate
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+
+        }
+    }
+
 }
 
 dependencies {
@@ -98,4 +110,11 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+
+    // Core TFLite runtime
+    implementation("org.tensorflow:tensorflow-lite:2.17.0")
+
+    // (Optional) NNAPI / GPU delegates – use one that works on your target devices
+    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.14.0")
+    // implementation("org.tensorflow:tensorflow-lite-gpu:2.14.0")
 }
