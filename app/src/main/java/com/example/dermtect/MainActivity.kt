@@ -50,6 +50,7 @@ import com.example.dermtect.ui.screens.TutorialScreen5
 import com.example.dermtect.ui.screens.PendingCasesScreen
 import com.example.dermtect.ui.components.ProfileScreenTemplate
 import com.example.dermtect.ui.screens.ClinicTemplateScreen
+import com.example.dermtect.ui.screens.LesionCaseTemplate
 import com.example.dermtect.ui.theme.DermtectTheme
 import com.example.dermtect.ui.viewmodel.DermaHomeViewModel
 import com.example.dermtect.ui.viewmodel.SharedProfileViewModel
@@ -57,6 +58,7 @@ import com.example.dermtect.ui.viewmodel.UserHomeViewModel
 import com.google.firebase.FirebaseApp
 import com.google.gson.Gson
 import kotlin.jvm.java
+import com.example.dermtect.ui.screens.generateTherapeuticMessage
 
 
 class MainActivity : ComponentActivity() {
@@ -83,6 +85,7 @@ class MainActivity : ComponentActivity() {
                         val email = backStackEntry.arguments?.getString("email") ?: ""
                         ForgotPass2(navController, email)
                     }
+
                     composable("forgot_pass3") { ForgotPass3(navController) }
                     composable("forgot_pass4") { ForgotPass4(navController) }
                     composable("change_pass") { ChangePasswordScreen(navController) }
@@ -239,6 +242,6 @@ class MainActivity : ComponentActivity() {
                 }
 
             }
-            }
         }
     }
+}
