@@ -1,6 +1,5 @@
 package com.example.cameradermtect
 
-import com.example.dermtect.ui.screens.ResultScreen
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Matrix
