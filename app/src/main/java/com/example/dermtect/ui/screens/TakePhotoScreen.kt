@@ -54,14 +54,22 @@ import com.example.dermtect.tflt.DermtectResult
 
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.rememberCoroutineScope
+import com.example.dermtect.ui.screens.LesionCaseTemplate
+import com.example.dermtect.ui.screens.generateTherapeuticMessage
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
+fun nowTimestamp(): String {
+    val sdf = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
+    return sdf.format(Date())
+}
 
-
-// ✅ Constant for square size
+ // ✅ Constant for square size
 val FOCUS_BOX_WIDTH = 280.dp
 val FOCUS_BOX_HEIGHT = 340.dp // mas mahaba para skin lesion focus
 
@@ -337,18 +345,31 @@ fun TakePhotoScreen(
                     }
                     inferenceResult != null -> {
                         val r = inferenceResult!!
-                        val prediction = if (r.isMalignant) "Malignant" else "Benign"
+                        val predictionStr = if (r.isMalignant) "Malignant" else "Benign"
 
-                        // ResultScreen is in ui.screens package; since TakePhotoScreen is also in that package,
-                        // you can call it directly.
-                        ResultScreen(
-                            imageBitmap = image,
-                            prediction = prediction,
-                            probability = r.probability,
-                            riskMessage = "Sample message: No serious risks detected. Please monitor for changes and consult a dermatologist if needed.",
-                            camBitmap   = r.heatmap
+                        // therapeutic copy from the real probability
+                        val riskCopy = generateTherapeuticMessage(
+                            prediction = predictionStr,
+                            probability = r.probability
                         )
+
+                        LesionCaseTemplate(
+                            imageBitmap = image,
+                            camBitmap = r.heatmap,
+                            title = "Result",
+                            timestamp = nowTimestamp(),   // 👈 auto-generated from device
+                            riskTitle = "Risk Assessment:",
+                            riskDescription = riskCopy,
+                            prediction = if (r.isMalignant) "Malignant" else "Benign", // for DB only
+                            probability = r.probability,                              // for DB only
+                            onBackClick = { inferenceResult = null; capturedImage = null },
+                            onDownloadClick = { /* ... */ },
+                            onFindClinicClick = { /* ... */ }
+                        )
+
                     }
+
+
                 }
             }
 
