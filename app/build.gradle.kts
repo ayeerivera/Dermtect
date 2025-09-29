@@ -92,9 +92,6 @@ dependencies {
     // Google sign-in
     implementation("com.google.android.gms:play-services-auth:21.0.0")
 
-    // mapbox
-    //implementation ("com.mapbox.maps:android:10.15.1")
-
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
@@ -117,4 +114,11 @@ dependencies {
     // (Optional) NNAPI / GPU delegates – use one that works on your target devices
     implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.14.0")
     // implementation("org.tensorflow:tensorflow-lite-gpu:2.14.0")
+
+    //OSMdroid MAPS
+    implementation ("org.osmdroid:osmdroid-android:6.1.18")
+    implementation ("com.google.android.gms:play-services-location:21.3.0") // for user location
+    implementation ("com.squareup.okhttp3:okhttp:4.12.0") // for Overpass API calls
+    implementation ("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1") // parse JSON
+    implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }
