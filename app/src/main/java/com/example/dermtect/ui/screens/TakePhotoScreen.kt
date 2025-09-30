@@ -34,7 +34,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -47,7 +46,16 @@ import androidx.compose.ui.geometry.Size as GeometrySize
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.example.dermtect.ui.components.BackButton
-
+import android.app.Activity
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.*
+import androidx.compose.material3.*
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.example.dermtect.tflt.TfLiteService
 import com.example.dermtect.tflt.DermtectResult
 
@@ -75,7 +83,7 @@ val FOCUS_BOX_HEIGHT = 340.dp // mas mahaba para skin lesion focus
 @Composable
 fun TakePhotoScreen(
     onBackClick: () -> Unit = {}
-) {
+) {a
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
@@ -163,7 +171,6 @@ fun TakePhotoScreen(
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .offset(y = (-80).dp) // move square higher
             ) {
                 // Dim background
                 drawRect(
@@ -430,4 +437,66 @@ fun rotateBitmapAccordingToExif(context: Context, file: File): Bitmap {
     }
 
     return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+}
+
+@Composable
+fun CameraPermissionGate(
+    onGranted: @Composable () -> Unit,
+    // optional UI if denied; keep it simple by default
+    deniedContent: @Composable () -> Unit = {
+        Text("Camera permission is required to continue.")
+    }
+) {
+    val context = LocalContext.current
+    val activity = context as? Activity
+    var checked by remember { mutableStateOf(false) }
+    var granted by remember { mutableStateOf(false) }
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        granted = isGranted
+        checked = true
+        if (!isGranted) {
+            Toast.makeText(context, "Camera permission denied", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (hasPermission) {
+            granted = true
+            checked = true
+        } else {
+            launcher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    // If user denied and checked is true, optionally show rationale + re-request button
+    if (checked && !granted) {
+        val shouldShowRationale =
+            activity?.let { ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.CAMERA) } == true
+
+        Column {
+            deniedContent()
+            if (shouldShowRationale) {
+                Text("We use the camera to take/scan images. Please allow it to continue.")
+                Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) {
+                    Text("Allow Camera")
+                }
+            } else {
+                // "Don’t ask again" or first hard denial → guide to Settings
+                Button(onClick = {
+                    Toast.makeText(context, "Go to App Settings → Permissions → Camera", Toast.LENGTH_LONG).show()
+                }) {
+                    Text("Open Settings")
+                }
+            }
+        }
+    } else if (granted) {
+        onGranted()
+    }
 }
