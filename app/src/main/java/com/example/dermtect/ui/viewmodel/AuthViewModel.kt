@@ -2,17 +2,25 @@ package com.example.dermtect.ui.viewmodel
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import com.example.dermtect.domain.usecase.AuthUseCase
-import com.google.firebase.auth.*
-import com.google.firebase.firestore.*
+import com.google.firebase.auth.EmailAuthProvider
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
+import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
 
+    // --- Firebase --- //
     private val auth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
 
+    // --- Loading / Result flags (kept for backward compatibility) --- //
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading
 
@@ -25,191 +33,187 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage
 
+    private val _navigateToHome = MutableStateFlow(false)
+    val navigateToHome: StateFlow<Boolean> = _navigateToHome
 
+    // --- Persistent Auth State for app routing --- //
+    sealed interface AuthUiState {
+        data object Loading : AuthUiState
+        data object SignedOut : AuthUiState
+        data class EmailUnverified(val user: FirebaseUser) : AuthUiState
+        data class SignedIn(val user: FirebaseUser) : AuthUiState
+    }
 
+    private val _authState = MutableStateFlow<AuthUiState>(AuthUiState.Loading)
+    val authState: StateFlow<AuthUiState> = _authState
+
+    private val authListener = FirebaseAuth.AuthStateListener { fa ->
+        val user = fa.currentUser
+        if (user == null) {
+            _authState.value = AuthUiState.SignedOut
+        } else {
+            // Evaluate role-based access + email verification on every session restore
+            evaluateUserState(user)
+        }
+    }
+
+    init {
+        auth.addAuthStateListener(authListener)
+        // Fire immediately to reflect current session on cold start
+        authListener.onAuthStateChanged(auth)
+    }
+
+    override fun onCleared() {
+        auth.removeAuthStateListener(authListener)
+        super.onCleared()
+    }
+
+    // --- Audit logging --- //
     private fun logAudit(uid: String?, email: String?, action: String) {
-        val db = FirebaseFirestore.getInstance()
         val logEntry = hashMapOf(
             "uid" to uid,
             "email" to email,
             "action" to action,
             "timestamp" to FieldValue.serverTimestamp()
         )
-
         Log.d("AuditLog", "Logging action: $action for uid=$uid email=$email")
 
-        db.collection("audit_logs").add(logEntry)
-            .addOnSuccessListener {
-                Log.d("AuditLog", "Audit log saved.")
+        firestore.collection("audit_logs").add(logEntry)
+            .addOnSuccessListener { Log.d("AuditLog", "Audit log saved.") }
+            .addOnFailureListener { Log.e("AuditLog", "Failed to log audit event: ${it.message}") }
+    }
+
+    // --- Helper: Evaluate current user for routing (derma bypass) --- //
+    private fun evaluateUserState(user: FirebaseUser) {
+        _authState.value = AuthUiState.Loading
+        firestore.collection("users").document(user.uid).get()
+            .addOnSuccessListener { doc ->
+                val role = doc.getString("role") ?: "patient"
+                val allow = role == "derma" || user.isEmailVerified
+                _authState.value = if (allow) AuthUiState.SignedIn(user) else AuthUiState.EmailUnverified(user)
             }
             .addOnFailureListener {
-                Log.e("AuditLog", "Failed to log audit event: ${it.message}")
+                // If role fetch fails, fall back to plain email verification
+                _authState.value = if (user.isEmailVerified) AuthUiState.SignedIn(user) else AuthUiState.EmailUnverified(user)
             }
     }
 
-    private val _navigateToHome = MutableStateFlow(false)
-    val navigateToHome: StateFlow<Boolean> = _navigateToHome
-
-
+    // --- Registration --- //
     fun register(email: String, password: String, firstName: String, lastName: String) {
         _loading.value = true
         auth.createUserWithEmailAndPassword(email, password)
             .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    val user = auth.currentUser
-
-                    val formattedFirstName = firstName.lowercase().replaceFirstChar { it.uppercaseChar().toString() }
-                    val formattedLastName = lastName.lowercase().replaceFirstChar { it.uppercaseChar().toString() }
-
-                    val userData = hashMapOf(
-                        "uid" to user?.uid,
-                        "email" to user?.email,
-                        "firstName" to formattedFirstName,
-                        "lastName" to formattedLastName,
-                        "createdAt" to FieldValue.serverTimestamp(),
-                        "emailVerified" to false,
-                        "role" to "patient",
-                        "provider" to "email"
-                    )
-
-
-                    user?.let {
-                        FirebaseFirestore.getInstance()
-                            .collection("users")
-                            .document(it.uid)
-                            .set(userData)
-                            .addOnSuccessListener {
-                                user.sendEmailVerification()
-                                    .addOnCompleteListener { emailTask ->
-                                        if (emailTask.isSuccessful) {
-                                            logAudit(user.uid, user.email, "account_created")
-                                            FirebaseAuth.getInstance().signOut()
-                                            _authSuccess.value = true
-                                        } else {
-                                            _errorMessage.value = "Failed to send verification email."
-                                        }
-                                        _loading.value = false
-                                    }
-                            }
-                            .addOnFailureListener {
-                                _loading.value = false
-                                _errorMessage.value = "Failed to save user info."
-                            }
-                    } ?: run {
-                        _loading.value = false
-                        _errorMessage.value = "Registration failed: no user."
-                    }
-                } else {
+                if (!task.isSuccessful) {
                     _loading.value = false
                     _errorMessage.value = task.exception?.message ?: "Registration failed"
+                    return@addOnCompleteListener
                 }
+
+                val user = auth.currentUser
+                if (user == null) {
+                    _loading.value = false
+                    _errorMessage.value = "Registration failed: no user."
+                    return@addOnCompleteListener
+                }
+
+                val formattedFirstName = firstName.lowercase().replaceFirstChar { it.uppercaseChar().toString() }
+                val formattedLastName = lastName.lowercase().replaceFirstChar { it.uppercaseChar().toString() }
+
+                val userData = hashMapOf(
+                    "uid" to user.uid,
+                    "email" to user.email,
+                    "firstName" to formattedFirstName,
+                    "lastName" to formattedLastName,
+                    "createdAt" to FieldValue.serverTimestamp(),
+                    "emailVerified" to false,
+                    "role" to "patient",
+                    "provider" to "email"
+                )
+
+                firestore.collection("users").document(user.uid).set(userData)
+                    .addOnSuccessListener {
+                        user.sendEmailVerification()
+                            .addOnCompleteListener { emailTask ->
+                                _loading.value = false
+                                if (emailTask.isSuccessful) {
+                                    logAudit(user.uid, user.email, "account_created")
+                                    // Optional: sign out after registration to force email verification flow
+                                    FirebaseAuth.getInstance().signOut()
+                                    _authSuccess.value = true
+                                } else {
+                                    _errorMessage.value = "Failed to send verification email."
+                                }
+                            }
+                    }
+                    .addOnFailureListener {
+                        _loading.value = false
+                        _errorMessage.value = "Failed to save user info."
+                    }
             }
     }
+
     fun isPasswordStrong(password: String): Boolean {
         val passwordRegex =
             Regex("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@\$!%*#?&])[A-Za-z\\d@\$!%*#?&]{8,}\$")
         return passwordRegex.matches(password)
     }
 
-
+    // --- Email/Password Login --- //
     fun login(email: String, password: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         _isLoading.value = true
 
         authUseCase.loginUser(email, password)
             .addOnCompleteListener { task ->
                 _isLoading.value = false
-                if (task.isSuccessful) {
-                    val user = auth.currentUser
-                    user?.reload()?.addOnCompleteListener { reloadTask ->
-                        if (reloadTask.isSuccessful) {
-                            FirebaseFirestore.getInstance()
-                                .collection("users")
-                                .document(user.uid)
-                                .get()
-                                .addOnSuccessListener { document ->
-                                    val role = document.getString("role") ?: "user"
-                                    val isVerified = user.isEmailVerified || role == "derma"
-
-                                    if (isVerified) {
-                                        document.reference.update(
-                                            mapOf(
-                                                "emailVerified" to true,
-                                                "provider" to "email"
-                                            )
-                                        ).addOnSuccessListener {
-                                            logAudit(user.uid, user.email, "login")
-                                            _authSuccess.value = true
-                                            _navigateToHome.value = true
-                                            onSuccess()
-                                        }.addOnFailureListener {
-                                            onError("Verified but failed to update Firestore.")
-                                        }
-                                    } else {
-                                        onError("Please verify your email first.")
-                                        auth.signOut()
-                                    }
-                                }
-                                .addOnFailureListener {
-                                    onError("Failed to reload user info.")
-                                }
-                        }
-                        }
-                } else {
+                if (!task.isSuccessful) {
                     onError(task.exception?.message ?: "Login failed")
+                    return@addOnCompleteListener
+                }
+
+                val user = auth.currentUser ?: return@addOnCompleteListener
+                user.reload().addOnCompleteListener {
+                    // Fetch role for derma bypass, update Firestore on verified email
+                    firestore.collection("users").document(user.uid).get()
+                        .addOnSuccessListener { document ->
+                            val role = document.getString("role") ?: "patient"
+                            val isVerified = user.isEmailVerified || role == "derma"
+
+                            if (isVerified) {
+                                document.reference.update(
+                                    mapOf(
+                                        "emailVerified" to true,
+                                        "provider" to "email"
+                                    )
+                                ).addOnSuccessListener {
+                                    logAudit(user.uid, user.email, "login")
+                                    _authSuccess.value = true
+                                    _navigateToHome.value = true // kept for backward compatibility
+                                    onSuccess()
+                                    // Listener will emit SignedIn soon after
+                                }.addOnFailureListener {
+                                    onError("Verified but failed to update Firestore.")
+                                }
+                            } else {
+                                // IMPORTANT: do NOT sign out here. Keep session and let UI show Verify screen.
+                                onError("Please verify your email first.")
+                                evaluateUserState(user) // will emit EmailUnverified
+                            }
+                        }
+                        .addOnFailureListener {
+                            onError("Failed to reload user info.")
+                        }
                 }
             }
     }
 
+    // --- Google Sign-In --- //
     fun signInWithGoogle(idToken: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         val credential = GoogleAuthProvider.getCredential(idToken, null)
-
         auth.signInWithCredential(credential)
             .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    val user = auth.currentUser ?: return@addOnCompleteListener
-                    val uid = user.uid
-                    val email = user.email ?: ""
-
-                    val db = FirebaseFirestore.getInstance()
-                    val userDocRef = db.collection("users").document(uid)
-
-                    userDocRef.get()
-                        .addOnSuccessListener { document ->
-                            if (!document.exists()) {
-                                // If no document, create one
-                                val names = user.displayName?.split(" ") ?: listOf("", "")
-                                val firstName = names.getOrNull(0) ?: ""
-                                val lastName = names.getOrNull(1) ?: ""
-
-                                val userData = mapOf(
-                                    "uid" to uid,
-                                    "email" to email,
-                                    "firstName" to firstName,
-                                    "lastName" to lastName,
-                                    "role" to "patient",
-                                    "provider" to "google",
-                                    "createdAt" to FieldValue.serverTimestamp()
-                                )
-
-                                userDocRef.set(userData)
-                                    .addOnSuccessListener {
-                                        logAudit(uid, email, "google_sign_in_created")
-                                        onSuccess()
-                                    }
-                                    .addOnFailureListener { onError("Failed to save user data") }
-                            } else {
-                                logAudit(uid, email, "google_sign_in_existing")
-                                onSuccess()
-                            }
-                        }
-                        .addOnFailureListener {
-                            onError("Failed to fetch user document")
-                        }
-
-                } else {
+                if (!task.isSuccessful) {
                     val exception = task.exception
                     if (exception is FirebaseAuthUserCollisionException) {
-                        // Email already exists: try to link Google to the existing email/password account
                         val email = exception.email
                         if (email != null) {
                             onError("This email is already registered with another method. Please login with email/password first.")
@@ -219,41 +223,102 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
                     } else {
                         onError(exception?.localizedMessage ?: "Google Sign-In Failed")
                     }
+                    return@addOnCompleteListener
                 }
+
+                val user = auth.currentUser ?: return@addOnCompleteListener
+                val uid = user.uid
+                val email = user.email ?: ""
+
+                val userDocRef = firestore.collection("users").document(uid)
+                userDocRef.get()
+                    .addOnSuccessListener { document ->
+                        if (!document.exists()) {
+                            val names = user.displayName?.split(" ") ?: listOf("", "")
+                            val firstName = names.getOrNull(0) ?: ""
+                            val lastName = names.getOrNull(1) ?: ""
+
+                            val userData = mapOf(
+                                "uid" to uid,
+                                "email" to email,
+                                "firstName" to firstName,
+                                "lastName" to lastName,
+                                "role" to "patient",
+                                "provider" to "google",
+                                "createdAt" to FieldValue.serverTimestamp()
+                            )
+
+                            userDocRef.set(userData)
+                                .addOnSuccessListener {
+                                    logAudit(uid, email, "google_sign_in_created")
+                                    onSuccess()
+                                    evaluateUserState(user)
+                                }
+                                .addOnFailureListener { onError("Failed to save user data") }
+                        } else {
+                            logAudit(uid, email, "google_sign_in_existing")
+                            onSuccess()
+                            evaluateUserState(user)
+                        }
+                    }
+                    .addOnFailureListener { onError("Failed to fetch user document") }
             }
     }
 
+    // --- Verify helpers --- //
+    fun resendVerificationEmail(onResult: (Boolean, String?) -> Unit) {
+        val user = auth.currentUser
+        if (user == null) {
+            onResult(false, "No authenticated user.")
+            return
+        }
+        user.sendEmailVerification()
+            .addOnSuccessListener { onResult(true, null) }
+            .addOnFailureListener { e -> onResult(false, e.message ?: "Failed to send email") }
+    }
+
+    fun reloadAndRefresh() {
+        val user = auth.currentUser ?: return
+        user.reload().addOnCompleteListener { evaluateUserState(user) }
+    }
+
+    // --- Navigation helpers (legacy) --- //
     fun markNavigationDone() {
         _navigateToHome.value = false
     }
+
+    // --- Logout --- //
     fun logout(onComplete: () -> Unit) {
         val user = auth.currentUser
         logAudit(user?.uid, user?.email, "logout")
         auth.signOut()
         onComplete()
+        // Listener will emit SignedOut
     }
 
+    // --- Account Deletion --- //
     fun deleteUser(onSuccess: () -> Unit, onFailure: (String) -> Unit) {
         val user = auth.currentUser
-        if (user != null) {
-            val uid = user.uid
-            val email = user.email
-
-            // Optional: Firestore cleanup
-            firestore.collection("users").document(uid).delete()
-
-            // Optional: Audit log
-            logAudit(uid, email, "Account Deleted")
-
-            user.delete()
-                .addOnSuccessListener { onSuccess() }
-                .addOnFailureListener { exception ->
-                    onFailure(exception.message ?: "Something went wrong")
-                }
-        } else {
+        if (user == null) {
             onFailure("No authenticated user.")
+            return
         }
+        val uid = user.uid
+        val email = user.email
+
+        // Optional: Firestore cleanup
+        firestore.collection("users").document(uid).delete()
+
+        // Audit log
+        logAudit(uid, email, "Account Deleted")
+
+        user.delete()
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { exception ->
+                onFailure(exception.message ?: "Something went wrong")
+            }
     }
+
     fun reauthenticateAndDelete(
         password: String,
         onSuccess: () -> Unit,
@@ -265,30 +330,16 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
         if (user != null && email != null) {
             val credential = EmailAuthProvider.getCredential(email, password)
             user.reauthenticate(credential)
-                .addOnSuccessListener {
-                    // Use your existing deleteUser function
-                    deleteUser(onSuccess, onFailure = { onFailure() })
-                }
-                .addOnFailureListener {
-                    onFailure()
-                }
+                .addOnSuccessListener { deleteUser(onSuccess) { onFailure() } }
+                .addOnFailureListener { onFailure() }
         } else {
             onFailure()
         }
     }
 
-
-
-
-    fun clearError() {
-        _errorMessage.value = null
-    }
-
-    fun resetAuthSuccess() {
-        _authSuccess.value = false
-    }
-
+    // --- Error helpers --- //
+    fun clearError() { _errorMessage.value = null }
+    fun resetAuthSuccess() { _authSuccess.value = false }
 }
 
-
-
+// Optional: Factory for creating AuthViewModel with AuthUseCase
