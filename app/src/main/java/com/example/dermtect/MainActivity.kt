@@ -29,6 +29,8 @@ import com.example.dermtect.ui.viewmodel.AuthViewModelFactory
 import androidx.compose.ui.platform.LocalContext
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.example.cameradermtect.CameraPermissionGate
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -99,12 +101,28 @@ class MainActivity : ComponentActivity() {
                     composable("user_home") {UserHomeScreen(navController = navController) }
                     composable("notifications") {NotificationScreen(navController = navController) }
                     composable("questionnaire") { QuestionnaireScreen(navController = navController)}
-                    composable("camera") { TakePhotoScreen(onBackClick = {
-                        navController.navigate("user_home") {
-                            popUpTo("user_home") { inclusive = true }
-                            launchSingleTop = true
-                        }
-                    }) }
+                   composable("camera") {
+                        CameraPermissionGate(
+                            onGranted = {
+                                TakePhotoScreen(
+                                    onBackClick = {
+                                        navController.navigate("user_home") {
+                                            popUpTo("user_home") { inclusive = true }
+                                            launchSingleTop = true
+                                        }
+                                    }
+                                )
+                            },
+                            deniedContent = {
+                                // Optional: nice UI if permission is denied
+                                Column(Modifier.padding(24.dp)) {
+                                    Text("We need the camera to scan lesions.")
+                                    Spacer(Modifier.height(12.dp))
+                                    Text("Please allow the Camera permission to continue.")
+                                }
+                            }
+                        )
+                    }
                     composable(
                         route = "highlightarticle?newsJson={newsJson}",
                         arguments = listOf(
