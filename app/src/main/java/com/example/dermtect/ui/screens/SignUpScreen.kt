@@ -45,13 +45,18 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.sp
+import com.example.dermtect.data.repository.AuthRepositoryImpl
+import com.example.dermtect.domain.usecase.AuthUseCase
+
 
 @Composable
 fun Register(navController: NavController) {
     val focusManager = LocalFocusManager.current
 
     val context = LocalContext.current
-    val viewModel: AuthViewModel = viewModel(factory = AuthViewModelFactory())
+    val viewModel: AuthViewModel = viewModel(
+        factory = AuthViewModelFactory(AuthUseCase(AuthRepositoryImpl()))
+    )
     var fnameTouched by remember { mutableStateOf(false) }
     var lnameTouched by remember { mutableStateOf(false) }
 
