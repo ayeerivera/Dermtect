@@ -43,6 +43,11 @@ import kotlinx.coroutines.launch
 import androidx.compose.runtime.collectAsState
 import com.example.dermtect.ui.viewmodel.DermaHomeViewModel
 import com.example.dermtect.ui.viewmodel.UserHomeViewModel
+import com.example.dermtect.data.repository.AuthRepositoryImpl
+import com.example.dermtect.domain.usecase.AuthUseCase
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun ProfileScreenTemplate(
@@ -74,7 +79,9 @@ fun ProfileScreenTemplate(
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showDeletedDialog by remember { mutableStateOf(false) }
-    val authViewModel: AuthViewModel = viewModel(factory = AuthViewModelFactory())
+    val authViewModel: AuthViewModel = viewModel(
+        factory = AuthViewModelFactory(AuthUseCase(AuthRepositoryImpl()))
+    )
     val coroutineScope = rememberCoroutineScope()
 
     var passwordInput by remember { mutableStateOf("") }
@@ -86,6 +93,13 @@ fun ProfileScreenTemplate(
     ) { uri: Uri? ->
         sharedProfileViewModel.setImageUri(uri) // must call ViewModel
     }
+
+    val context = LocalContext.current
+    val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+        .requestIdToken("50445058822-fn9cea4e0bduos6t0g7ofb2g9ujri5s2.apps.googleusercontent.com")
+        .requestEmail()
+        .build()
+    val googleSignInClient = GoogleSignIn.getClient(context, gso)
 
     Column(
         modifier = Modifier
@@ -458,9 +472,13 @@ fun ProfileScreenTemplate(
         title = "Confirm logout?",
         primaryText = "Yes, Logout",
         onPrimary = {
-            authViewModel.logout {
-                navController.navigate("login") {
-                    popUpTo(0) { inclusive = true }
+            // 1) Sign out Google (harmless if email/password user)
+            googleSignInClient.signOut().addOnCompleteListener {
+                // 2) Then sign out Firebase
+                authViewModel.logout {
+                    navController.navigate("login") {
+                        popUpTo(0) { inclusive = true }
+                    }
                 }
             }
         },
