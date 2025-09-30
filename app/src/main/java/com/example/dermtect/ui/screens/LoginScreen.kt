@@ -58,6 +58,8 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.sp
+import com.example.dermtect.data.repository.AuthRepositoryImpl
+import com.example.dermtect.domain.usecase.AuthUseCase
 
 
 @Composable
@@ -66,7 +68,9 @@ fun Login(navController: NavController) {
     var password by remember { mutableStateOf("") }
     var showBackDialog by remember { mutableStateOf(false) }
     val isEmailValid = remember(email) { android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches() }
-    val viewModel: AuthViewModel = viewModel(factory = AuthViewModelFactory())
+    val viewModel: AuthViewModel = viewModel(
+        factory = AuthViewModelFactory(AuthUseCase(AuthRepositoryImpl()))
+    )
     val authSuccess by viewModel.authSuccess.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
     val focusManager = LocalFocusManager.current
