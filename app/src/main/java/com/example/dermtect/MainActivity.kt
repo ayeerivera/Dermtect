@@ -5,7 +5,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.Text
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
@@ -16,50 +16,19 @@ import androidx.navigation.navArgument
 import com.example.cameradermtect.TakePhotoScreen
 import com.example.dermtect.model.Clinic
 import com.example.dermtect.model.NewsItem
-import com.example.dermtect.ui.components.CaseData
-import com.example.dermtect.ui.components.DermaAssessmentReportScreen
-import com.example.dermtect.ui.components.NearbyClinicsScreen
-import com.example.dermtect.ui.screens.AboutScreen
-import com.example.dermtect.ui.screens.ArticleDetailScreen
-import com.example.dermtect.ui.screens.CaseHistoryScreen
-import com.example.dermtect.ui.screens.DermaAssessmentScreen
-import com.example.dermtect.ui.screens.Register
-import com.example.dermtect.ui.screens.Login
-import com.example.dermtect.ui.screens.ChangePasswordScreen
-import com.example.dermtect.ui.screens.DermaHomeScreen
-import com.example.dermtect.ui.screens.ForgotPass1
-import com.example.dermtect.ui.screens.ForgotPass2
-import com.example.dermtect.ui.screens.ForgotPass3
-import com.example.dermtect.ui.screens.ForgotPass4
-import com.example.dermtect.ui.screens.HighlightArticle
-import com.example.dermtect.ui.screens.HistoryScreen
-import com.example.dermtect.ui.screens.UserHomeScreen
-import com.example.dermtect.ui.screens.QuestionnaireScreen
-import com.example.dermtect.ui.screens.NotificationScreen
-import com.example.dermtect.ui.screens.OnboardingScreen1
-import com.example.dermtect.ui.screens.OnboardingScreen2
-import com.example.dermtect.ui.screens.OnboardingScreen3
-import com.example.dermtect.ui.components.SettingsScreenTemplate
-import com.example.dermtect.ui.screens.SplashScreen
-import com.example.dermtect.ui.screens.TutorialScreen0
-import com.example.dermtect.ui.screens.TutorialScreen1
-import com.example.dermtect.ui.screens.TutorialScreen2
-import com.example.dermtect.ui.screens.TutorialScreen3
-import com.example.dermtect.ui.screens.TutorialScreen4
-import com.example.dermtect.ui.screens.TutorialScreen5
-import com.example.dermtect.ui.screens.PendingCasesScreen
-import com.example.dermtect.ui.components.ProfileScreenTemplate
-import com.example.dermtect.ui.screens.ClinicTemplateScreen
-import com.example.dermtect.ui.screens.LesionCaseTemplate
+import com.example.dermtect.ui.components.*
+import com.example.dermtect.ui.screens.*
 import com.example.dermtect.ui.theme.DermtectTheme
-import com.example.dermtect.ui.viewmodel.DermaHomeViewModel
-import com.example.dermtect.ui.viewmodel.SharedProfileViewModel
-import com.example.dermtect.ui.viewmodel.UserHomeViewModel
+import com.example.dermtect.ui.viewmodel.*
 import com.google.firebase.FirebaseApp
 import com.google.gson.Gson
-import kotlin.jvm.java
-import com.example.dermtect.ui.screens.generateTherapeuticMessage
-
+import com.example.dermtect.data.repository.AuthRepositoryImpl
+import com.example.dermtect.domain.usecase.AuthUseCase
+import com.example.dermtect.ui.viewmodel.AuthViewModel
+import com.example.dermtect.ui.viewmodel.AuthViewModelFactory
+import androidx.compose.ui.platform.LocalContext
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -73,8 +42,46 @@ class MainActivity : ComponentActivity() {
                 val sharedProfileViewModel: SharedProfileViewModel = viewModel()
                 val userHomeViewModel: UserHomeViewModel = viewModel()
 
+                val authUseCase = AuthUseCase(repository = AuthRepositoryImpl())
+                val authVm: AuthViewModel = viewModel(factory = AuthViewModelFactory(authUseCase))
+                val authState by authVm.authState.collectAsState()
+                
                 NavHost(navController = navController, startDestination = "login") {
-                    composable("splash") { SplashScreen(navController) }
+                    composable("splash") {
+                        // Show your existing splash UI (but remove any internal navigation in it)
+                        SplashScreen(navController)
+
+                        LaunchedEffect(authState) {
+                            when (authState) {
+                                AuthViewModel.AuthUiState.Loading -> {
+                                    // do nothing; wait for Firebase to restore the session
+                                }
+
+                                AuthViewModel.AuthUiState.SignedOut -> {
+                                    navController.navigate("login") {
+                                        popUpTo("splash") { inclusive = true }
+                                        launchSingleTop = true
+                                    }
+                                }
+
+                                is AuthViewModel.AuthUiState.EmailUnverified -> {
+                                    // Minimal: still send to login (or create a VerifyEmail screen later)
+                                    navController.navigate("login") {
+                                        popUpTo("splash") { inclusive = true }
+                                        launchSingleTop = true
+                                    }
+                                }
+
+                                is AuthViewModel.AuthUiState.SignedIn -> {
+                                    navController.navigate("user_home") {
+                                        popUpTo("splash") { inclusive = true }
+                                        launchSingleTop = true
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     composable("onboarding_screen1") { OnboardingScreen1(navController) }
                     composable("onboarding_screen2") { OnboardingScreen2(navController) }
                     composable("onboarding_screen3") { OnboardingScreen3(navController) }
@@ -118,17 +125,31 @@ class MainActivity : ComponentActivity() {
                             onBackClick = { navController.popBackStack() })
                     }
                     composable("user_settings") {
+                        val context = LocalContext.current
+                        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                            .requestIdToken("50445058822-fn9cea4e0bduos6t0g7ofb2g9ujri5s2.apps.googleusercontent.com")
+                            .requestEmail()
+                            .build()
+                        val googleSignInClient = GoogleSignIn.getClient(context, gso)
+
                         SettingsScreenTemplate(
                             navController = navController,
                             userRole = "user",
                             sharedProfileViewModel = sharedProfileViewModel,
                             onLogout = {
-                                navController.navigate("login") {
-                                    popUpTo(0) { inclusive = true }
+                                googleSignInClient.signOut().addOnCompleteListener {
+                                    authVm.logout {
+                                        navController.navigate("login") {
+                                            popUpTo(0) {
+                                                inclusive = true
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         )
                     }
+                    
                     composable("tutorial_screen0") {TutorialScreen0(navController = navController) }
                     composable("tutorial_screen1") {TutorialScreen1(navController) }
                     composable("tutorial_screen2") { TutorialScreen2(navController) }
@@ -224,13 +245,26 @@ class MainActivity : ComponentActivity() {
                     ) }
 
                     composable("derma_settings") {
+                        val context = LocalContext.current
+                        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                            .requestIdToken("50445058822-fn9cea4e0bduos6t0g7ofb2g9ujri5s2.apps.googleusercontent.com")
+                            .requestEmail()
+                            .build()
+                        val googleSignInClient = GoogleSignIn.getClient(context, gso)
+
                         SettingsScreenTemplate(
                             navController = navController,
                             sharedProfileViewModel = sharedProfileViewModel,
-                            userRole = "derma", // hides About section
+                            userRole = "derma",
                             onLogout = {
-                                navController.navigate("login") {
-                                    popUpTo(0) { inclusive = true }
+                                googleSignInClient.signOut().addOnCompleteListener {
+                                    authVm.logout {
+                                        navController.navigate("login") {
+                                            popUpTo(0) {
+                                                inclusive = true
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         )
