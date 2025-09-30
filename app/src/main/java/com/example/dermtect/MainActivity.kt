@@ -48,7 +48,7 @@ class MainActivity : ComponentActivity() {
                 val authVm: AuthViewModel = viewModel(factory = AuthViewModelFactory(authUseCase))
                 val authState by authVm.authState.collectAsState()
                 
-                NavHost(navController = navController, startDestination = "login") {
+                NavHost(navController = navController, startDestination = "splash") {
                     composable("splash") {
                         // Show your existing splash UI (but remove any internal navigation in it)
                         SplashScreen(navController)
