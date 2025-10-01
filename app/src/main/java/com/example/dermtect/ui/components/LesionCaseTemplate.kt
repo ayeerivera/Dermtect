@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import com.example.dermtect.R
 import com.example.dermtect.ui.components.BackButton
 import com.example.dermtect.ui.components.BubblesBackground
+import java.util.Locale
 
 @Composable
 fun LesionCaseTemplate(
@@ -47,9 +48,14 @@ fun LesionCaseTemplate(
     probability: Float,
     onBackClick: () -> Unit,
     onDownloadClick: () -> Unit,
-    onFindClinicClick: () -> Unit
+    onFindClinicClick: () -> Unit,
+    // NEW:
+    showPrimaryButtons: Boolean = false,   // show Save + Retake
+    showSecondaryActions: Boolean = true,  // show the “You can also …” cards
+    onSaveClick: (() -> Unit)? = null,
+    onRetakeClick: (() -> Unit)? = null
 ) {
-    val riskMessage = generateTherapeuticMessage(prediction, probability)
+    val riskMessage = generateTherapeuticMessage(probability)
 
     val frameSize = 220.dp
     val frameShape = RoundedCornerShape(12.dp)
@@ -154,7 +160,8 @@ fun LesionCaseTemplate(
                                         }
                                     }
                                 }
-                            }}
+                            }
+                        }
 
                         Spacer(Modifier.height(8.dp))
                         Row(
@@ -194,30 +201,56 @@ fun LesionCaseTemplate(
                 )
 
                 Spacer(Modifier.height(20.dp))
+                if (showPrimaryButtons) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = { onSaveClick?.invoke() },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Save")
+                        }
+                        OutlinedButton(
+                            onClick = { onRetakeClick?.invoke() },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Retake")
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                }
 
-                Text(
-                    text = "You can also",
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                if (showSecondaryActions) {
+                    Text(
+                        text = "You can also",
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(16.dp))
 
-                Spacer(Modifier.height(16.dp))
+                    ResultActionCard(
+                        text = "Download Full PDF Report\n& Risk Assessment Questionnaires",
+                        backgroundColor = Color(0xFFBAFFFF),
+                        imageResId = R.drawable.risk_image,
+                        onClick = onDownloadClick
+                    )
 
-                ResultActionCard(
-                    text = "Download Full PDF Report\n& Risk Assessment Questionnaires",
-                    backgroundColor = Color(0xFFBAFFFF),
-                    imageResId = R.drawable.risk_image,
-                    onClick = onDownloadClick
-                )
+                    Spacer(Modifier.height(16.dp))
 
-                Spacer(Modifier.height(16.dp))
+                    ResultActionCard(
+                        text = "Find Nearby Derma Clinics \nNear You",
+                        backgroundColor = Color(0xFFBAFFD7),
+                        imageResId = R.drawable.nearby_clinics,
+                        onClick = onFindClinicClick
+                    )
+                }
 
-                ResultActionCard(
-                    text = "Find Nearby Derma Clinics \nNear You",
-                    backgroundColor = Color(0xFFBAFFD7),
-                    imageResId = R.drawable.nearby_clinics,
-                    onClick = onFindClinicClick
-                )
             }
         }
     }
@@ -263,15 +296,30 @@ fun ResultActionCard(
     }
 }
 
-fun generateTherapeuticMessage(prediction: String, probability: Float): String {
-    val p = probability * 100
-    return when {
-        p < 10 -> "This scan appears very reassuring. While no system is perfect, the likelihood of a serious concern is very low. Continue your usual skin care and monitor changes over time."
-        p < 30 -> "This scan suggests a low likelihood of concern. It’s best to keep monitoring this spot for any changes and consider sharing it with a healthcare professional if it changes in size, color, or texture."
-        p < 60 -> "This scan shows some uncertainty. It doesn’t clearly point one way or the other, which means it’s important to keep an eye on the lesion and consider professional evaluation for peace of mind."
-        p < 80 -> "This scan suggests a moderate level of concern. While this doesn’t confirm anything, scheduling a dermatology consultation would be a safe next step."
-        else -> "This scan suggests a higher level of concern. This does not mean something is definitely wrong, but we strongly recommend having a dermatologist review it soon."
+
+fun generateTherapeuticMessage(
+    probability: Float,
+    tau: Float = 0.0112f
+): String {
+    val pPct = probability * 100f
+    val alerted = probability >= tau
+    fun fmt(x: Float) = String.format(Locale.getDefault(), "%.1f", x)
+
+    return if (alerted) {
+        when {
+            pPct < 10f -> "Precautionary alert (~${fmt(pPct)}%). Still very low, just monitor changes."
+            pPct < 30f -> "Alert with a low chance (~${fmt(pPct)}%). Non-urgent check is reasonable."
+            pPct < 60f -> "Some concern (~${fmt(pPct)}%). Clinical evaluation advised."
+            pPct < 80f -> "Elevated chance (~${fmt(pPct)}%). Please arrange a dermatology visit."
+            else       -> "Higher chance (~${fmt(pPct)}%). Prompt dermatologist review recommended."
+        }
+    } else {
+        when {
+            pPct < 10f -> "Very reassuring (~${fmt(pPct)}%). Keep up normal skin care."
+            pPct < 30f -> "Low chance (~${fmt(pPct)}%). Monitor casually and share if changes appear."
+            pPct < 60f -> "Unclear (~${fmt(pPct)}%). Consider professional opinion."
+            pPct < 80f -> "Moderate (~${fmt(pPct)}%). Dermatology check would be sensible."
+            else       -> "Higher (~${fmt(pPct)}%). Timely dermatologist review is recommended."
+        }
     }
 }
-
-

@@ -284,21 +284,6 @@ fun ProfileScreenTemplate(
                         showDeleteDialog = true
                     }
                 )
-
-                ChangePasswordRow(
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.ExitToApp,
-                            contentDescription = "Logout",
-                            tint = Color(0xFF0FB2B2),
-                            modifier = Modifier.size(28.dp) // matched Settings icon size
-                        )
-                    },
-                    label = "Logout",
-                    onClick = {
-                        showLogoutDialog = true
-                    }
-                )
             }
         }
     }

@@ -62,6 +62,12 @@ dependencies {
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("com.google.firebase:firebase-storage-ktx")
+    // optional push
+    // implementation("com.google.firebase:firebase-messaging-ktx")
+
+    //scans
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.6")
+
 
     //Camera
     implementation("androidx.camera:camera-core:1.3.0")
@@ -88,6 +94,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation(libs.coil.compose)
 
     // Google sign-in
     implementation("com.google.android.gms:play-services-auth:21.0.0")

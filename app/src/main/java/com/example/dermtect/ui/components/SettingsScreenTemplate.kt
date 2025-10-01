@@ -34,6 +34,8 @@ import androidx.compose.material.icons.filled.Person
 import coil.compose.AsyncImage
 import androidx.compose.material.icons.filled.Close
 import com.example.dermtect.ui.viewmodel.SharedProfileViewModel
+import androidx.compose.material.icons.filled.Logout
+
 
 
 @Composable
@@ -131,100 +133,108 @@ fun SettingsScreenTemplate(
                 )
             }
 
-    }
-    Box(
+        }
+        Box(
             modifier = Modifier
                 .fillMaxSize(),
-        contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center
         ) {
-        Card(
-            modifier = Modifier
-                .offset(y = (-20).dp)
-                .fillMaxWidth(0.9f)
-                .wrapContentHeight()
-                .shadow(8.dp, RoundedCornerShape(36.dp)),
-            shape = RoundedCornerShape(36.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-        ) {
-        Column {
-            Box(
+            Card(
                 modifier = Modifier
-                    .offset(x = 19.dp, y = 18.dp)
-                    .size(width = 323.dp, height = 85.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFEDFFFF))
+                    .offset(y = (-20).dp)
+                    .fillMaxWidth(0.9f)
+                    .wrapContentHeight()
+                    .shadow(8.dp, RoundedCornerShape(36.dp)),
+                shape = RoundedCornerShape(36.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
             ) {
-                AccountInfoRow(email = email, isGoogleAccount = isGoogleAccount)
+                Column {
+                    Box(
+                        modifier = Modifier
+                            .offset(x = 19.dp, y = 18.dp)
+                            .size(width = 323.dp, height = 85.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFFEDFFFF))
+                    ) {
+                        AccountInfoRow(email = email, isGoogleAccount = isGoogleAccount)
 
-            }
-            Spacer(modifier = Modifier.height(30.dp))
-
-
-            SettingsRow(
-                icon = {
-                    Icon(
-                        imageVector = Icons.Filled.Person,
-                        contentDescription = "User",
-                        tint = Color(0xFF0FB2B2),
-                        modifier = Modifier.size(28.dp)
-                    )
-                },
-                label = "Profile",
-                onClick = {
-                    val encodedFirstName = Uri.encode(firstName)
-                    val encodedLastName = Uri.encode(lastName)
-                    val encodedEmail = Uri.encode(email)
-
-                    navController.navigate("profile/$encodedFirstName/$encodedLastName/$encodedEmail/$isGoogleAccount/$userRole")
-                }
-            )
-
-            if (userRole == "user") {
-                SettingsRow(
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Filled.Info,
-                            contentDescription = "User",
-                            tint = Color(0xFF0FB2B2),
-                            modifier = Modifier.size(28.dp)
-                        )
-                    },
-                    label = "About",
-                    onClick = {
-                        navController.navigate("about")
                     }
-                )
-            }
+                    Spacer(modifier = Modifier.height(30.dp))
 
 
-            NotificationRow(
-                icon = {
-                    Icon(
-                        imageVector = Icons.Filled.Notifications,
-                        contentDescription = "Notifications",
-                        tint = Color(0xFF0FB2B2),
-                        modifier = Modifier.size(28.dp)
+                    SettingsRow(
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Filled.Person,
+                                contentDescription = "User",
+                                tint = Color(0xFF0FB2B2),
+                                modifier = Modifier.size(28.dp)
+                            )
+                        },
+                        label = "Profile",
+                        onClick = {
+                            val encodedFirstName = Uri.encode(firstName)
+                            val encodedLastName = Uri.encode(lastName)
+                            val encodedEmail = Uri.encode(email)
+
+                            navController.navigate("profile/$encodedFirstName/$encodedLastName/$encodedEmail/$isGoogleAccount/$userRole")
+                        }
                     )
-                },
-                label = "Notification",
-                checked = notificationsEnabled,
-                onCheckedChange = { notificationsEnabled = it },
-                onClick = {
-                    navController.navigate("notifications")
+
+                    if (userRole == "user") {
+                        SettingsRow(
+                            icon = {
+                                Icon(
+                                    imageVector = Icons.Filled.Info,
+                                    contentDescription = "User",
+                                    tint = Color(0xFF0FB2B2),
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            },
+                            label = "About",
+                            onClick = {
+                                navController.navigate("about")
+                            }
+                        )
+                    }
+
+
+                    NotificationRow(
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Filled.Notifications,
+                                contentDescription = "Notifications",
+                                tint = Color(0xFF0FB2B2),
+                                modifier = Modifier.size(28.dp)
+                            )
+                        },
+                        label = "Notification",
+                        checked = notificationsEnabled,
+                        onCheckedChange = { notificationsEnabled = it },
+                        onClick = {
+                            navController.navigate("notifications")
+                        }
+                    )
+
+
+                    SettingsRow(
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Filled.Logout,
+                                contentDescription = "Logout",
+                                tint = Color(0xFF0FB2B2),
+                                modifier = Modifier.size(28.dp)
+                            )
+                        },
+                        label = "Logout",
+                        onClick = {
+                            showLogoutDialog = true}
+                    )
                 }
-            )
-
-
-            Spacer(modifier = Modifier.height(15.dp))
-
-            LogoutRow {
-                showLogoutDialog = true
             }
         }
-            }
     }
-}
 
     if (showPhoto) {
         Box(
@@ -440,31 +450,6 @@ fun NotificationRow(
             modifier = Modifier
                 .size(width = 40.dp, height = 20.dp)
                 .clickable { onCheckedChange(!checked) }
-        )
-    }
-}
-
-@Composable
-fun LogoutRow(onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(horizontal = 20.dp, vertical = 20.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.End
-    ) {
-        Icon(
-            painter = painterResource(id = R.drawable.logout_icon),
-            contentDescription = "Logout",
-            tint = Color(0xFF00B2B2),
-            modifier = Modifier.size(18.dp)
-        )
-        Spacer(modifier = Modifier.width(10.dp))
-        Text(
-            text = "Logout",
-            color = Color(0xFF484848),
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal)
         )
     }
 }
