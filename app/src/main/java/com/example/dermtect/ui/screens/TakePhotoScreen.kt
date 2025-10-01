@@ -83,7 +83,7 @@ val FOCUS_BOX_HEIGHT = 340.dp // mas mahaba para skin lesion focus
 @Composable
 fun TakePhotoScreen(
     onBackClick: () -> Unit = {}
-) {a
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
