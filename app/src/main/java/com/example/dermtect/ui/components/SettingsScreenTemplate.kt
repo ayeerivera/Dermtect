@@ -34,6 +34,8 @@ import androidx.compose.material.icons.filled.Person
 import coil.compose.AsyncImage
 import androidx.compose.material.icons.filled.Close
 import com.example.dermtect.ui.viewmodel.SharedProfileViewModel
+import androidx.compose.material.icons.filled.Logout
+
 
 
 @Composable
@@ -216,11 +218,19 @@ fun SettingsScreenTemplate(
             )
 
 
-            Spacer(modifier = Modifier.height(15.dp))
-
-            LogoutRow {
-                showLogoutDialog = true
-            }
+            SettingsRow(
+                icon = {
+                    Icon(
+                        imageVector = Icons.Filled.Logout,
+                        contentDescription = "Logout",
+                        tint = Color(0xFF0FB2B2),
+                        modifier = Modifier.size(28.dp)
+                    )
+                },
+                label = "Logout",
+                onClick = {
+                    showLogoutDialog = true}
+            )
         }
             }
     }
@@ -444,27 +454,3 @@ fun NotificationRow(
     }
 }
 
-@Composable
-fun LogoutRow(onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(horizontal = 20.dp, vertical = 20.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.End
-    ) {
-        Icon(
-            painter = painterResource(id = R.drawable.logout_icon),
-            contentDescription = "Logout",
-            tint = Color(0xFF00B2B2),
-            modifier = Modifier.size(18.dp)
-        )
-        Spacer(modifier = Modifier.width(10.dp))
-        Text(
-            text = "Logout",
-            color = Color(0xFF484848),
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal)
-        )
-    }
-}

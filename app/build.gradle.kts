@@ -62,14 +62,20 @@ dependencies {
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("com.google.firebase:firebase-storage-ktx")
+    // optional push
+    // implementation("com.google.firebase:firebase-messaging-ktx")
+
+    //scans
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.6")
+
 
     //Camera
-    implementation("androidx.camera:camera-core:1.3.0")
-    implementation("androidx.camera:camera-camera2:1.3.0")
-    implementation("androidx.camera:camera-lifecycle:1.3.0")
-    implementation("androidx.camera:camera-view:1.3.0")
+    implementation("androidx.camera:camera-core:1.3.4")
+    implementation("androidx.camera:camera-camera2:1.3.4")
+    implementation("androidx.camera:camera-lifecycle:1.3.4")
+    implementation("androidx.camera:camera-view:1.3.4")
     implementation("androidx.exifinterface:exifinterface:1.3.7")
-    implementation ("com.google.guava:guava:32.1.3-jre")
+    implementation ("com.google.guava:guava:32.1.3-android")
 
     // Coil
     implementation("io.coil-kt:coil-compose:2.5.0")
@@ -88,6 +94,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation(libs.coil.compose)
 
     // Google sign-in
     implementation("com.google.android.gms:play-services-auth:21.0.0")
@@ -114,7 +121,7 @@ dependencies {
     // Core TFLite runtime
     implementation("org.tensorflow:tensorflow-lite:2.17.0")
 
-    // (Optional) NNAPI / GPU delegates – use one that works on your target devices
+    // (Optional) NNAPI / GPU delegates
     implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.14.0")
     // implementation("org.tensorflow:tensorflow-lite-gpu:2.14.0")
 }

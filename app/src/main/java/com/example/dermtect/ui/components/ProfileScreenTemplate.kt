@@ -71,7 +71,6 @@ fun ProfileScreenTemplate(
     var editedLastName by remember { mutableStateOf(lastName) }
 
     var showDiscardDialog by remember { mutableStateOf(false) }
-    var showLogoutDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showDeletedDialog by remember { mutableStateOf(false) }
     val authViewModel: AuthViewModel = viewModel(factory = AuthViewModelFactory())
@@ -271,20 +270,6 @@ fun ProfileScreenTemplate(
                     }
                 )
 
-                ChangePasswordRow(
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.ExitToApp,
-                            contentDescription = "Logout",
-                            tint = Color(0xFF0FB2B2),
-                            modifier = Modifier.size(28.dp) // matched Settings icon size
-                        )
-                    },
-                    label = "Logout",
-                    onClick = {
-                        showLogoutDialog = true
-                    }
-                )
             }
         }
     }
@@ -453,21 +438,6 @@ fun ProfileScreenTemplate(
         }
     }
 
-    DialogTemplate(
-        show = showLogoutDialog,
-        title = "Confirm logout?",
-        primaryText = "Yes, Logout",
-        onPrimary = {
-            authViewModel.logout {
-                navController.navigate("login") {
-                    popUpTo(0) { inclusive = true }
-                }
-            }
-        },
-        secondaryText = "Stay logged in",
-        onSecondary = { showLogoutDialog = false },
-        onDismiss = { showLogoutDialog = false }
-    )
 
     DialogTemplate(
         show = showDeletedDialog,
@@ -620,9 +590,8 @@ fun AssessmentRow(
 
         Text(
             text = label,
-            fontSize = fontSize,
+            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal),
             color = Color(0xFF484848),
-            fontWeight = FontWeight.Normal,
             modifier = Modifier.weight(1f)
         )
 
