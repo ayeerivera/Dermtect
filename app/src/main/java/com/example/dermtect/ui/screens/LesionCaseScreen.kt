@@ -64,7 +64,7 @@ fun LesionCaseScreen(
                 if (url.isNullOrBlank()) return null
                 val req = ImageRequest.Builder(ctx)
                     .data(url)
-                    .allowHardware(false)   // we need a software bitmap
+                    .allowHardware(false)   // we nee d a software bitmap
                     .size(Size.ORIGINAL)
                     .build()
                 val result = withContext(Dispatchers.IO) { imageLoader.execute(req) }
@@ -115,12 +115,18 @@ fun LesionCaseScreen(
                 timestamp = timestampText,
                 riskTitle = "Risk Assessment:",
                 riskDescription = riskCopy,
-                prediction = uiPrediction,        // <- do NOT pass "Malignant/Benign" here
+                prediction = if (probability >= 0.0112f) "Malignant" else "Benign",
                 probability = probability,
                 onBackClick = onBackClick,
-                onDownloadClick = { /* TODO: export PDF */ },
-                onFindClinicClick = { /* TODO */ }
+
+                // New:
+                showPrimaryButtons = false,
+                showSecondaryActions = true,
+
+                onDownloadClick = { /* open/generate PDF */ },
+                onFindClinicClick = { /* nearby clinics */ }
             )
+
         }
 
     }

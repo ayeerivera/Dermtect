@@ -160,7 +160,8 @@ fun LesionCaseTemplate(
                                         }
                                     }
                                 }
-                            }}
+                            }
+                        }
 
                         Spacer(Modifier.height(8.dp))
                         Row(
@@ -200,30 +201,56 @@ fun LesionCaseTemplate(
                 )
 
                 Spacer(Modifier.height(20.dp))
+                if (showPrimaryButtons) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = { onSaveClick?.invoke() },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Save")
+                        }
+                        OutlinedButton(
+                            onClick = { onRetakeClick?.invoke() },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Retake")
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                }
 
-                Text(
-                    text = "You can also",
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                if (showSecondaryActions) {
+                    Text(
+                        text = "You can also",
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(16.dp))
 
-                Spacer(Modifier.height(16.dp))
+                    ResultActionCard(
+                        text = "Download Full PDF Report\n& Risk Assessment Questionnaires",
+                        backgroundColor = Color(0xFFBAFFFF),
+                        imageResId = R.drawable.risk_image,
+                        onClick = onDownloadClick
+                    )
 
-                ResultActionCard(
-                    text = "Download Full PDF Report\n& Risk Assessment Questionnaires",
-                    backgroundColor = Color(0xFFBAFFFF),
-                    imageResId = R.drawable.risk_image,
-                    onClick = onDownloadClick
-                )
+                    Spacer(Modifier.height(16.dp))
 
-                Spacer(Modifier.height(16.dp))
+                    ResultActionCard(
+                        text = "Find Nearby Derma Clinics \nNear You",
+                        backgroundColor = Color(0xFFBAFFD7),
+                        imageResId = R.drawable.nearby_clinics,
+                        onClick = onFindClinicClick
+                    )
+                }
 
-                ResultActionCard(
-                    text = "Find Nearby Derma Clinics \nNear You",
-                    backgroundColor = Color(0xFFBAFFD7),
-                    imageResId = R.drawable.nearby_clinics,
-                    onClick = onFindClinicClick
-                )
             }
         }
     }

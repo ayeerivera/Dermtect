@@ -70,6 +70,7 @@ import androidx.compose.runtime.*
 import androidx.compose.material3.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.ActivityCompat
+import kotlinx.coroutines.launch
 
 
 // ---------- Small utilities ----------
@@ -98,6 +99,9 @@ fun TakePhotoScreen(
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     var flashEnabled by remember { mutableStateOf(false) }
     val previewView = remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }
+    val coroutineScope = rememberCoroutineScope()
+
+    var hasSaved by remember { mutableStateOf(false) }
 
     var cameraControl: CameraControl? by remember { mutableStateOf(null) }
     var cameraInfo: CameraInfo? by remember { mutableStateOf(null) }
@@ -326,10 +330,9 @@ fun TakePhotoScreen(
 
                         LaunchedEffect(capturedImage, r, hasUploaded) {
                             if (!hasUploaded && capturedImage != null) {
-                                // LaunchedEffect is already a coroutine -> call suspend function directly
                                 val ok = uploadScanWithLabel(
                                     bitmap = capturedImage!!,   // original cropped photo
-                                    heatmap = r.heatmap,        // the merged overlay you created
+                                    heatmap = r.heatmap,        //  merged overlay
                                     probability = r.probability,
                                     prediction = modelFlag
                                 )
@@ -346,12 +349,37 @@ fun TakePhotoScreen(
                             title = "Result",
                             timestamp = nowTimestamp(),
                             riskTitle = "Risk Assessment:",
-                            riskDescription = riskCopy,            // for DB only
-                            probability = r.probability,               // for DB only
-                            prediction = modelFlag,
+                            riskDescription = riskCopy,
+                            prediction = if (r.probability >= 0.0112f) "Malignant" else "Benign",
+                            probability = r.probability,
                             onBackClick = { inferenceResult = null; capturedImage = null },
-                            onDownloadClick = { /* TODO */ },
-                            onFindClinicClick = { /* TODO */ }
+
+                            // NEW:
+                            showPrimaryButtons = !hasSaved,      // show Save/Retake only before saving
+                            showSecondaryActions = hasSaved,     // show "You can also…" only after saving
+                            onSaveClick = {
+                                // Call your existing upload function
+                                coroutineScope.launch {
+                                    val ok = uploadScanWithLabel(
+                                        bitmap = capturedImage!!,
+                                        heatmap = r.heatmap,
+                                        probability = r.probability,
+                                        prediction = if (r.probability >= 0.0112f) "Malignant" else "Benign"
+                                    )
+                                    if (ok) {
+                                        Toast.makeText(context, "Scan saved", Toast.LENGTH_SHORT).show()
+                                        hasSaved = true   // Switch UI: hide Save/Retake, show "You can also"
+                                    } else {
+                                        Toast.makeText(context, "Save failed", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
+                            onRetakeClick = {
+                                inferenceResult = null
+                                capturedImage = null
+                            },
+                            onDownloadClick = { /* PDF export */ },
+                            onFindClinicClick = { /* open clinics screen */ }
                         )
                     }
                 }
