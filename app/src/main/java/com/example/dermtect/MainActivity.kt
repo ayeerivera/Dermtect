@@ -4,6 +4,10 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.res.painterResource
@@ -27,9 +31,11 @@ import com.example.dermtect.domain.usecase.AuthUseCase
 import com.example.dermtect.ui.viewmodel.AuthViewModel
 import com.example.dermtect.ui.viewmodel.AuthViewModelFactory
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.example.cameradermtect.CameraPermissionGate
+import androidx.compose.ui.Modifier
 
 
 class MainActivity : ComponentActivity() {
