@@ -294,19 +294,22 @@ fun TakePhotoScreen(
 
         // Show captured result / analysis
         capturedImage?.let { image ->
-            // New image → reset and run inference
+            // New image → reset state and run inference
             LaunchedEffect(image) {
-                hasUploaded = false
+                // Reset UI flags for a fresh capture
+                hasSaved = false         // 👈 show Save/Retake again
+                hasUploaded = false      // (you can delete hasUploaded entirely if not used elsewhere)
+
                 if (!isRunning && inferenceResult == null) {
                     isRunning = true
                     val r = withContext(Dispatchers.Default) { tfService.infer(image) }
                     modelFlag = if (r.probability >= 0.0112f) "Malignant" else "Benign"
                     val merged = r.heatmap?.let { overlayBitmaps(image, it, 115) }
                     inferenceResult = r.copy(heatmap = merged)
-
                     isRunning = false
                 }
             }
+
 
             Box(
                 modifier = Modifier
@@ -352,13 +355,11 @@ fun TakePhotoScreen(
                             riskDescription = riskCopy,
                             prediction = if (r.probability >= 0.0112f) "Malignant" else "Benign",
                             probability = r.probability,
-                            onBackClick = { inferenceResult = null; capturedImage = null },
 
-                            // NEW:
-                            showPrimaryButtons = !hasSaved,      // show Save/Retake only before saving
-                            showSecondaryActions = hasSaved,     // show "You can also…" only after saving
+                            showPrimaryButtons = !hasSaved,    // Save / Retake before saving
+                            showSecondaryActions = hasSaved,   // “You can also …” after saving
+
                             onSaveClick = {
-                                // Call your existing upload function
                                 coroutineScope.launch {
                                     val ok = uploadScanWithLabel(
                                         bitmap = capturedImage!!,
@@ -368,7 +369,7 @@ fun TakePhotoScreen(
                                     )
                                     if (ok) {
                                         Toast.makeText(context, "Scan saved", Toast.LENGTH_SHORT).show()
-                                        hasSaved = true   // Switch UI: hide Save/Retake, show "You can also"
+                                        hasSaved = true
                                     } else {
                                         Toast.makeText(context, "Save failed", Toast.LENGTH_SHORT).show()
                                     }
@@ -377,9 +378,18 @@ fun TakePhotoScreen(
                             onRetakeClick = {
                                 inferenceResult = null
                                 capturedImage = null
+                                hasSaved = false
+                                hasUploaded = false
                             },
-                            onDownloadClick = { /* PDF export */ },
-                            onFindClinicClick = { /* open clinics screen */ }
+                            onBackClick = {
+                                inferenceResult = null
+                                capturedImage = null
+                                hasSaved = false
+                                hasUploaded = false
+                                onBackClick()
+                            },
+                            onDownloadClick = { /* PDF */ },
+                            onFindClinicClick = { /* Clinics */ }
                         )
                     }
                 }

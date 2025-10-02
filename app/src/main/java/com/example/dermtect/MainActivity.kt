@@ -143,7 +143,8 @@ class MainActivity : ComponentActivity() {
                         val caseId = backStackEntry.arguments?.getString("caseId")!!
                         LesionCaseScreen(
                             caseId = caseId,
-                            onBackClick = { navController.popBackStack() }
+                            onBackClick = { navController.popBackStack()},
+                            onFindClinicClick = { navController.navigate("nearby_clinics")}
                         )
                     }
 
@@ -240,8 +241,8 @@ class MainActivity : ComponentActivity() {
                         val case = Gson().fromJson(caseJson, com.example.dermtect.ui.components.CaseData::class.java)
 
                         DermaAssessmentScreen(
-                            lesionImage = case.imageRes ?: R.drawable.sample_skin, // fallback to a non-null drawable
-                            scanTitle = case.label,                                 // use label instead of title
+                            lesionImage = case.imageRes ?: R.drawable.sample_skin,
+                            scanTitle = case.label,
                             onBackClick = { navController.popBackStack() },
                             onCancel = { navController.popBackStack() },
                             onSubmit = { diagnosis, notes ->

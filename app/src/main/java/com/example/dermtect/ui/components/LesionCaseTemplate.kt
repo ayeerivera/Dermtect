@@ -1,6 +1,7 @@
 package com.example.dermtect.ui.screens
 
 import android.graphics.Bitmap
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -17,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
@@ -269,31 +271,40 @@ fun ResultActionCard(
         modifier = Modifier.fillMaxWidth(0.9f),
         onClick = onClick,
         colors = CardDefaults.cardColors(containerColor = backgroundColor),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(
+            1.dp,
+            Brush.linearGradient(
+                listOf(
+                    Color.White.copy(alpha = 0.6f),
+                    Color.Black.copy(alpha = 0.3f)
+                )
+            )
+        )
         ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.CenterHorizontally
+            Row(
+                modifier = Modifier.padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = text,
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                    modifier = Modifier.fillMaxWidth()
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = text,
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Image(
+                    painter = painterResource(id = imageResId),
+                    contentDescription = "Skin Check Icon",
+                    modifier = Modifier.size(70.dp)
                 )
             }
-            Spacer(modifier = Modifier.width(10.dp))
-            Image(
-                painter = painterResource(id = imageResId),
-                contentDescription = "Skin Check Icon",
-                modifier = Modifier.size(70.dp)
-            )
         }
-    }
 }
 
 

@@ -26,17 +26,24 @@ object PdfExporter {
     )
 
     fun createCasePdf(
+
         context: Context,
         data: CasePdfData
     ): Uri {
+        require(data.answers.isNotEmpty()) {
+            "Questionnaire must be completed before exporting PDF."
+        }
         val pdf = android.graphics.pdf.PdfDocument()
         val pageWidth = 595  // A4 @ ~72dpi
         val pageHeight = 842
         val margin = 24
-        val lineGap = 8
+        val lineGap = 15
 
+        var pageNumber = 1
         fun newPage(): android.graphics.pdf.PdfDocument.Page {
-            val info = android.graphics.pdf.PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pdf.pages.size + 1).create()
+            val info = android.graphics.pdf.PdfDocument.PageInfo
+                .Builder(pageWidth, pageHeight, pageNumber++)
+                .create()
             return pdf.startPage(info)
         }
 
@@ -54,6 +61,7 @@ object PdfExporter {
         }
 
         var y = margin.toFloat()
+
 
         // Header
         canvas.drawText(data.title, margin.toFloat(), y, titlePaint)
@@ -137,7 +145,7 @@ object PdfExporter {
             y += hdrPaint.textSize + lineGap
         }
 
-        drawSectionHeader("Questionnaire")
+        drawSectionHeader("Assessment Report:")
         data.answers.forEach { (q, a) ->
             drawWrappedText("Q: $q", "A: $a")
         }
@@ -167,14 +175,15 @@ object PdfExporter {
             pdf.close()
             uri
         } else {
-            // API 23–28
-            val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            val folder = File(dir, "Dermtect").apply { if (!exists()) mkdirs() }
+            // API 23–28: save to app-specific external storage (no storage permission needed)
+            val base = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
+            val folder = File(base, "Dermtect").apply { if (!exists()) mkdirs() }
             val file = File(folder, fileName)
+
             FileOutputStream(file).use { out -> pdf.writeTo(out) }
             pdf.close()
 
-            // Return a content:// Uri via FileProvider
+// Return a content:// Uri via FileProvider (matches external-files-path in file_paths.xml)
             FileProvider.getUriForFile(
                 context,
                 "${context.packageName}.fileprovider",
@@ -184,10 +193,24 @@ object PdfExporter {
     }
 
     fun openPdf(context: Context, uri: Uri) {
-        val intent = Intent(Intent.ACTION_VIEW).apply {
+        val view = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/pdf")
-            flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        context.startActivity(intent)
+        try {
+            context.startActivity(Intent.createChooser(view, "Open PDF"))
+        } catch (e: Exception) {
+            // No viewer installed? Offer share so user can open in Drive/Files/etc.
+            val share = Intent(Intent.ACTION_SEND).apply {
+                type = "application/pdf"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(
+                Intent.createChooser(share, "Open or share PDF")
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }
     }
+
 }
