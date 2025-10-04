@@ -2,6 +2,7 @@ package com.example.dermtect
 
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Column
@@ -9,33 +10,73 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.cameradermtect.CameraPermissionGate
 import com.example.cameradermtect.TakePhotoScreen
 import com.example.dermtect.model.Clinic
 import com.example.dermtect.model.NewsItem
-import com.example.dermtect.ui.components.*
-import com.example.dermtect.ui.screens.*
+import com.example.dermtect.ui.components.CaseData
+import com.example.dermtect.ui.components.DermaAssessmentReportScreen
+import com.example.dermtect.ui.components.NearbyClinicsScreen
+import com.example.dermtect.ui.screens.AboutScreen
+import com.example.dermtect.ui.screens.ArticleDetailScreen
+import com.example.dermtect.ui.screens.CaseHistoryScreen
+import com.example.dermtect.ui.screens.DermaAssessmentScreen
+import com.example.dermtect.ui.screens.Register
+import com.example.dermtect.ui.screens.Login
+import com.example.dermtect.ui.screens.ChangePasswordScreen
+import com.example.dermtect.ui.screens.DermaHomeScreen
+import com.example.dermtect.ui.screens.ForgotPass1
+import com.example.dermtect.ui.screens.ForgotPass2
+import com.example.dermtect.ui.screens.ForgotPass3
+import com.example.dermtect.ui.screens.ForgotPass4
+import com.example.dermtect.ui.screens.HighlightArticle
+import com.example.dermtect.ui.screens.HistoryScreen
+import com.example.dermtect.ui.screens.UserHomeScreen
+import com.example.dermtect.ui.screens.QuestionnaireScreen
+import com.example.dermtect.ui.screens.NotificationScreen
+import com.example.dermtect.ui.screens.OnboardingScreen1
+import com.example.dermtect.ui.screens.OnboardingScreen2
+import com.example.dermtect.ui.screens.OnboardingScreen3
+import com.example.dermtect.ui.components.SettingsScreenTemplate
+import com.example.dermtect.ui.screens.SplashScreen
+import com.example.dermtect.ui.screens.TutorialScreen0
+import com.example.dermtect.ui.screens.TutorialScreen1
+import com.example.dermtect.ui.screens.TutorialScreen2
+import com.example.dermtect.ui.screens.TutorialScreen3
+import com.example.dermtect.ui.screens.TutorialScreen4
+import com.example.dermtect.ui.screens.TutorialScreen5
+import com.example.dermtect.ui.screens.PendingCasesScreen
+import com.example.dermtect.ui.components.ProfileScreenTemplate
+import com.example.dermtect.ui.screens.ClinicTemplateScreen
+import com.example.dermtect.ui.screens.LesionCaseScreen
+import com.example.dermtect.ui.screens.LesionCaseTemplate
 import com.example.dermtect.ui.theme.DermtectTheme
-import com.example.dermtect.ui.viewmodel.*
+import com.example.dermtect.ui.viewmodel.DermaHomeViewModel
+import com.example.dermtect.ui.viewmodel.SharedProfileViewModel
+import com.example.dermtect.ui.viewmodel.UserHomeViewModel
 import com.google.firebase.FirebaseApp
 import com.google.gson.Gson
+import kotlin.jvm.java
 import com.example.dermtect.data.repository.AuthRepositoryImpl
 import com.example.dermtect.domain.usecase.AuthUseCase
 import com.example.dermtect.ui.viewmodel.AuthViewModel
 import com.example.dermtect.ui.viewmodel.AuthViewModelFactory
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.example.cameradermtect.CameraPermissionGate
-import androidx.compose.ui.Modifier
 
 
 class MainActivity : ComponentActivity() {
@@ -43,6 +84,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         FirebaseApp.initializeApp(this)
+        val app = FirebaseApp.getInstance()
+        Log.d("FirebaseCheck", "Firebase project: ${app.options.projectId}")
 
         setContent {
             DermtectTheme {
@@ -53,10 +96,9 @@ class MainActivity : ComponentActivity() {
                 val authUseCase = AuthUseCase(repository = AuthRepositoryImpl())
                 val authVm: AuthViewModel = viewModel(factory = AuthViewModelFactory(authUseCase))
                 val authState by authVm.authState.collectAsState()
-                
+
                 NavHost(navController = navController, startDestination = "splash") {
                     composable("splash") {
-                        // Show your existing splash UI (but remove any internal navigation in it)
                         SplashScreen(navController)
 
                         LaunchedEffect(authState) {
@@ -107,7 +149,7 @@ class MainActivity : ComponentActivity() {
                     composable("user_home") {UserHomeScreen(navController = navController) }
                     composable("notifications") {NotificationScreen(navController = navController) }
                     composable("questionnaire") { QuestionnaireScreen(navController = navController)}
-                   composable("camera") {
+                    composable("camera") {
                         CameraPermissionGate(
                             onGranted = {
                                 TakePhotoScreen(
@@ -116,14 +158,16 @@ class MainActivity : ComponentActivity() {
                                             popUpTo("user_home") { inclusive = true }
                                             launchSingleTop = true
                                         }
-                                    }
+                                    },
+                                    onFindClinicClick = { navController.navigate("nearby_clinics") }
+
                                 )
                             },
                             deniedContent = {
                                 // Optional: nice UI if permission is denied
                                 Column(Modifier.padding(24.dp)) {
                                     Text("We need the camera to scan lesions.")
-                                    Spacer(Modifier.height(12.dp))
+                                    Spacer(Modifier.    height(12.dp))
                                     Text("Please allow the Camera permission to continue.")
                                 }
                             }
@@ -142,6 +186,15 @@ class MainActivity : ComponentActivity() {
 
 
                     composable("history") { HistoryScreen(navController = navController)}
+                    composable("case_detail/{caseId}") { backStackEntry ->
+                        val caseId = backStackEntry.arguments?.getString("caseId")!!
+                        LesionCaseScreen(
+                            caseId = caseId,
+                            onBackClick = { navController.popBackStack()},
+                            onFindClinicClick = { navController.navigate("nearby_clinics")}
+                        )
+                    }
+
                     composable("article_detail_screen/{newsJson}") { backStackEntry ->
                         val json = backStackEntry.arguments?.getString("newsJson") ?: ""
                         val newsItem = Gson().fromJson(json, NewsItem::class.java)
@@ -173,7 +226,7 @@ class MainActivity : ComponentActivity() {
                             }
                         )
                     }
-                    
+
                     composable("tutorial_screen0") {TutorialScreen0(navController = navController) }
                     composable("tutorial_screen1") {TutorialScreen1(navController) }
                     composable("tutorial_screen2") { TutorialScreen2(navController) }
@@ -246,11 +299,11 @@ class MainActivity : ComponentActivity() {
                         arguments = listOf(navArgument("caseJson") { type = NavType.StringType })
                     ) { backStackEntry ->
                         val caseJson = backStackEntry.arguments?.getString("caseJson")
-                        val case = Gson().fromJson(caseJson, CaseData::class.java)
+                        val case = Gson().fromJson(caseJson, com.example.dermtect.ui.components.CaseData::class.java)
 
                         DermaAssessmentScreen(
-                            lesionImage = case.imageRes,
-                            scanTitle = case.title,
+                            lesionImage = case.imageRes ?: R.drawable.sample_skin, // fallback to a non-null drawable
+                            scanTitle = case.label,                                 // use label instead of title
                             onBackClick = { navController.popBackStack() },
                             onCancel = { navController.popBackStack() },
                             onSubmit = { diagnosis, notes ->

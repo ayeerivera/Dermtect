@@ -40,17 +40,8 @@ enum class FilterOption { ALL, READ, UNREAD, NEWEST_FIRST, OLDEST_FIRST }
 fun NotificationScreen(navController: NavController) {
     var filterOption by remember { mutableStateOf(FilterOption.ALL) }
     var showFilterMenu by remember { mutableStateOf(false) }
-    var notifications by remember {
-        mutableStateOf(
-            listOf(
-                NotificationItem("1", "Skin Check Result Ready", "Your skin check report is now available.", 1, "2 hours ago", true),
-                NotificationItem("2", "App Update Available", "Update the app to the latest version.", 2, "Yesterday", true),
-                NotificationItem("3", "Scan Upload Successful", "Your skin scan has been uploaded and is pending review.", 5, "1 day ago", false),
-                NotificationItem("4", "Health Tip of the Day", "Avoid prolonged sun exposure between 10 AM – 4 PM to reduce risk.", 7, "Today", true),
-                NotificationItem("5", "Incomplete Questionnaire Reminder", "You haven't completed the skin questionnaire.", 9, "Just now", false)
-            )
-        )
-    }
+    var notifications by remember { mutableStateOf<List<NotificationItem>>(emptyList()) }
+
 
     fun applyFilter(list: List<NotificationItem>): List<NotificationItem> {
         val sortedList = when (filterOption) {

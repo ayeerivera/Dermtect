@@ -2,42 +2,43 @@ package com.example.dermtect.ui.components
 
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import androidx.compose.ui.res.painterResource
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
-import com.google.gson.Gson
-
+import coil.compose.AsyncImage
+import com.example.dermtect.R
 
 data class CaseData(
-    val imageRes: Int,
-    val title: String,
-    val result: String?,
-    val date: String,
-    val status: String?
+    val caseId: String,
+    val label: String,                 // "Scan 1"
+    val result: String?,               // "Benign"/"Malignant"/"Pending"
+    val date: String,                  // formatted timestamp
+    val status: String?,               // "completed"/"pending"
+    val imageUrl: String? = null,      // Storage URL
+    val imageRes: Int? = null
 )
-
 
 @Composable
 fun HistoryScreenTemplate(
     navController: NavController,
     screenTitle: String,
     caseList: List<CaseData>
-
-
 ) {
     BubblesBackground {
         Box(
@@ -51,7 +52,6 @@ fun HistoryScreenTemplate(
                     .align(Alignment.CenterStart)
                     .padding(start = 23.dp)
             )
-
             Text(
                 text = screenTitle,
                 textAlign = TextAlign.Center,
@@ -61,7 +61,8 @@ fun HistoryScreenTemplate(
                     .fillMaxWidth()
             )
         }
-            Spacer(modifier = Modifier.height(40.dp))
+
+        Spacer(Modifier.height(40.dp))
 
         Column(
             modifier = Modifier
@@ -71,12 +72,20 @@ fun HistoryScreenTemplate(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             caseList.forEach { case ->
-                val indicatorColor = when (case.result?.lowercase()) {
-                    "pending" -> Color(0xFFFFC107)   // Yellow
-                    "benign" -> Color(0xFF4CAF50)    // Green
-                    "malignant" -> Color(0xFFF44336) // Red
-                    else -> Color(0xFFFFC107)
+                val indicatorColor = when {
+                    case.status?.equals("pending", true) == true -> Color(0xFFFFC107) // pending -> yellow
+
+                    // New strings you save now:
+                    case.result?.equals("Alert", true) == true   -> Color(0xFFF44336) // red
+                    case.result?.equals("NoAlert", true) == true -> Color(0xFF4CAF50) // green
+
+                    // Backward-compat with previous strings (if they ever exist):
+                    case.result?.equals("malignant", true) == true -> Color(0xFFF44336) // red
+                    case.result?.equals("benign", true) == true    -> Color(0xFF4CAF50) // green
+
+                    else -> Color(0xFFBDBDBD) // neutral gray instead of always yellow
                 }
+
 
                 val (statusLabel, statusColor) = when (case.status?.lowercase()) {
                     "pending" -> "Pending" to Color(0xFFFFD46D).copy(alpha = 0.2f)
@@ -85,52 +94,74 @@ fun HistoryScreenTemplate(
                 }
 
                 CaseListItem(
-                    imageRes = case.imageRes,
-                    title = case.title,
+                    title = case.label,
                     result = case.result,
                     date = case.date,
                     status = case.status,
                     indicatorColor = indicatorColor,
                     statusLabel = statusLabel,
                     statusColor = statusColor,
-                    onClick = {
-                        val gson = Gson()
-                        val caseJson = Uri.encode(gson.toJson(case))
-                        navController.navigate("derma_assessment_screen/$caseJson")
-                    }
-                )
-                Divider(modifier = Modifier.padding(vertical = 12.dp))
-            }
+                    imageUrl = case.imageUrl
+                ) {
+                    navController.navigate("case_detail/${case.caseId}")
 
                 }
-                Spacer(modifier = Modifier.height(60.dp))
+
+                androidx.compose.material3.Divider(modifier = Modifier.padding(vertical = 12.dp))
             }
+            Spacer(Modifier.height(60.dp))
         }
+    }
+}
 
 @Composable
 fun CaseListItem(
-    imageRes: Int,
     title: String,
     result: String?,
     date: String,
     status: String?,
     indicatorColor: Color,
-    statusLabel: String? = null, // Show "Pending" or "Completed"
+    statusLabel: String? = null,
     statusColor: Color? = null,
+    imageUrl: String? = null,
+    imageRes: Int? = null,
     onClick: () -> Unit
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
     ) {
         Box {
-            Image(
-                painter = painterResource(id = imageRes),
-                contentDescription = title,
-                modifier = Modifier
-                    .size(90.dp)
-                    .clip(RoundedCornerShape(15.dp))
-            )
+            if (imageUrl != null) {
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = title,
+                    modifier = Modifier
+                        .size(90.dp)
+                        .clip(RoundedCornerShape(15.dp)),
+                    placeholder = imageRes?.let { painterResource(it) },
+                    error = imageRes?.let { painterResource(it) },
+                    contentScale = ContentScale.Crop
+                )
+            } else if (imageRes != null) {
+                androidx.compose.foundation.Image(
+                    painter = painterResource(id = imageRes),
+                    contentDescription = title,
+                    modifier = Modifier
+                        .size(90.dp)
+                        .clip(RoundedCornerShape(15.dp))
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(90.dp)
+                        .clip(RoundedCornerShape(15.dp))
+                        .background(Color(0xFFE0E0E0))
+                )
+            }
+
             Box(
                 modifier = Modifier
                     .size(15.dp)
@@ -138,30 +169,27 @@ fun CaseListItem(
                     .background(indicatorColor, CircleShape)
             )
         }
-        Spacer(modifier = Modifier.width(15.dp))
+
+        Spacer(Modifier.width(15.dp))
+
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            result?.let {
-                Text("Result: $it", style = MaterialTheme.typography.bodyMedium)
-            }
             Text(date, style = MaterialTheme.typography.labelMedium, color = Color.Gray)
         }
+
         statusLabel?.let {
             Text(
                 text = it,
                 style = MaterialTheme.typography.labelSmall,
-                color = if (it.equals("Pending", ignoreCase = true)) Color(0xFFC48833)
-                else if (it.equals("Completed", ignoreCase = true)) Color(0xFF00B69B)
-                else Color(0xFFFFC107),
+                color = when {
+                    it.equals("Pending", true) -> Color(0xFFC48833)
+                    it.equals("Completed", true) -> Color(0xFF00B69B)
+                    else -> Color(0xFFFFC107)
+                },
                 modifier = Modifier
-                    .background(
-                        statusColor ?: Color.Gray.copy(alpha = 0.1f),
-                        RoundedCornerShape(4.dp)
-                    )
+                    .background(statusColor ?: Color.Gray.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             )
-        } ?: Spacer(modifier = Modifier.width(0.dp))
-
-
+        } ?: Spacer(Modifier.width(0.dp))
     }
 }

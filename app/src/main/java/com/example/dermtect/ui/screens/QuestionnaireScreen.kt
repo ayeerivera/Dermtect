@@ -60,11 +60,6 @@ fun QuestionnaireScreen(navController: NavController) {
             "Is the diameter larger than 6mm (about the size of a pencil eraser)?"
         )
     }
-
-    // Editable buffer
-    val answers =
-        remember { mutableStateListOf<Boolean?>().apply { repeat(questions.size) { add(null) } } }
-
     // Modes & navigation
     var isEditMode by remember { mutableStateOf(false) }
     var showBackDialog by remember { mutableStateOf(false) }
@@ -74,6 +69,15 @@ fun QuestionnaireScreen(navController: NavController) {
     var step by rememberSaveable { mutableStateOf(0) }          // 0..7
     var inReview by rememberSaveable { mutableStateOf(false) }  // review screen
     var showIntro by rememberSaveable { mutableStateOf(false) } // first-time intro screen
+
+// Show progress only while actively answering questions
+    val isReadSummary = existingAnswers != null && !isEditMode
+    val showEditingProgress = isEditMode && !inReview && !showIntro
+
+    // Editable buffer
+    val answers =
+        remember { mutableStateListOf<Boolean?>().apply { repeat(questions.size) { add(null) } } }
+
 
     // Initial load
     LaunchedEffect(Unit) {
@@ -86,19 +90,30 @@ fun QuestionnaireScreen(navController: NavController) {
 
     // React to loaded answers
     LaunchedEffect(existingAnswers) {
-        if (existingAnswers == null) {
-            // First time: enter edit mode with blanks and show intro screen
-            isEditMode = true
-            answers.clear(); answers.addAll(List(questions.size) { null })
-            step = 0
-            inReview = false
-            showIntro = true
-        } else if (!isEditMode) {
-            // Read mode
-            answers.clear(); answers.addAll(existingAnswers!!)
-            step = 0
-            inReview = false
-            showIntro = false
+        when {
+            // No doc yet: only go to intro ONCE (don’t keep forcing edit)
+            existingAnswers == null && answers.all { it == null } -> {
+                isEditMode = true
+                inReview = false
+                step = 0
+                showIntro = true
+                answers.clear()
+                answers.addAll(List(questions.size) { null })
+            }
+
+            // Doc arrived: copy answers and show summary by default
+            existingAnswers != null -> {
+                answers.clear()
+                answers.addAll(existingAnswers!!)
+                step = 0
+                inReview = false
+
+                // If we were showing the intro due to late data, exit edit mode.
+                if (showIntro) {
+                    isEditMode = false
+                    showIntro = false
+                }
+            }
         }
     }
 
@@ -144,9 +159,12 @@ fun QuestionnaireScreen(navController: NavController) {
                 showIntro = false
                 questionnaireViewModel.loadQuestionnaireAnswers()
             },
-            onError = {
-                Toast.makeText(context, "Failed to save. Please try again.", Toast.LENGTH_SHORT)
-                    .show()
+            onError = { msg ->
+                Toast.makeText(
+                    context,
+                    "Failed to save. ${msg ?: "Please check rules & logs."}",
+                    Toast.LENGTH_LONG
+                ).show()
             }
         )
     }
@@ -187,59 +205,63 @@ fun QuestionnaireScreen(navController: NavController) {
                             .fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+                        // Title
                         Text(
                             text = "Skin Check Questionnaire",
                             style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                             textAlign = TextAlign.Center
                         )
-                        Spacer(modifier = Modifier.height(15.dp))
+                        Spacer(Modifier.height(15.dp))
 
-                        // Progress bar (use step+1 so it starts filled on Q1)
-                        LinearProgressIndicator(
-                            progress = (step + 1).toFloat() / questions.size.toFloat(),
-                            modifier = Modifier
-                                .fillMaxWidth(0.9f)
-                                .height(8.dp),
-                            trackColor = Color(0xFFE6F4F4),
-                            color = Color(0xFF0FB2B2)
-                        )
-
-                        Spacer(Modifier.height(8.dp))
-
-                        // "Question X of 8" | "Skip" (first-time only)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(0.9f),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Question ${step + 1} of ${questions.size}",
-                                style = MaterialTheme.typography.bodyMedium
+                        if (showEditingProgress) {
+                            // Progress bar
+                            LinearProgressIndicator(
+                                progress = (step + 1).toFloat() / questions.size.toFloat(),
+                                modifier = Modifier
+                                    .fillMaxWidth(0.9f)
+                                    .height(8.dp),
+                                trackColor = Color(0xFFE6F4F4),
+                                color = Color(0xFF0FB2B2)
                             )
+                            Spacer(Modifier.height(8.dp))
 
-                            val rightActionLabel = when {
-                                existingAnswers == null -> "Skip"                  // first-time
-                                isEditMode && !inReview -> "Skip"       // editing
-                                else -> null
-                            }
+                            // "Question X of Y" | "Skip"
+                            Row(
+                                modifier = Modifier.fillMaxWidth(0.9f),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Question ${step + 1} of ${questions.size}",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
 
-                            if (rightActionLabel != null) {
-                                TextButton(
-                                    onClick = { showCancelDialog = true },
-                                    contentPadding = PaddingValues(
-                                        horizontal = 12.dp,
-                                        vertical = 6.dp
-                                    )
-                                ) {
-                                    Text(
-                                        text = rightActionLabel,
-                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                        color = Color(0xFF0FB2B2)
-                                    )
+                                val rightActionLabel = when {
+                                    existingAnswers == null -> "Skip"
+                                    isEditMode && !inReview -> "Skip"
+                                    else -> null
                                 }
-                            } else {
-                                Spacer(Modifier.width(1.dp))
+
+                                if (rightActionLabel != null) {
+                                    TextButton(
+                                        onClick = { showCancelDialog = true },
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                    ) {
+                                        Text(
+                                            text = rightActionLabel,
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                            color = Color(0xFF0FB2B2)
+                                        )
+                                    }
+                                } else {
+                                    Spacer(Modifier.width(1.dp))
+                                }
                             }
+
+                            Spacer(Modifier.height(12.dp))
+                        } else {
+                            // keep vertical rhythm when the header is hidden
+                            Spacer(Modifier.height(16.dp))
                         }
 
 
@@ -327,13 +349,17 @@ fun QuestionnaireScreen(navController: NavController) {
                                     )
                                     val btnHeight = 56.dp
 
+// selection flags
+                                    val yesSelected = answers[step] == true
+                                    val noSelected  = answers[step] == false
+
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(start = sideGutter, end = sideGutter),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        // YES — uses "Next" style
+                                        // YES
                                         EmbossedButton(
                                             text = "YES",
                                             onClick = { answers[step] = true },
@@ -341,19 +367,17 @@ fun QuestionnaireScreen(navController: NavController) {
                                                 .weight(1f)
                                                 .height(btnHeight),
                                             cornerRadius = 15.dp,
-                                            backgroundBrush = nextBrush,
-                                            textColor = Color.White
+                                            backgroundBrush = if (yesSelected)
+                                                nextBrush
+                                            else
+                                                Brush.linearGradient(listOf(Color(0xFFE6F4F4), Color(0xFFD3EBEB))),
+                                            textColor = Color(0xFF0FB2B2),
+                                            selected = yesSelected // <-- requires updated EmbossedButton
                                         )
 
-                                        // Middle divider
-                                        Box(
-                                            modifier = Modifier
-                                                .width(10.dp)
-                                                .height(btnHeight)
-                                                .background(Color.White.copy(alpha = 0.5f))
-                                        )
+                                        Spacer(Modifier.width(10.dp))
 
-                                        // NO — uses "Skip" style
+                                        // NO
                                         EmbossedButton(
                                             text = "NO",
                                             onClick = { answers[step] = false },
@@ -361,11 +385,27 @@ fun QuestionnaireScreen(navController: NavController) {
                                                 .weight(1f)
                                                 .height(btnHeight),
                                             cornerRadius = 15.dp,
-                                            backgroundBrush = skipBrush,
-                                            textColor = Color.Black
+                                            backgroundBrush = if (noSelected)
+                                                Brush.linearGradient(listOf(Color(0xFFCCCCCC), Color(0xFFB5B5B5)))
+                                            else
+                                                skipBrush,
+                                            textColor = Color.Black,
+                                            selected = noSelected
                                         )
                                     }
 
+                                    Spacer(Modifier.height(8.dp))
+                                    answers[step]?.let { picked ->
+                                        Text(
+                                            text = "Selected: " + if (picked) "Yes" else "No",
+                                            color = Color(0xFF0FB2B2),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(start = sideGutter, end = sideGutter)
+                                        )
+                                    }
                                     // Subtle Cancel/Skip under the answers
                                     Spacer(Modifier.height(8.dp))
                                     // Show warning first (if unanswered)
@@ -527,15 +567,14 @@ fun QuestionnaireScreen(navController: NavController) {
                                         isEditMode = true
                                         inReview = false
                                         step = 0
+                                        showIntro = false
+                                        answers.clear()
+                                        answers.addAll(existingAnswers ?: List(questions.size) { null })
                                     },
-                                    modifier = Modifier
-                                        .fillMaxWidth(0.9f)
-                                        .wrapContentHeight(),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFF0FB2B2),
-                                        contentColor = Color.White
-                                    )
+                                    modifier = Modifier.fillMaxWidth(0.9f)
                                 ) { Text("Edit") }
+
+
                             }
                         }
 
@@ -599,4 +638,3 @@ fun QuestionnaireScreen(navController: NavController) {
         }
     }
 }
-

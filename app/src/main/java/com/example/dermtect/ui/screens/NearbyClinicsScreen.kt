@@ -42,6 +42,7 @@ import android.content.Intent
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.core.app.ActivityCompat
+import org.osmdroid.config.Configuration
 
 
 @Composable
@@ -128,15 +129,6 @@ fun NearbyClinicsScreen(
                     .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = "+ Add your Address",
-                    fontSize = 14.sp,
-                    color = Color(0xFF1D1D1D),
-                    modifier = Modifier.align(Alignment.Start).padding(start = 20.dp)
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
                 Box(
                     modifier = Modifier
                         .clickable { showLocationDialog = true }
@@ -153,7 +145,7 @@ fun NearbyClinicsScreen(
                     contentAlignment = Alignment.CenterStart
                 ) {
                     Text(
-                        text = "Turn On Location or Manually Enter",
+                        text = "Turn On Location",
                         fontSize = 13.sp,
                         color = Color.Black,
                         modifier = Modifier.padding(start = 16.dp)
@@ -168,6 +160,8 @@ fun NearbyClinicsScreen(
                         .size(width = 335.dp, height = 248.dp)
                         .clip(RoundedCornerShape(11.dp)),
                     factory = { ctx ->
+                        Configuration.getInstance().userAgentValue = ctx.packageName
+
                         org.osmdroid.views.MapView(ctx).apply {
                             setMultiTouchControls(true)
                             controller.setZoom(14.0)
@@ -259,24 +253,24 @@ fun NearbyClinicsScreen(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 if (showLocationDialog) {
-                            showLocationDialog = false
+                    showLocationDialog = false
 
-                            val fineGranted = ContextCompat.checkSelfPermission(
-                                context, Manifest.permission.ACCESS_FINE_LOCATION
-                            ) == PackageManager.PERMISSION_GRANTED
-                            val coarseGranted = ContextCompat.checkSelfPermission(
-                                context, Manifest.permission.ACCESS_COARSE_LOCATION
-                            ) == PackageManager.PERMISSION_GRANTED
+                    val fineGranted = ContextCompat.checkSelfPermission(
+                        context, Manifest.permission.ACCESS_FINE_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED
+                    val coarseGranted = ContextCompat.checkSelfPermission(
+                        context, Manifest.permission.ACCESS_COARSE_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED
 
-                            if (fineGranted || coarseGranted) {
-                                overpassVm.loadUserLocation()
-                                overpassVm.fetchNearbyDermatology(radiusMeters = 5000)
-                            } else {
-                                permissionLauncher.launch(arrayOf(
-                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.ACCESS_COARSE_LOCATION
-                                ))
-                            }
+                    if (fineGranted || coarseGranted) {
+                        overpassVm.loadUserLocation()
+                        overpassVm.fetchNearbyDermatology(radiusMeters = 5000)
+                    } else {
+                        permissionLauncher.launch(arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        ))
+                    }
                 }
 
                 if (showOpenSettings) {

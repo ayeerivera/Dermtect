@@ -1,19 +1,39 @@
 package com.example.dermtect.ui.screens
 
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.dermtect.ui.components.CaseData
 import com.example.dermtect.ui.components.HistoryScreenTemplate
-import com.example.dermtect.R
+import com.example.dermtect.ui.viewmodel.HistoryViewModel
 
 @Composable
-fun CaseHistoryScreen(navController: NavController) {
-    val allCases = listOf(
-        CaseData(R.drawable.sample_skin_1, "Scan 1", "Pending", "May 8, 2025", "Pending"),
-        CaseData(R.drawable.sample_skin_1, "Scan 2", "Benign", "May 9, 2025", "Completed"),
-        CaseData(R.drawable.sample_skin_1, "Scan 3", "Malignant", "May 10, 2025", "Completed")
-    )
-    HistoryScreenTemplate(navController, "Case History", allCases)
+fun CaseHistoryScreen(
+    navController: NavController,
+    viewModel: HistoryViewModel = viewModel()
+) {
+    val uiState by viewModel.state.collectAsState()
+
+    when {
+        uiState.loading -> {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        }
+        uiState.error != null -> {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(text = uiState.error ?: "Error", color = MaterialTheme.colorScheme.error)
+            }
+        }
+        else -> {
+            HistoryScreenTemplate(
+                navController = navController,
+                screenTitle = "Case History",
+                caseList = uiState.items
+            )
+        }
+    }
 }
-
-

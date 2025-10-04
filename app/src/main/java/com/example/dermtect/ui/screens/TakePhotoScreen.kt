@@ -9,7 +9,6 @@ import android.util.Log
 import android.util.Size
 import android.widget.Toast
 import androidx.camera.core.*
-import com.example.dermtect.R
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Canvas
@@ -18,15 +17,19 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
@@ -34,18 +37,30 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import androidx.exifinterface.media.ExifInterface
+import com.example.dermtect.R
+import com.example.dermtect.tflt.DermtectResult
+import com.example.dermtect.tflt.TfLiteService
+import com.example.dermtect.ui.components.BackButton
+import com.example.dermtect.ui.screens.LesionCaseTemplate
+import com.example.dermtect.ui.screens.generateTherapeuticMessage
+import com.example.dermtect.data.repository.ScanRepository
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.storage.FirebaseStorage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.tasks.await
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import androidx.exifinterface.media.ExifInterface
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.geometry.Size as GeometrySize
-import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.shape.RoundedCornerShape
-import com.example.dermtect.ui.components.BackButton
 import android.app.Activity
 import android.Manifest
 import android.content.pm.PackageManager
@@ -55,67 +70,78 @@ import androidx.compose.runtime.*
 import androidx.compose.material3.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-import com.example.dermtect.tflt.TfLiteService
-import com.example.dermtect.tflt.DermtectResult
-
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.runtime.rememberCoroutineScope
-import com.example.dermtect.ui.screens.LesionCaseTemplate
-import com.example.dermtect.ui.screens.generateTherapeuticMessage
-
-import kotlinx.coroutines.Dispatchers
+import com.example.dermtect.pdf.PdfExporter
+import com.example.dermtect.ui.viewmodel.QuestionnaireViewModel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import kotlin.collections.any
 
+
+
+// ---------- Small utilities ----------
 fun nowTimestamp(): String {
     val sdf = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
     return sdf.format(Date())
 }
 
-// ✅ Constant for square size
+// Focus box constants
 val FOCUS_BOX_WIDTH = 280.dp
-val FOCUS_BOX_HEIGHT = 340.dp // mas mahaba para skin lesion focus
+val FOCUS_BOX_HEIGHT = 340.dp
 
 @Composable
 fun TakePhotoScreen(
-    onBackClick: () -> Unit = {}
+    onBackClick: () -> Unit = {},
+    onFindClinicClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
-
-    val tfService = remember { TfLiteService.get(context) }        // one instance
-    val scope = rememberCoroutineScope()
+    val tfService = remember { TfLiteService.get(context) }
+    val cameraExecutor: ExecutorService = remember { Executors.newSingleThreadExecutor() }
+    var modelFlag by remember { mutableStateOf("Benign") }  // "Malignant" | "Benign"
 
     var lensFacing = CameraSelector.LENS_FACING_BACK
-    val cameraExecutor: ExecutorService = remember { Executors.newSingleThreadExecutor() }
-
     var preview by remember { mutableStateOf<Preview?>(null) }
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     var flashEnabled by remember { mutableStateOf(false) }
     val previewView = remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }
+    val coroutineScope = rememberCoroutineScope()
+
+    var hasSaved by remember { mutableStateOf(false) }
+    var hasUploaded by remember { mutableStateOf(false) }
 
     var cameraControl: CameraControl? by remember { mutableStateOf(null) }
     var cameraInfo: CameraInfo? by remember { mutableStateOf(null) }
 
     var capturedImage by remember { mutableStateOf<Bitmap?>(null) }
-
-    // Save square region for cropping
     var squareRect by remember { mutableStateOf<Rect?>(null) }
 
     var isRunning by remember { mutableStateOf(false) }
     var inferenceResult by remember { mutableStateOf<DermtectResult?>(null) }
 
+    var fullImagePage by remember { mutableStateOf<Int?>(null) }
+
+
+    // === NEW: questionnaire state (gate PDF download) ===
+    val qvm = remember { QuestionnaireViewModel() }
+    val existingAnswers by qvm.existingAnswers.collectAsState()
+    val questions = remember {
+        listOf(
+            "Have you noticed this skin spot recently appearing or changing in size?",
+            "Does the lesion have uneven or irregular borders?",
+            "Is the color of the spot unusual (black, blue, red, or a mix of colors)?",
+            "Has the lesion been bleeding, itching, or scabbing recently?",
+            "Is there a family history of skin cancer or melanoma?",
+            "Has the lesion changed in color or texture over the last 3 months?",
+            "Is the lesion asymmetrical (one half unlike the other)?",
+            "Is the diameter larger than 6mm (about the size of a pencil eraser)?"
+        )
+    }
+    LaunchedEffect(Unit) { qvm.loadQuestionnaireAnswers() }
+
+    // ===== Camera bind =====
     DisposableEffect(Unit) {
         val cameraProvider = cameraProviderFuture.get()
-
-        val cameraSelector = CameraSelector.Builder()
-            .requireLensFacing(lensFacing)
-            .build()
+        val cameraSelector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
 
         preview = Preview.Builder()
             .setTargetResolution(Size(1080, 1920))
@@ -128,10 +154,7 @@ fun TakePhotoScreen(
         try {
             cameraProvider.unbindAll()
             val camera = cameraProvider.bindToLifecycle(
-                lifecycleOwner,
-                cameraSelector,
-                preview,
-                imageCapture
+                lifecycleOwner, cameraSelector, preview, imageCapture
             )
             cameraControl = camera.cameraControl
             cameraInfo = camera.cameraInfo
@@ -148,7 +171,6 @@ fun TakePhotoScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-
         // Camera Preview
         AndroidView(
             factory = { previewView },
@@ -166,19 +188,15 @@ fun TakePhotoScreen(
                 }
         )
 
-        // Focus guide overlay (square + dimmed outside + corner lines)
+        // Focus overlay
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
+                    .offset(y = (-80).dp)
             ) {
-                // Dim background
-                drawRect(
-                    color = Color.Black.copy(alpha = 0.7f),
-                    size = size
-                )
+                drawRect(color = Color.Black.copy(alpha = 0.7f), size = size)
 
-                // Use constants for dimensions
                 val rectWidth = FOCUS_BOX_WIDTH.toPx()
                 val rectHeight = FOCUS_BOX_HEIGHT.toPx()
 
@@ -189,7 +207,6 @@ fun TakePhotoScreen(
 
                 squareRect = Rect(left, top, right, bottom)
 
-                // Transparent cut-out
                 drawRect(
                     color = Color.Transparent,
                     topLeft = Offset(left, top),
@@ -197,10 +214,9 @@ fun TakePhotoScreen(
                     blendMode = androidx.compose.ui.graphics.BlendMode.Clear
                 )
 
-                // Corner lines
                 val lineLength = 40.dp.toPx()
                 val strokeWidth = 6f
-
+                // corners
                 drawLine(Color.Cyan, Offset(left, top), Offset(left + lineLength, top), strokeWidth)
                 drawLine(Color.Cyan, Offset(left, top), Offset(left, top + lineLength), strokeWidth)
                 drawLine(Color.Cyan, Offset(right, top), Offset(right - lineLength, top), strokeWidth)
@@ -219,8 +235,7 @@ fun TakePhotoScreen(
                 .padding(top = 50.dp, start = 23.dp)
         ) {
             BackButton(
-                modifier = Modifier
-                    .align(Alignment.CenterStart),
+                modifier = Modifier.align(Alignment.CenterStart),
                 onClick = { onBackClick() }
             )
         }
@@ -232,21 +247,12 @@ fun TakePhotoScreen(
                 .padding(top = 100.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = "Take a photo",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "3–6 (8–15 cm) inches away from the lesion",
-                fontSize = 14.sp,
-                color = Color.LightGray
-            )
+            Text("Take a photo", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Spacer(Modifier.height(8.dp))
+            Text("3–6 (8–15 cm) inches away from the lesion", fontSize = 14.sp, color = Color.LightGray)
         }
 
-        // === BOTTOM CONTROLS (unchanged) ===
+        // Bottom controls
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -260,75 +266,71 @@ fun TakePhotoScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
+                Spacer(Modifier.width(75.dp))
 
-                Spacer(modifier = Modifier.width(75.dp))
-
-                // Camera Button
                 Box(
                     modifier = Modifier
                         .size(65.dp)
                         .background(Color(0xFF0FB2B2), shape = CircleShape)
                         .clickable {
-                            val file = File(
-                                context.cacheDir,
-                                "${System.currentTimeMillis()}.jpg"
-                            )
-
+                            val file = File(context.cacheDir, "${System.currentTimeMillis()}.jpg")
                             val outputOptions = ImageCapture.OutputFileOptions.Builder(file).build()
-
                             imageCapture?.takePicture(
                                 outputOptions,
                                 ContextCompat.getMainExecutor(context),
                                 object : ImageCapture.OnImageSavedCallback {
                                     override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                                         val fullBitmap = rotateBitmapAccordingToExif(context, file)
-
                                         squareRect?.let { rect ->
                                             val scaleX = fullBitmap.width.toFloat() / previewView.width.toFloat()
                                             val scaleY = fullBitmap.height.toFloat() / previewView.height.toFloat()
 
                                             val cropLeft = (rect.left * scaleX).toInt().coerceAtLeast(0)
                                             val cropTop = (rect.top * scaleY).toInt().coerceAtLeast(0)
-                                            val cropWidth = (rect.width * scaleX).toInt().coerceAtMost(fullBitmap.width - cropLeft)
-                                            val cropHeight = (rect.height * scaleY).toInt().coerceAtMost(fullBitmap.height - cropTop)
+                                            val cropWidth = (rect.width * scaleX).toInt()
+                                                .coerceAtMost(fullBitmap.width - cropLeft)
+                                            val cropHeight = (rect.height * scaleY).toInt()
+                                                .coerceAtMost(fullBitmap.height - cropTop)
 
-                                            capturedImage = Bitmap.createBitmap(fullBitmap, cropLeft, cropTop, cropWidth, cropHeight)
-                                        } ?: run {
-                                            capturedImage = fullBitmap
-                                        }
+                                            capturedImage = Bitmap.createBitmap(
+                                                fullBitmap, cropLeft, cropTop, cropWidth, cropHeight
+                                            )
+                                        } ?: run { capturedImage = fullBitmap }
                                     }
-
                                     override fun onError(exception: ImageCaptureException) {
                                         Toast.makeText(context, "Capture failed", Toast.LENGTH_SHORT).show()
                                         Log.e("CameraX", "Photo capture failed: ${exception.message}", exception)
                                     }
                                 }
                             )
-                        }, contentAlignment = Alignment.Center
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.camera_vector),
                         contentDescription = "Capture",
-                        modifier = Modifier
-                            .size(24.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                 }
 
-
-                Spacer(modifier = Modifier.width(65.dp))
-
+                Spacer(Modifier.width(65.dp))
             }
         }
 
-        // === Show captured image popup (with buttons) ===
+        // Show captured result / analysis
         capturedImage?.let { image ->
-
-            // Auto-run inference when a new image is captured
+            // New image → reset state and run inference
             LaunchedEffect(image) {
+                hasSaved = false
+                hasUploaded = false
+                fullImagePage = null
+
                 if (!isRunning && inferenceResult == null) {
                     isRunning = true
                     val r = withContext(Dispatchers.Default) { tfService.infer(image) }
-                    inferenceResult = r
+                    modelFlag = if (r.probability >= 0.0112f) "Malignant" else "Benign"
+                    val merged = r.heatmap?.let { overlayBitmaps(image, it, 115) }
+                    inferenceResult = r.copy(heatmap = merged)
                     isRunning = false
                 }
             }
@@ -351,75 +353,194 @@ fun TakePhotoScreen(
                     }
                     inferenceResult != null -> {
                         val r = inferenceResult!!
-                        val predictionStr = if (r.isMalignant) "Malignant" else "Benign"
+                        val riskCopy = generateTherapeuticMessage(r.probability)
 
-                        // therapeutic copy from the real probability
-                        val riskCopy = generateTherapeuticMessage(
-                            prediction = predictionStr,
-                            probability = r.probability
-                        )
+                        // Auto-upload once per capture
+                        LaunchedEffect(capturedImage, r, hasUploaded) {
+                            if (!hasUploaded && capturedImage != null) {
+                                val ok = uploadScanWithLabel(
+                                    bitmap = capturedImage!!,
+                                    heatmap = r.heatmap,
+                                    probability = r.probability,
+                                    prediction = modelFlag
+                                )
+                                Log.d("Upload", if (ok) "Scan saved" else "Save failed")
+                                hasUploaded = true
+                            }
+                        }
 
                         LesionCaseTemplate(
                             imageBitmap = image,
                             camBitmap = r.heatmap,
                             title = "Result",
-                            timestamp = nowTimestamp(),   // 👈 auto-generated from device
+                            timestamp = nowTimestamp(),
                             riskTitle = "Risk Assessment:",
                             riskDescription = riskCopy,
-                            prediction = if (r.isMalignant) "Malignant" else "Benign", // for DB only
-                            probability = r.probability,                              // for DB only
-                            onBackClick = { inferenceResult = null; capturedImage = null },
-                            onDownloadClick = { /* ... */ },
-                            onFindClinicClick = { /* ... */ }
+                            prediction = modelFlag,
+                            probability = r.probability,
+
+                            showPrimaryButtons = !hasSaved,   // big image before saving
+                            showSecondaryActions = hasSaved,   // actions after saving
+
+                            // NEW: tap image to open fullscreen
+                            onImageClick = { page -> fullImagePage = page },  // << was: { showFullImage = true }
+
+                            onSaveClick = {
+                                coroutineScope.launch {
+                                    try {
+                                        val uid = FirebaseAuth.getInstance().currentUser?.uid
+                                        Log.d("TakePhotoScreen", "onSaveClick fired. uid=$uid, hasImage=${capturedImage != null}, pred=$modelFlag")
+
+                                        if (uid == null) {
+                                            Toast.makeText(context, "Please sign in first.", Toast.LENGTH_SHORT).show()
+                                            return@launch
+                                        }
+                                        if (capturedImage == null) {
+                                            Toast.makeText(context, "No image to save.", Toast.LENGTH_SHORT).show()
+                                            return@launch
+                                        }
+
+                                        val ok = uploadScanWithLabel(
+                                            bitmap = capturedImage!!,
+                                            heatmap = inferenceResult?.heatmap,
+                                            probability = inferenceResult?.probability ?: 0f,
+                                            prediction = modelFlag
+                                        )
+                                        Log.d("TakePhotoScreen", "uploadScanWithLabel -> $ok")
+                                        if (ok) {
+                                            hasSaved = true
+                                            Toast.makeText(context, "Scan saved", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "Save failed (uid or rules).", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } catch (t: Throwable) {
+                                        Log.e("TakePhotoScreen", "Save failed with exception", t)
+                                        Toast.makeText(context, "Save failed: ${t.message}", Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            },
+                            onRetakeClick = {
+                                inferenceResult = null
+                                capturedImage = null
+                                hasSaved = false
+                                hasUploaded = false
+                                fullImagePage = null
+                            },
+                            onBackClick = {
+                                inferenceResult = null
+                                capturedImage = null
+                                hasSaved = false
+                                hasUploaded = false
+                                fullImagePage = null
+                                onBackClick()
+                            },
+                            onDownloadClick = {
+                                coroutineScope.launch {
+                                    // Gate: questionnaire must be complete (8 answers, none null)
+                                    val qa = existingAnswers
+                                    val notCompleted =
+                                        (qa == null) || (qa.size != questions.size) || qa.any { it == null }
+                                    if (notCompleted) {
+                                        Toast.makeText(
+                                            context,
+                                            "Please complete the questionnaire before downloading the PDF.",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                        return@launch
+                                    }
+
+                                    try {
+                                        val answerPairs: List<Pair<String, String>> =
+                                            questions.indices.map { i ->
+                                                val a = qa!![i] ?: false
+                                                questions[i] to if (a) "Yes" else "No"
+                                            }
+
+                                        val data = PdfExporter.CasePdfData(
+                                            title = "Result",
+                                            timestamp = nowTimestamp(),
+                                            photo = image,
+                                            heatmap = r.heatmap,
+                                            shortMessage = generateTherapeuticMessage(r.probability),
+                                            answers = answerPairs
+                                        )
+
+                                        val uri = withContext(Dispatchers.IO) {
+                                            PdfExporter.createCasePdf(context, data)
+                                        }
+                                        PdfExporter.openPdf(context, uri)
+                                        Toast.makeText(context, "PDF saved successfully", Toast.LENGTH_SHORT).show()
+
+                                    } catch (t: Throwable) {
+                                        Log.e("TakePhotoScreen", "PDF export failed", t)
+                                        Toast.makeText(
+                                            context,
+                                            "Failed to create PDF: ${t.message ?: "Unknown error"}",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                }
+                            },
+                            onFindClinicClick = { onFindClinicClick() }
                         )
 
+                        if (fullImagePage != null) {
+                            androidx.compose.ui.window.Dialog(onDismissRequest = { fullImagePage = null }) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    val displayBmp = when (fullImagePage) {
+                                        0 -> image                       // captured photo
+                                        1 -> r.heatmap ?: image          // heatmap (fallback to photo if null)
+                                        else -> null
+                                    }
+                                    if (displayBmp != null) {
+                                        Image(
+                                            bitmap = displayBmp.asImageBitmap(),
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable { fullImagePage = null },
+                                            contentScale = ContentScale.Fit
+                                        )
+                                    } else {
+                                        Text("No image", color = Color.White)
+                                    }
+                                }
+                            }
+                        }
+
                     }
-
-
                 }
             }
-
         }
     }
 }
 
-@Composable
-fun GradientButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .height(56.dp)
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF4DD0E1), // light cyan
-                        Color(0xFF00796B)  // teal
-                    )
-                ),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
-            )
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            color = Color.White,
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp
-        )
-    }
+
+// ---------- Helpers (non-Compose) ----------
+fun overlayBitmaps(base: Bitmap, overlay: Bitmap, alpha: Int = 115): Bitmap {
+    val config = base.config ?: Bitmap.Config.ARGB_8888
+    val result = Bitmap.createBitmap(base.width, base.height, config)
+    val canvas = android.graphics.Canvas(result)
+    canvas.drawBitmap(base, 0f, 0f, null)
+
+    val paint = android.graphics.Paint().apply { this.alpha = alpha }
+    val scaled = if (overlay.width == base.width && overlay.height == base.height)
+        overlay
+    else
+        Bitmap.createScaledBitmap(overlay, base.width, base.height, true)
+
+    canvas.drawBitmap(scaled, 0f, 0f, paint)
+    return result
 }
 
 fun rotateBitmapAccordingToExif(context: Context, file: File): Bitmap {
     val exif = ExifInterface(file.absolutePath)
-    val orientation = exif.getAttributeInt(
-        ExifInterface.TAG_ORIENTATION,
-        ExifInterface.ORIENTATION_NORMAL
-    )
-
+    val orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
     val rotationAngle = when (orientation) {
         ExifInterface.ORIENTATION_ROTATE_90 -> 90f
         ExifInterface.ORIENTATION_ROTATE_180 -> 180f
@@ -427,18 +548,70 @@ fun rotateBitmapAccordingToExif(context: Context, file: File): Bitmap {
         else -> 0f
     }
 
-    val bitmap = MediaStore.Images.Media.getBitmap(
-        context.contentResolver,
-        Uri.fromFile(file)
-    )
-
-    val matrix = Matrix().apply {
-        postRotate(rotationAngle)
-    }
-
+    val bitmap = MediaStore.Images.Media.getBitmap(context.contentResolver, Uri.fromFile(file))
+    val matrix = Matrix().apply { postRotate(rotationAngle) }
     return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
 }
 
+/**
+ * Uploads the cropped photo to Storage and writes the scan metadata into Firestore:
+ * - Storage path: users/{uid}/scans/{caseId}.jpg
+ * - Firestore doc: lesion_case/{caseId}
+ * Includes a friendly label "Scan N".
+ */
+
+suspend fun uploadScanWithLabel(
+    bitmap: Bitmap,            // original cropped photo
+    heatmap: Bitmap?,          // heatmap/overlay to save (can be null)
+    probability: Float,
+    prediction: String
+): Boolean {
+    val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return false
+    val db = FirebaseFirestore.getInstance()
+
+    // 1) Reserve Firestore doc id + "Scan N" label (you already have this repo)
+    val (caseId, label) = ScanRepository.reserveScanLabelAndId(db, uid)
+
+    // 2) Prepare Storage refs
+    val storage = FirebaseStorage.getInstance().reference
+    val photoRef = storage.child("users/$uid/scans/$caseId.jpg")
+    val heatmapRef = storage.child("users/$uid/scans/${caseId}_heatmap.jpg")
+
+    // 3) Upload original photo
+    val photoBytes = ByteArrayOutputStream().apply {
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, this)
+    }.toByteArray()
+    photoRef.putBytes(photoBytes).await()
+    val photoUrl = photoRef.downloadUrl.await().toString()
+
+    // 4) Upload heatmap (if provided)
+    var heatmapUrl: String? = null
+    if (heatmap != null) {
+        val heatmapBytes = ByteArrayOutputStream().apply {
+            heatmap.compress(Bitmap.CompressFormat.JPEG, 90, this)
+        }.toByteArray()
+        heatmapRef.putBytes(heatmapBytes).await()
+        heatmapUrl = heatmapRef.downloadUrl.await().toString()
+    }
+
+    // 5) Firestore metadata
+    val doc = hashMapOf(
+        "user_id" to uid,
+        "label" to label,
+        "scan_url" to photoUrl,
+        "timestamp" to FieldValue.serverTimestamp(),
+        "timestamp_ms" to System.currentTimeMillis(),
+        "prediction" to prediction,
+        "probability" to probability.toDouble(),
+        "status" to "completed",
+        "heatmap_url" to heatmapUrl            // may be null if no heatmap
+    )
+
+
+    db.collection("lesion_case").document(caseId).set(doc).await()
+    return true
+
+}
 @Composable
 fun CameraPermissionGate(
     onGranted: @Composable () -> Unit,
@@ -500,3 +673,4 @@ fun CameraPermissionGate(
         onGranted()
     }
 }
+

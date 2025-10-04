@@ -1,6 +1,5 @@
 package com.example.dermtect.ui.screens
 
-import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -9,7 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -22,7 +21,6 @@ import com.example.dermtect.R
 import com.example.dermtect.ui.components.TopRightNotificationIcon
 import com.example.dermtect.ui.components.CaseData
 import com.example.dermtect.ui.components.CaseListItem
-import com.google.gson.Gson
 
 @Composable
 fun DermaHomeScreen(
@@ -33,13 +31,12 @@ fun DermaHomeScreen(
     onSettingsClick: () -> Unit,
     firstName: String
 ) {
-    fun getIndicatorColor(result: String?): Color = when (result?.lowercase()) {
-        "pending" -> Color(0xFFFFA500)
-        "benign" -> Color(0xFF4CAF50)
-        "malignant" -> Color(0xFFF44336)
+    fun indicatorColorOf(result: String?, status: String?): Color = when {
+        status?.equals("pending", true) == true -> Color(0xFFFFA500)  // orange
+        result?.equals("benign", true) == true -> Color(0xFF4CAF50)   // green
+        result?.equals("malignant", true) == true -> Color(0xFFF44336) // red
         else -> Color.Gray
     }
-
 
     Column(
         modifier = Modifier
@@ -60,35 +57,33 @@ fun DermaHomeScreen(
                 .padding(horizontal = 20.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.Start
         ) {
-
-            // Header Section
-
-                Text(
-                    text = "Hello,",
-                    style = MaterialTheme.typography.displayMedium.copy(fontWeight = FontWeight.Normal)
-                )
+            // Header
             Text(
-                text = "Dr. ${firstName}!",
+                text = "Hello,",
+                style = MaterialTheme.typography.displayMedium.copy(fontWeight = FontWeight.Normal)
+            )
+            Text(
+                text = "Dr. $firstName!",
                 style = MaterialTheme.typography.displayLarge.copy(fontWeight = FontWeight.Bold)
             )
-
             Text(
-                    text = "Early Detection Saves Lives.",
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal)
-                )
+                text = "Early Detection Saves Lives.",
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal)
+            )
 
             Spacer(modifier = Modifier.height(30.dp))
-            StatCardRow (
+
+            StatCardRow(
                 onPendingCasesClick = onPendingCasesClick,
                 onTotalCasesClick = onTotalCasesClick
             )
 
-                    Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            // Pending Cases Section
+            // Pending Cases Section header
             Row(
-                modifier = Modifier.fillMaxWidth()
-
+                modifier = Modifier
+                    .fillMaxWidth()
                     .verticalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -110,42 +105,55 @@ fun DermaHomeScreen(
 
             Spacer(modifier = Modifier.height(15.dp))
 
-            val pendingCases = listOf(
-                CaseData(R.drawable.sample_skin_1, "Scan 1", "Pending", "May 8, 2025", null),
-                CaseData(R.drawable.sample_skin_1, "Scan 2", "Pending", "May 9, 2025",null ),
-                CaseData(R.drawable.sample_skin_1, "Scan 3", "Pending", "May 10, 2025",null )
-            )
+            // ===== Empty state (no items) =====
+            val pendingCases = emptyList<CaseData>()
 
-            pendingCases.forEach { case ->
-                CaseListItem(
-                    imageRes = case.imageRes,
-                    title = case.title,
-                    result = case.result,
-                    date = case.date,
-                    status = case.status,
-                    indicatorColor = getIndicatorColor(case.result),
-                    statusLabel = case.status,
-                    statusColor = null,
-                    onClick = {
-                        val gson = Gson()
-                        val caseJson = Uri.encode(gson.toJson(case))
-                        navController.navigate("derma_assessment_screen/$caseJson")
-                    }
-                )
-                Divider(modifier = Modifier.padding(vertical = 12.dp))
+            if (pendingCases.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp)
+                        .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No pending cases right now",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF7A7A7A)
+                    )
+                }
+            } else {
+                pendingCases.forEach { case ->
+                    CaseListItem(
+                        title = case.label,
+                        result = case.result,
+                        date = case.date,
+                        status = case.status,
+                        indicatorColor = indicatorColorOf(case.result, case.status),
+                        statusLabel = case.status,
+                        statusColor = null,
+                        imageUrl = case.imageUrl,
+                        imageRes = case.imageRes,
+                        onClick = {
+                            navController.navigate("pending_cases")
+                        }
+                    )
+                    Divider(modifier = Modifier.padding(vertical = 12.dp))
+                }
             }
 
-            Spacer(modifier = Modifier.height(60.dp)) // Space for bottom nav
-
-
+            Spacer(modifier = Modifier.height(60.dp)) // bottom nav spacing
         }
+
         BottomNavBar(onSettingsClick = onSettingsClick)
     }
 }
 
 @Composable
-fun StatCardRow ( onPendingCasesClick: () -> Unit,
-                  onTotalCasesClick: () -> Unit ){
+fun StatCardRow(
+    onPendingCasesClick: () -> Unit,
+    onTotalCasesClick: () -> Unit
+) {
     Box(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -153,10 +161,9 @@ fun StatCardRow ( onPendingCasesClick: () -> Unit,
                 .align(Alignment.Center),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-
             StatCard(
                 label = "Pending Cases",
-                value = "20",
+                value = "0",
                 imageRes = R.drawable.pending_cases,
                 imageCardColor = Color(0xFFD7F2D6),
                 modifier = Modifier.weight(1f),
@@ -164,7 +171,7 @@ fun StatCardRow ( onPendingCasesClick: () -> Unit,
             )
             StatCard(
                 label = "Total Cases",
-                value = "20",
+                value = "0", // ← all cases empty
                 imageRes = R.drawable.total_cases,
                 imageCardColor = Color(0xFFDCD2DE),
                 modifier = Modifier.weight(1f),
@@ -173,7 +180,6 @@ fun StatCardRow ( onPendingCasesClick: () -> Unit,
         }
     }
 }
-
 
 @Composable
 fun StatCard(
@@ -191,49 +197,51 @@ fun StatCard(
         shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFFCDFFFF))
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
-        )   {
+        Column(modifier = Modifier.fillMaxSize()) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold, color = Color.DarkGray),
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = Color.DarkGray
+                ),
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
                     .padding(top = 20.dp)
             )
             Text(
                 text = value,
-                style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Medium, fontSize = 30.sp),
+                style = MaterialTheme.typography.displaySmall.copy(
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 30.sp
+                ),
                 modifier = Modifier
                     .padding(start = 15.dp)
                     .fillMaxWidth(0.5f)
             )
-            Card (
+            Card(
                 colors = CardDefaults.cardColors(containerColor = imageCardColor),
                 modifier = Modifier
                     .size(60.dp)
                     .align(Alignment.End)
                     .padding(end = 10.dp, bottom = 10.dp)
-                    .offset(x = -5.dp, y = -5.dp)
-            ){
-            Image(
-                painter = painterResource(id = imageRes),
-                contentDescription = label,
-                modifier = Modifier
-                    .size(60.dp)
-                    .padding(10.dp)
-
-            ) }
+                    .offset(x = (-5).dp, y = (-5).dp)
+            ) {
+                Image(
+                    painter = painterResource(id = imageRes),
+                    contentDescription = label,
+                    modifier = Modifier
+                        .size(60.dp)
+                        .padding(10.dp)
+                )
+            }
         }
     }
 }
-
 
 @Composable
 fun BottomNavBar(
     onSettingsClick: () -> Unit = {}
 ) {
-
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -267,9 +275,7 @@ fun BottomNavBar(
                         .size(26.dp)
                         .clickable { onSettingsClick() }
                 )
-
             }
         }
-
     }
 }

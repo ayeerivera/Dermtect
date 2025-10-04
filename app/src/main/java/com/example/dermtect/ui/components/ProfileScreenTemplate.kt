@@ -17,7 +17,6 @@ import androidx.compose.material.icons.filled.AssignmentTurnedIn
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -192,7 +191,6 @@ fun ProfileScreenTemplate(
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
                     )
                     Spacer(Modifier.width(6.dp))
-                    // Removed pencil icon as requested
                 }
             }
         }
@@ -219,7 +217,6 @@ fun ProfileScreenTemplate(
 
                 Spacer(modifier = Modifier.height(30.dp))
 
-                // Edit Name row (using font size from Settings)
                 EditName(
                     icon = {
                         Icon(
@@ -243,7 +240,7 @@ fun ProfileScreenTemplate(
                             imageVector = Icons.Filled.Lock,
                             contentDescription = "Change Password",
                             tint = Color(0xFF0FB2B2),
-                            modifier = Modifier.size(28.dp) // matched Settings icon size
+                            modifier = Modifier.size(28.dp)
                         )
                     },
                     label = "Change Password",
@@ -265,8 +262,7 @@ fun ProfileScreenTemplate(
                         label = "My Assessment Report",
                         onClick = {
                             navController.navigate("questionnaire")
-                        },
-                        fontSize = 16.sp // added parameter for font size in AssessmentRow
+                        }
                     )
                 }
 
@@ -276,27 +272,12 @@ fun ProfileScreenTemplate(
                             imageVector = Icons.Filled.Delete,
                             contentDescription = "Deactivate Account",
                             tint = Color(0xFF0FB2B2),
-                            modifier = Modifier.size(28.dp) // matched Settings icon size
+                            modifier = Modifier.size(28.dp)
                         )
                     },
                     label = "Deactivate Account",
                     onClick = {
                         showDeleteDialog = true
-                    }
-                )
-
-                ChangePasswordRow(
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.ExitToApp,
-                            contentDescription = "Logout",
-                            tint = Color(0xFF0FB2B2),
-                            modifier = Modifier.size(28.dp) // matched Settings icon size
-                        )
-                    },
-                    label = "Logout",
-                    onClick = {
-                        showLogoutDialog = true
                     }
                 )
             }

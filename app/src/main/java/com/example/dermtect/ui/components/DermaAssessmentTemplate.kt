@@ -80,34 +80,34 @@ fun DermaAssessmentScreen(
 
             Column(modifier = Modifier.fillMaxWidth(0.9f)
             ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xFFD3FFFD), RoundedCornerShape(10.dp))
-            ) {
-                Column (modifier = Modifier.padding(10.dp)){
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.context_icon),
-                            contentDescription = "Context Icon",
-                            modifier = Modifier.size(16.67.dp)
-                        )
-                        Spacer(modifier = Modifier.width(5.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFFD3FFFD), RoundedCornerShape(10.dp))
+                ) {
+                    Column (modifier = Modifier.padding(10.dp)){
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.context_icon),
+                                contentDescription = "Context Icon",
+                                modifier = Modifier.size(16.67.dp)
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = "Additional Context",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color.Black
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Additional Context",
-                            style = MaterialTheme.typography.labelMedium,
+                            text = "View Risk Assessment & Report",
+                            style = MaterialTheme.typography.bodyLarge,
                             color = Color.Black
                         )
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "View Risk Assessment & Report",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color.Black
-                    )
                 }
-            }
 
                 Spacer(modifier = Modifier.height(24.dp))
 

@@ -238,11 +238,4 @@ class UserHomeViewModel(application: Application) : AndroidViewModel(application
                 _lastName.value = lastName
             }
     }
-
-
-
-
-
-
-
 }

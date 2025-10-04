@@ -17,40 +17,59 @@ class QuestionnaireViewModel : ViewModel() {
     fun saveQuestionnaireAnswers(
         answers: List<Boolean?>,
         onSuccess: () -> Unit,
-        onError: () -> Unit
+        onError: (String?) -> Unit
     ) {
         _loading.value = true
-        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return onError()
+
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        if (uid == null) {
+            _loading.value = false
+            onError("No user UID")   // <-- show clearly if this ever happens
+            return
+        }
+
         val db = FirebaseFirestore.getInstance()
-        val answerMap = answers.mapIndexed { index, value ->
-            "question_${index + 1}" to value
+
+
+        if (answers.any { it == null }) {
+            onError("Not all questions answered"); return
+        }
+
+        val answerMap: Map<String, Boolean> = answers.mapIndexed { i, v ->
+            "question_${i + 1}" to (v == true)
         }.toMap()
 
         val data = mapOf(
-            "uid" to uid,
+            "user_id" to uid,                           // <-- permanent canonical field
             "answers" to answerMap,
             "timestamp" to FieldValue.serverTimestamp()
         )
+
+        FirebaseFirestore.getInstance()
+            .collection("questionnaires")
+            .document(uid)                               // docId permanently = uid
+            .set(data)
+            .addOnSuccessListener { /* ... */ }
+            .addOnFailureListener { e -> onError(e.message) }
+
+
+        // 👇 Log where we write for sanity
+        android.util.Log.d("QuestionnaireVM", "Writing to questionnaires/$uid")
 
         db.collection("questionnaires")
             .document(uid)
             .set(data)
             .addOnSuccessListener {
                 _loading.value = false
-
-                // ✅ do NOT clear _existingAnswers here
-                // _existingAnswers.value = null   ❌ remove this
-
-                // reload from Firestore
                 loadQuestionnaireAnswers()
-
                 _saveSuccess.value = true
                 logQuestionnaireAudit("questionnaire_updated")
                 onSuccess()
             }
-            .addOnFailureListener {
+            .addOnFailureListener { e ->
                 _loading.value = false
-                onError()
+                android.util.Log.e("QuestionnaireVM", "Save failed", e)
+                onError(e.message)   // <-- bubble the message up to the UI
             }
 
     }

@@ -123,6 +123,7 @@ fun EmbossedButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    selected: Boolean = false,                // 👈 NEW
     cornerRadius: Dp = 15.dp,
     backgroundBrush: Brush? = Brush.linearGradient(
         colors = listOf(
@@ -141,11 +142,19 @@ fun EmbossedButton(
     ),
     textColor: Color = Color.White
 ) {
+    val borderColor =
+        if (!enabled) Color(0x33000000)
+        else if (selected) Color(0xFF0FB2B2)   // thicker teal border when selected
+        else Color(0x33000000)
+
+    val borderWidth = if (selected) 2.dp else 1.dp
+    val displayText = if (selected) "$text ✓" else text
+
     Box(
         modifier = modifier
             .height(56.dp)
             .shadow(
-                elevation = if (enabled) 0.dp else 2.dp, // remove default shadow for enabled to match original
+                elevation = if (enabled) 0.dp else 2.dp,
                 shape = RoundedCornerShape(cornerRadius),
                 clip = false
             )
@@ -154,6 +163,7 @@ fun EmbossedButton(
                 brush = if (enabled) backgroundBrush!! else disabledBrush!!,
                 shape = RoundedCornerShape(cornerRadius)
             )
+            .border(borderWidth, borderColor, RoundedCornerShape(cornerRadius))
             .clickable(
                 enabled = enabled,
                 onClick = onClick,
@@ -161,31 +171,10 @@ fun EmbossedButton(
                 interactionSource = remember { MutableInteractionSource() }
             )
     ) {
-        // Border + shine overlay
+        // Shine overlay + content
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .border(
-                    width = 1.dp,
-                    brush = if (enabled) {
-                        Brush.linearGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = 0.6f),
-                                Color.Black.copy(alpha = 0.3f)
-                            ),
-                            start = Offset(0f, 0f),
-                            end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
-                        )
-                    } else {
-                        Brush.linearGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = 0.2f),
-                                Color.Black.copy(alpha = 0.2f)
-                            )
-                        )
-                    },
-                    shape = RoundedCornerShape(cornerRadius)
-                )
                 .drawWithContent {
                     drawContent()
                     if (enabled) {
@@ -204,10 +193,10 @@ fun EmbossedButton(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = text,
+                text = displayText,
                 style = MaterialTheme.typography.bodyLarge.copy(
                     fontWeight = FontWeight.Bold,
-                    color = if (enabled) textColor else textColor.copy(alpha = 0.7f),
+                    color = if (selected) Color.White else textColor,   // white text when selected
                     shadow = if (enabled) Shadow(
                         color = Color.Black.copy(alpha = 0.4f),
                         offset = Offset(1f, 2f),
@@ -218,6 +207,8 @@ fun EmbossedButton(
         }
     }
 }
+
+
 
 
 

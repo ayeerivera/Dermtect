@@ -86,120 +86,120 @@ fun DermaAssessmentReportScreen(
             Spacer(modifier = Modifier.height(39.dp))
 
             Column(modifier = Modifier.fillMaxWidth(0.9f)) {
-            Text(
-                text = buildAnnotatedString {
-                    withStyle(
-                        style = SpanStyle(
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    ) {
-                        append("Assessment: ")
+                Text(
+                    text = buildAnnotatedString {
+                        withStyle(
+                            style = SpanStyle(
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        ) {
+                            append("Assessment: ")
+                        }
+                        withStyle(
+                            style = SpanStyle(
+                                fontWeight = FontWeight.Normal
+                            )
+                        ) {
+                            append(assessmentResult)
+                        }
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Normal,
+                    color = Color.Black
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Notes text
+                Text(
+                    text = buildAnnotatedString {
+                        withStyle(style = SpanStyle(fontWeight = FontWeight.SemiBold)) {
+                            append("Notes: ")
+                        }
+                        withStyle(style = SpanStyle(fontWeight = FontWeight.Normal)) {
+                            append(notes)
+                        }
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Normal,
+                    color = Color.Black,
+                    modifier = Modifier.align(Alignment.Start)
+                )
+
+                Spacer(modifier = Modifier.height(60.dp))
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 20.dp, top = 150.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    var isReportSent by remember { mutableStateOf(false) }
+
+                    if (!isReportSent) {
+                        Button(
+                            onClick = { isReportSent = true },
+                            modifier = Modifier
+                                .fillMaxWidth(0.8f)
+                                .wrapContentHeight(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0FB2B2))
+                        ) {
+                            Text(
+                                text = "Send Report to User",
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal),
+                                color = Color.White
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(5.dp))
+
+                        OutlinedButton(
+                            onClick = { /* cancel logic */ },
+                            modifier = Modifier
+                                .fillMaxWidth(0.8f)
+                                .wrapContentHeight(),
+                            border = BorderStroke(0.5.dp, Color(0xFF0FB2B2))
+                        ) {
+                            Text(
+                                text = "Cancel",
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal),
+                                color = Color(0xFF0FB2B2)
+                            )
+                        }
+                    } else {
+                        // Report has been sent
+                        Button(
+                            onClick = { /* do nothing or show a message */ },
+                            enabled = false,
+                            modifier = Modifier
+                                .fillMaxWidth(0.8f)
+                                .wrapContentHeight(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF626262))
+                        ) {
+                            Text(
+                                text = "Assessment Done",
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal),
+
+                                color = Color.White
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(25.dp))
+
+                        OutlinedButton(
+                            onClick = { /* edit logic */ },
+                            modifier = Modifier
+                                .fillMaxWidth(0.8f)
+                                .wrapContentHeight(),
+                            border = BorderStroke(0.5.dp, Color(0xFF0FB2B2))
+                        ) {
+                            Text(
+                                text = "Edit Assessment",
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal),
+                                color = Color(0xFF0FB2B2)
+                            )
+                        }
                     }
-                    withStyle(
-                        style = SpanStyle(
-                            fontWeight = FontWeight.Normal
-                        )
-                    ) {
-                        append(assessmentResult)
-                    }
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Normal,
-                color = Color.Black
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Notes text
-            Text(
-                text = buildAnnotatedString {
-                    withStyle(style = SpanStyle(fontWeight = FontWeight.SemiBold)) {
-                        append("Notes: ")
-                    }
-                    withStyle(style = SpanStyle(fontWeight = FontWeight.Normal)) {
-                        append(notes)
-                    }
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Normal,
-                color = Color.Black,
-                modifier = Modifier.align(Alignment.Start)
-            )
-
-            Spacer(modifier = Modifier.height(60.dp))
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 20.dp, top = 150.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                var isReportSent by remember { mutableStateOf(false) }
-
-                if (!isReportSent) {
-                    Button(
-                        onClick = { isReportSent = true },
-                        modifier = Modifier
-                            .fillMaxWidth(0.8f)
-                            .wrapContentHeight(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0FB2B2))
-                    ) {
-                        Text(
-                            text = "Send Report to User",
-                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal),
-                            color = Color.White
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(5.dp))
-
-                    OutlinedButton(
-                        onClick = { /* cancel logic */ },
-                        modifier = Modifier
-                            .fillMaxWidth(0.8f)
-                            .wrapContentHeight(),
-                        border = BorderStroke(0.5.dp, Color(0xFF0FB2B2))
-                    ) {
-                        Text(
-                            text = "Cancel",
-                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal),
-                            color = Color(0xFF0FB2B2)
-                        )
-                    }
-                } else {
-                    // Report has been sent
-                    Button(
-                        onClick = { /* do nothing or show a message */ },
-                        enabled = false,
-                        modifier = Modifier
-                            .fillMaxWidth(0.8f)
-                            .wrapContentHeight(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF626262))
-                    ) {
-                        Text(
-                            text = "Assessment Done",
-                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal),
-
-                            color = Color.White
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(25.dp))
-
-                    OutlinedButton(
-                        onClick = { /* edit logic */ },
-                        modifier = Modifier
-                            .fillMaxWidth(0.8f)
-                            .wrapContentHeight(),
-                        border = BorderStroke(0.5.dp, Color(0xFF0FB2B2))
-                    ) {
-                        Text(
-                            text = "Edit Assessment",
-                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal),
-                            color = Color(0xFF0FB2B2)
-                        )
-                    }
-                }
                 }
             }
         }

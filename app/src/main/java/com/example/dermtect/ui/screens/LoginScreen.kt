@@ -124,20 +124,20 @@ fun Login(navController: NavController) {
     BubblesBackground {
 
         Scaffold(
-            
+
             containerColor = Color.Transparent
         ) { innerPadding ->
             Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .clickable(
-                    indication = null,
-                    interactionSource = remember { MutableInteractionSource() }
-                ) {
-                    focusManager.clearFocus()
-                }
-        ) {
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() }
+                    ) {
+                        focusManager.clearFocus()
+                    }
+            ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -155,166 +155,166 @@ fun Login(navController: NavController) {
                     )
 
                 }
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.Center),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Title
-                Text(
-                    text = "Login",
-                    style = MaterialTheme.typography.displayLarge.copy(fontWeight = FontWeight.Bold),
-                    color = Color(0xFF1D1D1D)
-                )
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                // Email input
-                InputField(
-                    value = email,
-                    onValueChange = { email = it },
-                    placeholder = "Email",
-                    iconRes = R.drawable.icon_email,
-                    textColor = Color(0xFF1D1D1D)
-                )
-
-                if (email.isNotEmpty() && !isEmailValid) {
-                    Text(
-                        text = "Invalid email address",
-                        color = Color.Red,
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier
-                            .padding(start = 48.dp, top = 4.dp)
-                            .align(Alignment.Start)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-
-                // Password input
-                InputField(
-                    value = password,
-                    onValueChange = { password = it },
-                    placeholder = "Password",
-                    iconRes = R.drawable.icon_pass,
-                    isPassword = true,
-                    textColor = Color(0xFF1D1D1D)
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Forgot Password
-                Box(
+                Column(
                     modifier = Modifier
-                        .width(299.dp)
-                        .padding(top = 8.dp)
-                        .clickable { navController.navigate("forgot_pass1") },
-                    contentAlignment = Alignment.CenterEnd
+                        .fillMaxWidth()
+                        .align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = "Forgot Password?",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color(0xFF1D1D1D),
-                        textDecoration = TextDecoration.Underline
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                val buttonEnabled = isEmailValid && password.isNotBlank()
-
-                Box(
-                    modifier = Modifier
-                        .width(320.dp)
-                        .height(50.dp)
-                        .shadow(
-                            elevation = 8.dp,
-                            shape = RoundedCornerShape(12.dp),
-                            clip = false
-                        )
-                        .background(
-                            brush = if (buttonEnabled) {
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color(0xFF5FEAEA), // top lighter shade
-                                        Color(0xFF2A9D9D), // bottom darker shade
-                                        Color(0xFF187878)
-                                    )
-                                )
-                            } else {
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color(0xFFBDBDBD), // top light grey
-                                        Color(0xFF9E9E9E), // middle grey
-                                        Color(0xFF757575)  // bottom dark grey
-                                    )
-                                )
-                            },
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        .clickable(enabled = buttonEnabled) {
-                            viewModel.login(
-                                email = email,
-                                password = password,
-                                onSuccess = { /* handled */ },
-                                onError = { error ->
-                                    Toast.makeText(context, error, Toast.LENGTH_LONG).show()
-                                }
-                            )
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
+                    // Title
                     Text(
                         text = "Login",
-                        color = if (buttonEnabled) Color.White else Color.LightGray,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                Text(
-                    text = "Other",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Color(0xFF828282)
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Image(
-                    painter = painterResource(id = R.drawable.google_icon),
-                    contentDescription = "Google Login",
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clickable {
-                            val signInIntent = googleSignInClient.signInIntent
-                            launcher.launch(signInIntent)
-                        }
-                )
-
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row {
-                    Text(
-                        text = "Don't have an account? ",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.displayLarge.copy(fontWeight = FontWeight.Bold),
                         color = Color(0xFF1D1D1D)
                     )
-                    Text(
-                        text = "Register",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = Color(0xFF2FD8D8),
-                        modifier = Modifier.clickable {
-                            navController.navigate("register")
-                        }
+
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    // Email input
+                    InputField(
+                        value = email,
+                        onValueChange = { email = it },
+                        placeholder = "Email",
+                        iconRes = R.drawable.icon_email,
+                        textColor = Color(0xFF1D1D1D)
                     )
+
+                    if (email.isNotEmpty() && !isEmailValid) {
+                        Text(
+                            text = "Invalid email address",
+                            color = Color.Red,
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier
+                                .padding(start = 48.dp, top = 4.dp)
+                                .align(Alignment.Start)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+
+                    // Password input
+                    InputField(
+                        value = password,
+                        onValueChange = { password = it },
+                        placeholder = "Password",
+                        iconRes = R.drawable.icon_pass,
+                        isPassword = true,
+                        textColor = Color(0xFF1D1D1D)
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Forgot Password
+                    Box(
+                        modifier = Modifier
+                            .width(299.dp)
+                            .padding(top = 8.dp)
+                            .clickable { navController.navigate("forgot_pass1") },
+                        contentAlignment = Alignment.CenterEnd
+                    ) {
+                        Text(
+                            text = "Forgot Password?",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color(0xFF1D1D1D),
+                            textDecoration = TextDecoration.Underline
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    val buttonEnabled = isEmailValid && password.isNotBlank()
+
+                    Box(
+                        modifier = Modifier
+                            .width(320.dp)
+                            .height(50.dp)
+                            .shadow(
+                                elevation = 8.dp,
+                                shape = RoundedCornerShape(12.dp),
+                                clip = false
+                            )
+                            .background(
+                                brush = if (buttonEnabled) {
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color(0xFF5FEAEA), // top lighter shade
+                                            Color(0xFF2A9D9D), // bottom darker shade
+                                            Color(0xFF187878)
+                                        )
+                                    )
+                                } else {
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color(0xFFBDBDBD), // top light grey
+                                            Color(0xFF9E9E9E), // middle grey
+                                            Color(0xFF757575)  // bottom dark grey
+                                        )
+                                    )
+                                },
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .clickable(enabled = buttonEnabled) {
+                                viewModel.login(
+                                    email = email,
+                                    password = password,
+                                    onSuccess = { /* handled */ },
+                                    onError = { error ->
+                                        Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+                                    }
+                                )
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Login",
+                            color = if (buttonEnabled) Color.White else Color.LightGray,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    Text(
+                        text = "Other",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color(0xFF828282)
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Image(
+                        painter = painterResource(id = R.drawable.google_icon),
+                        contentDescription = "Google Login",
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clickable {
+                                val signInIntent = googleSignInClient.signInIntent
+                                launcher.launch(signInIntent)
+                            }
+                    )
+
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row {
+                        Text(
+                            text = "Don't have an account? ",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color(0xFF1D1D1D)
+                        )
+                        Text(
+                            text = "Register",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = Color(0xFF2FD8D8),
+                            modifier = Modifier.clickable {
+                                navController.navigate("register")
+                            }
+                        )
+                    }
                 }
-            }
                 if (showBackDialog) {
                     DialogTemplate(
                         show = showBackDialog,
@@ -332,27 +332,27 @@ fun Login(navController: NavController) {
                 }
 
                 LaunchedEffect(authSuccess) {
-                if (authSuccess) {
-                    val uid = FirebaseAuth.getInstance().currentUser?.uid
-                    if (uid != null) {
-                        val db = FirebaseFirestore.getInstance()
-                        db.collection("users").document(uid).get()
-                            .addOnSuccessListener { document ->
-                                val role = document.getString("role")
-                                when (role) {
-                                    "patient" -> navController.navigate("user_home")
-                                    "derma" -> navController.navigate("derma_home")
-                                    else -> navController.navigate("user_home")
+                    if (authSuccess) {
+                        val uid = FirebaseAuth.getInstance().currentUser?.uid
+                        if (uid != null) {
+                            val db = FirebaseFirestore.getInstance()
+                            db.collection("users").document(uid).get()
+                                .addOnSuccessListener { document ->
+                                    val role = document.getString("role")
+                                    when (role) {
+                                        "patient" -> navController.navigate("user_home")
+                                        "derma" -> navController.navigate("derma_home")
+                                        else -> navController.navigate("user_home")
+                                    }
+                                    viewModel.resetAuthSuccess()
                                 }
-                                viewModel.resetAuthSuccess()
-                            }
-                            .addOnFailureListener {
-                                Toast.makeText(context, "Failed to fetch role", Toast.LENGTH_SHORT)
-                                    .show()
-                            }
+                                .addOnFailureListener {
+                                    Toast.makeText(context, "Failed to fetch role", Toast.LENGTH_SHORT)
+                                        .show()
+                                }
+                        }
                     }
                 }
-            }
                 LaunchedEffect(errorMessage) {
                     errorMessage?.let { message ->
                         Toast.makeText(context, message, Toast.LENGTH_LONG).show()
@@ -360,14 +360,14 @@ fun Login(navController: NavController) {
                         viewModel.clearError() } }
                 val navigateToHome by viewModel.navigateToHome.collectAsState()
 
-            LaunchedEffect(navigateToHome) {
-                if (navigateToHome) {
-                    navController.navigate("user_home") {
-                        popUpTo("login") { inclusive = true }
+                LaunchedEffect(navigateToHome) {
+                    if (navigateToHome) {
+                        navController.navigate("user_home") {
+                            popUpTo("login") { inclusive = true }
+                        }
+                        viewModel.markNavigationDone()
                     }
-                    viewModel.markNavigationDone()
                 }
-            }
 
                 DialogTemplate(
                     show = isLoading,
@@ -387,5 +387,5 @@ fun Login(navController: NavController) {
 @Preview(showBackground = true)
 @Composable
 fun LoginPreview() {
-        Login(navController = rememberNavController())
+    Login(navController = rememberNavController())
 }

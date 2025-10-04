@@ -42,5 +42,5 @@ fun SplashScreen(navController: NavController) {
 @Preview(showBackground = true)
 @Composable
 fun SplashScreenPreview() {
-        SplashScreen(navController = rememberNavController())
+    SplashScreen(navController = rememberNavController())
 }

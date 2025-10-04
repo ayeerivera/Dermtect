@@ -84,87 +84,87 @@ fun ClinicTemplateScreen(
                     .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.Start
             ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = clinic.name,
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            modifier =
-                                Modifier.weight(1f)
-                                .fillMaxWidth(0.9f)
-                        )
-                        Icon(
-                            imageVector = if (isSaved) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,                            contentDescription = "Favorite",
-                            tint = Color.Cyan,
-                            modifier = Modifier
-                                .size(22.dp)
-                                .clickable {
-                                    viewModel.toggleClinicSave(clinic.id)
-                                    viewModel.fetchSavedClinics()
-                                }
-
-                        )
-
-                    }
-
-                    Spacer(modifier = Modifier.height(15.dp))
-
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = clinic.subtitle,
+                        text = clinic.name,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier =
+                            Modifier.weight(1f)
+                                .fillMaxWidth(0.9f)
+                    )
+                    Icon(
+                        imageVector = if (isSaved) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,                            contentDescription = "Favorite",
+                        tint = Color.Cyan,
+                        modifier = Modifier
+                            .size(22.dp)
+                            .clickable {
+                                viewModel.toggleClinicSave(clinic.id)
+                                viewModel.fetchSavedClinics()
+                            }
+
+                    )
+
+                }
+
+                Spacer(modifier = Modifier.height(15.dp))
+
+                Text(
+                    text = clinic.subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontStyle = FontStyle.Italic
+                )
+
+                Spacer(modifier = Modifier.height(15.dp))
+
+                Text(text = clinic.description, style = MaterialTheme.typography.bodyMedium,
+                )
+
+                Spacer(modifier = Modifier.height(15.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)){
+                    Text(
+                        text = "Address:",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = clinic.address,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                Spacer(modifier = Modifier.height(15.dp))
+                Row (
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)){
+                    Text(
+                        text = "Contact Number:",
+                        fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.bodyMedium,
-                        fontStyle = FontStyle.Italic
                     )
-
-                    Spacer(modifier = Modifier.height(15.dp))
-
-                    Text(text = clinic.description, style = MaterialTheme.typography.bodyMedium,
+                    Text(
+                        text = clinic.contact,
+                        style = MaterialTheme.typography.bodyMedium
                     )
+                }
+                Spacer(modifier = Modifier.height(15.dp))
 
-                    Spacer(modifier = Modifier.height(15.dp))
+                Row( modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "Consultation Schedule:",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = clinic.schedule,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)){
-                        Text(
-                            text = "Address:",
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            text = clinic.address,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(15.dp))
-                    Row (
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)){
-                        Text(
-                            text = "Contact Number:",
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        Text(
-                            text = clinic.contact,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(15.dp))
-
-                    Row( modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            text = "Consultation Schedule:",
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            text = clinic.schedule,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(40.dp))
+                Spacer(modifier = Modifier.height(40.dp))
 
 
                 if (mapResId != 0) {
@@ -187,10 +187,10 @@ fun ClinicTemplateScreen(
                 }
 
 
-                }
             }
         }
     }
+}
 
 @Composable
 fun InlineLabelText(label: String, value: String) {
