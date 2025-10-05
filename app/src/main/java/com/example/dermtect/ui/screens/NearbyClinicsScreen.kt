@@ -42,15 +42,15 @@ import android.content.Intent
 import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import org.osmdroid.config.Configuration
+import android.widget.Toast
 
 @Composable
 fun NearbyClinicsScreen(
     navController: NavController,
     onBackClick: () -> Unit,
-    viewModel: UserHomeViewModel, // keep for your other features if needed
+    viewModel: UserHomeViewModel,
     overpassVm: OverpassClinicsViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
-    // You can remove this if your Firestore clinics aren’t used here anymore:
     LaunchedEffect(Unit) { viewModel.fetchClinics() }
 
     val isLoadingClinics by viewModel.isLoadingClinics.collectAsState()
@@ -63,22 +63,6 @@ fun NearbyClinicsScreen(
     var requestPermissionNow by remember { mutableStateOf(false) }
 
     val context = androidx.compose.ui.platform.LocalContext.current
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { result ->
-        val granted = (result[Manifest.permission.ACCESS_FINE_LOCATION] == true) ||
-                (result[Manifest.permission.ACCESS_COARSE_LOCATION] == true)
-
-        if (granted) {
-            overpassVm.loadUserLocation()
-            // optional: fetch nearby after we (soon) have a location
-            // a small delay isn’t strictly necessary if your VM updates `user`
-            overpassVm.fetchNearbyDermatology(radiusMeters = 5000)
-        } else {
-            // user denied — do nothing or show a toast/snackbar if you like
-        }
-    }
 
     val activity = context as Activity
     var showOpenSettings by remember { mutableStateOf(false) }
@@ -94,7 +78,33 @@ fun NearbyClinicsScreen(
                 ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.ACCESS_COARSE_LOCATION)
     }
 
-    // 🔹 NEW: Auto-load location on start if permission is already granted
+    // =======================================
+    // 🔹 FIXED permission launcher
+    // =======================================
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        val granted = (result[Manifest.permission.ACCESS_FINE_LOCATION] == true) ||
+                (result[Manifest.permission.ACCESS_COARSE_LOCATION] == true)
+
+        if (granted) {
+            overpassVm.loadUserLocation()
+            overpassVm.fetchNearbyDermatology(radiusMeters = 5000)
+        } else {
+            if (shouldShowRationale()) {
+                Toast.makeText(
+                    context,
+                    "Location access is needed to find clinics near you.",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } else {
+                // User tapped "Don't ask again"
+                showOpenSettings = true
+            }
+        }
+    }
+
+    // 🔹 Auto-load if already granted
     LaunchedEffect(Unit) {
         val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
@@ -103,12 +113,10 @@ fun NearbyClinicsScreen(
         }
     }
 
-    // ✅ Fetch from Overpass when user location changes (distinct updates)
     LaunchedEffect(user) {
         user?.let { overpassVm.fetchNearbyDermatology(radiusMeters = 5000) }
     }
 
-    // ✅ Remember last map center to avoid re-centering while the user is dragging
     val lastCentered = remember { mutableStateOf<GeoPoint?>(null) }
     val recenterMetersThreshold = 25.0
     fun shouldRecenter(prev: GeoPoint?, next: GeoPoint): Boolean {
@@ -150,9 +158,30 @@ fun NearbyClinicsScreen(
                     .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // =======================================
+                // 🔹 FIXED Turn On Location button
+                // =======================================
                 Box(
                     modifier = Modifier
-                        .clickable { showLocationDialog = true }
+                        .clickable {
+                            when {
+                                hasLocationPermission() -> {
+                                    overpassVm.loadUserLocation()
+                                    overpassVm.fetchNearbyDermatology(radiusMeters = 5000)
+                                }
+                                shouldShowRationale() -> {
+                                    showLocationDialog = true
+                                }
+                                else -> {
+                                    permissionLauncher.launch(
+                                        arrayOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION
+                                        )
+                                    )
+                                }
+                            }
+                        }
                         .size(width = 335.dp, height = 44.dp)
                         .clip(RoundedCornerShape(18.dp))
                         .background(Color.White)
@@ -175,23 +204,19 @@ fun NearbyClinicsScreen(
 
                 Spacer(modifier = Modifier.height(25.dp))
 
-                // === REPLACE STATIC IMAGE WITH REAL MAP ===
+                // === map and other existing code remain unchanged ===
                 AndroidView(
                     modifier = Modifier
                         .size(width = 335.dp, height = 248.dp)
                         .clip(RoundedCornerShape(11.dp)),
                     factory = { ctx ->
                         Configuration.getInstance().userAgentValue = ctx.packageName
-
                         org.osmdroid.views.MapView(ctx).apply {
                             setMultiTouchControls(true)
-                            setTilesScaledToDpi(true)              // ✅ smoother on high-DPI screens
-                            isHorizontalMapRepetitionEnabled = true // ✅ smoother pan feel
-
+                            setTilesScaledToDpi(true)
+                            isHorizontalMapRepetitionEnabled = true
                             controller.setZoom(14.0)
                             controller.setCenter(GeoPoint(14.5995, 120.9842))
-
-                            // ✅ Prevent parent scroll from stealing gestures
                             setOnTouchListener { v, e ->
                                 when (e.actionMasked) {
                                     android.view.MotionEvent.ACTION_DOWN,
@@ -204,16 +229,13 @@ fun NearbyClinicsScreen(
                                         v.parent?.requestDisallowInterceptTouchEvent(false)
                                     }
                                 }
-                                false // let MapView handle the gesture
+                                false
                             }
                         }
                     },
-
                     update = { map ->
-                        // 1) Clear all markers first
                         map.overlays.removeAll { it is Marker }
 
-                        // 2) Center only if user actually moved far enough
                         user?.let { u ->
                             val target = GeoPoint(u.lat, u.lon)
                             if (shouldRecenter(lastCentered.value, target)) {
@@ -221,11 +243,9 @@ fun NearbyClinicsScreen(
                                 lastCentered.value = target
                             }
                         } ?: run {
-                            // No user yet → keep your Manila default
                             map.controller.setCenter(GeoPoint(14.5995, 120.9842))
                         }
 
-                        // --- USER MARKER (pin current location) ---
                         user?.let { u ->
                             val ctx = map.context
                             val redIcon = ContextCompat.getDrawable(ctx, R.drawable.location_icon)
@@ -235,24 +255,18 @@ fun NearbyClinicsScreen(
                             val me = Marker(map).apply {
                                 position = GeoPoint(u.lat, u.lon)
                                 title = "You are here"
-                                icon = redIcon   // <- use app drawable instead of osmdroid's marker_default
+                                icon = redIcon
                                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                             }
                             map.overlays.add(me)
                         }
 
-                        // ------------------------------------------------
-
-                        // 3) Add clinic pins (Overpass first)
                         if (osmClinics.isNotEmpty()) {
                             osmClinics.forEach { c ->
                                 val marker = Marker(map).apply {
                                     position = GeoPoint(c.lat, c.lon)
-                                    title = c.name // clinic name from Overpass
-
-                                    // CLEAN: show only distance (no address)
+                                    title = c.name
                                     snippet = String.format("%.2f km away", c.distanceMeters / 1000.0)
-
                                     setOnMarkerClickListener { m, mv ->
                                         m.showInfoWindow()
                                         mv.controller.animateTo(m.position)
@@ -261,25 +275,19 @@ fun NearbyClinicsScreen(
                                 }
                                 map.overlays.add(marker)
                             }
-                        }
-                        else {
-                            // Manual fallback with clinic + doctor + distance (no address)
+                        } else {
                             val u = user
                             ManualClinics.items.forEach { c ->
                                 val distKm = u?.let { uu ->
                                     distanceMeters(uu.lat, uu.lon, c.lat, c.lon) / 1000.0
                                 }
-
                                 val marker = Marker(map).apply {
                                     position = GeoPoint(c.lat, c.lon)
-                                    title = c.clinicName // clinic name as the marker title
-
-                                    // CLEAN: keep doctor + distance, drop address
+                                    title = c.clinicName
                                     snippet = buildString {
                                         c.doctorName?.takeIf { it.isNotBlank() }?.let { appendLine(it) }
                                         distKm?.let { append(String.format("%.2f km away", it)) }
                                     }.trim()
-
                                     setOnMarkerClickListener { m, mv ->
                                         m.showInfoWindow()
                                         mv.controller.animateTo(m.position)
@@ -314,27 +322,19 @@ fun NearbyClinicsScreen(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // build list with clinic title + optional doctor subtitle
                 data class ListItem(
-                    val title: String,        // clinic name
-                    val subtitle: String?,    // doctor
-                    val address: String,      // kept for detail page
+                    val title: String,
+                    val subtitle: String?,
+                    val address: String,
                     val distance: String,
-                    val contact: String?      // keep contact only
+                    val contact: String?
                 )
-
 
                 val finalClinics: List<ListItem> = when {
                     osmClinics.isNotEmpty() -> {
-                        // Overpass has a single name → show it as title, no subtitle
                         osmClinics.map {
-                            ListItem(
-                                title = it.name,
-                                subtitle = null,
-                                address = it.address ?: "No address",
-                                distance = String.format("%.2fkm", it.distanceMeters / 1000.0),
-                                contact = null
-                            )
+                            ListItem(it.name, null, it.address ?: "No address",
+                                String.format("%.2fkm", it.distanceMeters / 1000.0), null)
                         }
                     }
                     ManualClinics.items.isNotEmpty() -> {
@@ -349,25 +349,12 @@ fun NearbyClinicsScreen(
                             val dist = user?.let { u2 ->
                                 distanceMeters(u2.lat, u2.lon, it.lat, it.lon) / 1000.0
                             }?.let { "%.2fkm".format(it) } ?: "—"
-                            ListItem(
-                                title = it.clinicName,
-                                subtitle = it.doctorName,
-                                address = it.address, // kept but not shown
-                                distance = dist,
-                                contact = it.contact
-                            )
+                            ListItem(it.clinicName, it.doctorName, it.address, dist, it.contact)
                         }
                     }
                     else -> {
-                        // Fallback: Firestore clinics (no subtitle available)
                         clinicList.map {
-                            ListItem(
-                                title = it.name,
-                                subtitle = null,
-                                address = it.address, // kept but not shown
-                                distance = "—",
-                                contact = null
-                            )
+                            ListItem(it.name, null, it.address, "—", null)
                         }
                     }
                 }
@@ -379,7 +366,6 @@ fun NearbyClinicsScreen(
                 } else if (finalClinics.isEmpty()) {
                     Text("No clinics found.", color = Color.Gray)
                 } else {
-                    // render title + optional subtitle (NO address shown)
                     finalClinics.forEach { item ->
                         ClinicItem(
                             title = item.title,
@@ -402,6 +388,59 @@ fun NearbyClinicsScreen(
                         )
                     }
                 }
+
+                // =======================================
+                // 🔹 Dialog for rationale
+                // =======================================
+                if (showLocationDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showLocationDialog = false },
+                        title = { Text("Location Needed") },
+                        text = { Text("We use your location to find dermatology clinics near you.") },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showLocationDialog = false
+                                permissionLauncher.launch(
+                                    arrayOf(
+                                        Manifest.permission.ACCESS_FINE_LOCATION,
+                                        Manifest.permission.ACCESS_COARSE_LOCATION
+                                    )
+                                )
+                            }) { Text("Allow") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showLocationDialog = false }) {
+                                Text("Not now")
+                            }
+                        }
+                    )
+                }
+
+                // =======================================
+                // 🔹 Dialog for "Don't ask again" (open Settings)
+                // =======================================
+                if (showOpenSettings) {
+                    AlertDialog(
+                        onDismissRequest = { showOpenSettings = false },
+                        title = { Text("Enable Location in Settings") },
+                        text = { Text("To find nearby clinics, please enable location permission in Settings > Apps > Dermtect > Permissions.") },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showOpenSettings = false
+                                val intent = Intent(
+                                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                    Uri.fromParts("package", context.packageName, null)
+                                )
+                                context.startActivity(intent)
+                            }) { Text("Open Settings") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showOpenSettings = false }) {
+                                Text("Cancel")
+                            }
+                        }
+                    )
+                }
             }
         }
     }
@@ -416,13 +455,12 @@ private fun distanceMeters(
     val dLon = Math.toRadians(targetLon - userLon)
     val aLat = Math.toRadians(userLat)
     val bLat = Math.toRadians(targetLat)
-    val h = kotlin.math.sin(dLat/2) * kotlin.math.sin(dLat/2) +
+    val h = kotlin.math.sin(dLat / 2) * kotlin.math.sin(dLat / 2) +
             kotlin.math.cos(aLat) * kotlin.math.cos(bLat) *
-            kotlin.math.sin(dLon/2) * kotlin.math.sin(dLon/2)
+            kotlin.math.sin(dLon / 2) * kotlin.math.sin(dLon / 2)
     return 2 * R * kotlin.math.asin(kotlin.math.sqrt(h))
 }
 
-// ClinicItem now omits the address line from UI
 @Composable
 fun ClinicItem(
     title: String,
@@ -445,21 +483,21 @@ fun ClinicItem(
                 painter = painterResource(id = R.drawable.location_icon),
                 contentDescription = "Location Icon",
                 modifier = Modifier
-                    .size(22.dp) // a touch bigger
+                    .size(22.dp)
                     .padding(end = 6.dp)
             )
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    fontSize = 18.sp,                 // was 14.sp
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Color.Black
                 )
                 if (!subtitle.isNullOrBlank()) {
                     Text(
                         text = subtitle,
-                        fontSize = 14.sp,             // was 12.sp
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         color = Color(0xFF2E2E2E)
                     )
@@ -470,15 +508,15 @@ fun ClinicItem(
 
             Box(
                 modifier = Modifier
-                    .height(20.dp)                     // was 16.dp
-                    .clip(RoundedCornerShape(10.dp))   // was 8.dp
+                    .height(20.dp)
+                    .clip(RoundedCornerShape(10.dp))
                     .border(0.5.dp, Color.Black, shape = RoundedCornerShape(10.dp))
-                    .padding(horizontal = 8.dp),       // was 6.dp
+                    .padding(horizontal = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = distance,
-                    fontSize = 12.sp,                 // was 10.sp
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Normal,
                     color = Color.Black
                 )
@@ -486,4 +524,3 @@ fun ClinicItem(
         }
     }
 }
-
