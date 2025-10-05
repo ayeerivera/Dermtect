@@ -278,13 +278,20 @@ fun QuestionnaireScreen(navController: NavController) {
                                     modifier = Modifier.fillMaxWidth(0.9f)
                                 )
                                 Spacer(Modifier.height(24.dp))
-                                Button(
-                                    onClick = { showIntro = false }, // proceed to step-by-step
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFF0FB2B2),
-                                        contentColor = Color.White
-                                    )
-                                ) { Text("Next") }
+                                EmbossedButton(
+                                    text = "Next",
+                                    onClick = { showIntro = false },
+                                    modifier = Modifier
+                                        .fillMaxWidth(0.9f)
+                                        .height(56.dp),
+                                    cornerRadius = 12.dp,
+                                    backgroundBrush = Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color(0xFF5FEAEA), Color(0xFF2A9D9D), Color(0xFF187878)
+                                        )
+                                    ),
+                                    textColor = Color.White
+                                )
                             }
 
                             // ============== EDIT / FIRST-TIME: STEP-BY-STEP ==============
@@ -353,6 +360,26 @@ fun QuestionnaireScreen(navController: NavController) {
                                     val yesSelected = answers[step] == true
                                     val noSelected  = answers[step] == false
 
+                                    val yesActiveBrush = Brush.verticalGradient(
+                                        listOf(Color (0xFF5FEAEA),  // bright cyan
+                                            Color(0xFF2A9D9D),  // medium teal
+                                            Color(0xFF187878) )
+                                    )
+                                    val yesIdleBrush = Brush.linearGradient(
+                                        listOf( Color(0xFFBDBDBD),
+                                            Color(0xFF9E9E9E),
+                                            Color(0xFF757575))
+                                    )
+                                    val noActiveBrush = Brush.linearGradient(
+                                        listOf(Color (0xFF5FEAEA),  // bright cyan
+                                            Color(0xFF2A9D9D),  // medium teal
+                                            Color(0xFF187878) )
+                                    )
+                                    val noIdleBrush = Brush.linearGradient(
+                                        listOf( Color(0xFFBDBDBD),
+                                            Color(0xFF9E9E9E),
+                                            Color(0xFF757575))
+                                    )
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -366,13 +393,10 @@ fun QuestionnaireScreen(navController: NavController) {
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .height(btnHeight),
-                                            cornerRadius = 15.dp,
-                                            backgroundBrush = if (yesSelected)
-                                                nextBrush
-                                            else
-                                                Brush.linearGradient(listOf(Color(0xFFE6F4F4), Color(0xFFD3EBEB))),
-                                            textColor = Color(0xFF0FB2B2),
-                                            selected = yesSelected // <-- requires updated EmbossedButton
+                                            cornerRadius = 12.dp,
+                                            backgroundBrush = if (yesSelected) yesActiveBrush else yesIdleBrush,
+                                            textColor = if (yesSelected) Color.White else Color.White,
+                                            selected = yesSelected
                                         )
 
                                         Spacer(Modifier.width(10.dp))
@@ -384,12 +408,9 @@ fun QuestionnaireScreen(navController: NavController) {
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .height(btnHeight),
-                                            cornerRadius = 15.dp,
-                                            backgroundBrush = if (noSelected)
-                                                Brush.linearGradient(listOf(Color(0xFFCCCCCC), Color(0xFFB5B5B5)))
-                                            else
-                                                skipBrush,
-                                            textColor = Color.Black,
+                                            cornerRadius = 12.dp,
+                                            backgroundBrush = if (noSelected) noActiveBrush else noIdleBrush,
+                                            textColor = if (noSelected) Color.White else Color.White,
                                             selected = noSelected
                                         )
                                     }
@@ -487,37 +508,61 @@ fun QuestionnaireScreen(navController: NavController) {
                                         modifier = Modifier.fillMaxWidth(0.9f),
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        OutlinedButton(
+                                        EmbossedButton(
+                                            text = "Previous",
                                             onClick = {
                                                 inReview = false; step = questions.lastIndex
                                             },
-                                            border = BorderStroke(1.dp, Color(0xFF0FB2B2)),
-                                            colors = ButtonDefaults.outlinedButtonColors(
-                                                contentColor = Color(0xFF0FB2B2)
-                                            )
-                                        ) { Text("Previous") }
-
-                                        Button(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(56.dp),
+                                            cornerRadius = 12.dp,
+                                            backgroundBrush = Brush.linearGradient(
+                                                colors = listOf(Color(0xFFE6F4F4), Color(0xFFD3EBEB)) // subtle light
+                                            ),
+                                            textColor = Color(0xFF0FB2B2)
+                                        )
+                                        EmbossedButton(
+                                            text = if (loading) "Saving..." else "Save",
                                             onClick = { saveAnswers() },
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(56.dp),
                                             enabled = !loading,
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = Color(0xFF0FB2B2),
-                                                contentColor = Color.White
-                                            )
-                                        ) { Text(if (loading) "Saving..." else "Save") }
+                                            cornerRadius = 12.dp,
+                                            backgroundBrush = if (!loading) {
+                                                Brush.verticalGradient(
+                                                    colors = listOf(
+                                                        Color(0xFF5FEAEA), Color(0xFF2A9D9D), Color(0xFF187878)
+                                                    )
+                                                )
+                                            } else {
+                                                // disabled gradient — same as your Login disabled
+                                                Brush.verticalGradient(
+                                                    colors = listOf(
+                                                        Color(0xFFBDBDBD), Color(0xFF9E9E9E), Color(0xFF757575)
+                                                    )
+                                                )
+                                            },
+                                            textColor = Color.White
+                                        )
+
                                     }
 
                                     Spacer(Modifier.height(8.dp))
-                                    OutlinedButton(
+                                    EmbossedButton(
+                                        text = "Cancel",
                                         onClick = { showCancelDialog = true },
-                                        modifier = Modifier.fillMaxWidth(0.9f),
-                                        border = BorderStroke(1.dp, Color(0xFF0FB2B2)),
-                                        colors = ButtonDefaults.outlinedButtonColors(
-                                            contentColor = Color(
-                                                0xFF0FB2B2
-                                            )
-                                        )
-                                    ) { Text("Cancel") }
+                                        modifier = Modifier
+                                            .fillMaxWidth(0.9f)
+                                            .height(56.dp),
+                                        cornerRadius = 12.dp,
+                                        backgroundBrush = Brush.linearGradient(
+                                            colors = listOf(Color(0xFFF0F0F0), Color(0xFFF0F0F0))
+                                        ),
+                                        textColor = Color(0xFF0FB2B2)
+                                    )
+
                                 }
                             }
 
@@ -562,7 +607,8 @@ fun QuestionnaireScreen(navController: NavController) {
                                     }
                                 }
 
-                                Button(
+                                EmbossedButton(
+                                    text = "Edit",
                                     onClick = {
                                         isEditMode = true
                                         inReview = false
@@ -571,8 +617,17 @@ fun QuestionnaireScreen(navController: NavController) {
                                         answers.clear()
                                         answers.addAll(existingAnswers ?: List(questions.size) { null })
                                     },
-                                    modifier = Modifier.fillMaxWidth(0.9f)
-                                ) { Text("Edit") }
+                                    modifier = Modifier
+                                        .fillMaxWidth(0.9f)
+                                        .height(56.dp),
+                                    cornerRadius = 12.dp,
+                                    backgroundBrush = Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color(0xFF5FEAEA), Color(0xFF2A9D9D), Color(0xFF187878)
+                                        )
+                                    ),
+                                    textColor = Color.White
+                                )
 
 
                             }

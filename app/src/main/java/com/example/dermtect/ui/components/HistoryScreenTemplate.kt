@@ -2,14 +2,24 @@ package com.example.dermtect.ui.components
 
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.FilterList
+import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.indicatorColor
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,6 +33,15 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.dermtect.R
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.indicatorColor
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import com.example.dermtect.ui.screens.ResultFilter
+import com.example.dermtect.ui.screens.StatusFilter
 
 data class CaseData(
     val caseId: String,
@@ -31,39 +50,66 @@ data class CaseData(
     val date: String,                  // formatted timestamp
     val status: String?,               // "completed"/"pending"
     val imageUrl: String? = null,      // Storage URL
-    val imageRes: Int? = null
+    val imageRes: Int? = null,
+    val createdAt: Long = 0
 )
 
 @Composable
 fun HistoryScreenTemplate(
     navController: NavController,
     screenTitle: String,
-    caseList: List<CaseData>
+    caseList: List<CaseData>,
+    showIndicators: Boolean = true,
+    topContent: @Composable () -> Unit = {},
+    actions: @Composable RowScope.() -> Unit = {}
 ) {
     BubblesBackground {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 50.dp, bottom = 10.dp)
         ) {
-            BackButton(
-                onClick = { navController.popBackStack() },
+            Box(
                 modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(start = 23.dp)
-            )
-            Text(
-                text = screenTitle,
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier
-                    .align(Alignment.Center)
                     .fillMaxWidth()
-            )
+                    .padding(horizontal = 20.dp)
+            ) {
+                BackButton(
+                    onClick = { navController.popBackStack() },
+                    modifier = Modifier.align(Alignment.CenterStart)
+                )
+
+                Text(
+                    text = screenTitle,
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .fillMaxWidth()
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(end = 10.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), // light background
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    .padding(horizontal = 12.dp, vertical = 6.dp), // internal padding inside the background
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                actions()
+            }
+            topContent()
         }
 
-        Spacer(Modifier.height(40.dp))
 
+        Spacer(Modifier.height(20.dp))
+
+        // Scrollable case list...
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -72,20 +118,13 @@ fun HistoryScreenTemplate(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             caseList.forEach { case ->
+                // compute colors/labels per item
                 val indicatorColor = when {
-                    case.status?.equals("pending", true) == true -> Color(0xFFFFC107) // pending -> yellow
-
-                    // New strings you save now:
-                    case.result?.equals("Alert", true) == true   -> Color(0xFFF44336) // red
-                    case.result?.equals("NoAlert", true) == true -> Color(0xFF4CAF50) // green
-
-                    // Backward-compat with previous strings (if they ever exist):
-                    case.result?.equals("malignant", true) == true -> Color(0xFFF44336) // red
-                    case.result?.equals("benign", true) == true    -> Color(0xFF4CAF50) // green
-
-                    else -> Color(0xFFBDBDBD) // neutral gray instead of always yellow
+                    case.status?.equals("pending", true) == true -> Color(0xFFFFC107)
+                    case.result?.equals("malignant", true) == true -> Color(0xFFF44336)
+                    case.result?.equals("benign", true) == true -> Color(0xFF4CAF50)
+                    else -> Color(0xFFBDBDBD)
                 }
-
 
                 val (statusLabel, statusColor) = when (case.status?.lowercase()) {
                     "pending" -> "Pending" to Color(0xFFFFD46D).copy(alpha = 0.2f)
@@ -101,20 +140,20 @@ fun HistoryScreenTemplate(
                     indicatorColor = indicatorColor,
                     statusLabel = statusLabel,
                     statusColor = statusColor,
-                    imageUrl = case.imageUrl
+                    imageUrl = case.imageUrl,
                 ) {
                     navController.navigate("case_detail/${case.caseId}")
-
                 }
 
-                androidx.compose.material3.Divider(modifier = Modifier.padding(vertical = 12.dp))
+                Divider(modifier = Modifier.padding(vertical = 12.dp))
             }
-            Spacer(Modifier.height(60.dp))
+
         }
     }
 }
 
-@Composable
+
+            @Composable
 fun CaseListItem(
     title: String,
     result: String?,
@@ -125,6 +164,7 @@ fun CaseListItem(
     statusColor: Color? = null,
     imageUrl: String? = null,
     imageRes: Int? = null,
+    hideStatusChip: Boolean = false,
     onClick: () -> Unit
 ) {
     Row(
@@ -191,5 +231,74 @@ fun CaseListItem(
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             )
         } ?: Spacer(Modifier.width(0.dp))
+    }
+}
+@Composable
+fun HistoryFilterButton(
+    isDerma: Boolean,
+    statusFilter: StatusFilter,
+    onStatusChange: (StatusFilter) -> Unit,
+    resultFilter: ResultFilter,
+    onResultChange: (ResultFilter) -> Unit,
+    newestFirst: Boolean,
+    onSortChange: (Boolean) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = Modifier
+            .shadow(elevation = 6.dp, shape = RoundedCornerShape(20.dp))
+            .background(
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        Color(0xFFBFFDFD),
+                        Color(0xFF88E7E7),
+                        Color(0xFF55BFBF)
+                    )
+                ),
+                shape = RoundedCornerShape(20.dp)
+            )
+            .border(
+                width = 1.dp,
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.6f),
+                        Color.Black.copy(alpha = 0.3f)
+                    )
+                ),
+                shape = RoundedCornerShape(20.dp)
+            )
+            .clickable { expanded = true }
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.Outlined.FilterList,
+                contentDescription = "Filter",
+                tint = Color.Black,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.width(6.dp))
+        }
+
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            // Status
+            DropdownMenuItem(text = { Text("All") },        onClick = { onStatusChange(StatusFilter.ALL); expanded = false })
+            DropdownMenuItem(text = { Text("Completed") },  onClick = { onStatusChange(StatusFilter.COMPLETED); expanded = false })
+            DropdownMenuItem(text = { Text("Pending") },    onClick = { onStatusChange(StatusFilter.PENDING); expanded = false })
+
+            if (isDerma) {
+                Divider()
+                // Result (Derma-only)
+                DropdownMenuItem(text = { Text("All") },       onClick = { onResultChange(ResultFilter.ALL); expanded = false })
+                DropdownMenuItem(text = { Text("Malignant") }, onClick = { onResultChange(ResultFilter.MALIGNANT); expanded = false })
+                DropdownMenuItem(text = { Text("Benign") },    onClick = { onResultChange(ResultFilter.BENIGN); expanded = false })
+            }
+
+            Divider()
+            // Sort
+            DropdownMenuItem(text = { Text("Newest to Oldest") }, onClick = { onSortChange(true);  expanded = false })
+            DropdownMenuItem(text = { Text("Oldest to Newest") }, onClick = { onSortChange(false); expanded = false })
+        }
     }
 }

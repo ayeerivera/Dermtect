@@ -68,7 +68,6 @@ fun BackButton(
 ) {
     Box(
         modifier = modifier
-
             .size(50.dp)
             .shadow(
                 elevation = 6.dp,
@@ -76,6 +75,17 @@ fun BackButton(
             )
             .background(
                 color = Color.White,
+                shape = CircleShape
+            )
+            .border(
+                width = 1.dp,
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        Color(0xFFBFFDFD),
+                        Color(0xFF88E7E7),
+                        Color(0xFF55BFBF)
+                    )
+                ),
                 shape = CircleShape
             )
             .clickable { onClick() },
@@ -90,30 +100,42 @@ fun BackButton(
     }
 }
 
-
 @Composable
 fun PrimaryButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    selected: Boolean = false, // optional: show ✓ when selected
 ) {
-    Button(
+    EmbossedButton(
+        text = text,
         onClick = onClick,
         modifier = modifier
             .fillMaxWidth(0.8f)
-            .wrapContentHeight(),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (enabled) Color(0xFF0FB2B2) else Color(0xFFBDBDBD),
-            contentColor = Color.White
-        ),
-        enabled = enabled
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
-        )
-    }
+            .height(56.dp),
+        enabled = enabled,
+        selected = selected,
+        cornerRadius = 12.dp, // pill-like
+        // same cyan family you’re using across the app
+        backgroundBrush = if (enabled) {
+            Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFF5FEAEA),
+                    Color(0xFF2A9D9D),
+                    Color(0xFF187878)
+                )
+            )
+        } else {
+            Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFFBDBDBD),
+                    Color(0xFF9E9E9E),
+                    Color(0xFF757575)
+                )
+            )
+        }
+    )
 }
 
 
@@ -124,7 +146,7 @@ fun EmbossedButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     selected: Boolean = false,                // 👈 NEW
-    cornerRadius: Dp = 15.dp,
+    cornerRadius: Dp = 12.dp,
     backgroundBrush: Brush? = Brush.linearGradient(
         colors = listOf(
             Color(0xFF5FEAEA),

@@ -40,6 +40,8 @@ class UserHomeViewModel(application: Application) : AndroidViewModel(application
     private val _isGoogleAccount = MutableStateFlow(false)
     val isGoogleAccount: StateFlow<Boolean> = _isGoogleAccount
 
+    private val _role = MutableStateFlow<String?>(null)
+    val role: StateFlow<String?> = _role
 
     fun fetchUserInfo() {
         if (uid.isEmpty()) return
@@ -50,6 +52,8 @@ class UserHomeViewModel(application: Application) : AndroidViewModel(application
             val email = userDoc.getString("email") ?: ""
             val providers = FirebaseAuth.getInstance().currentUser?.providerData?.map { it.providerId }
             val isGoogle = providers?.contains("google.com") == true
+            _role.value = userDoc.getString("role")
+
 
             _firstName.value = first
             _lastName.value = last

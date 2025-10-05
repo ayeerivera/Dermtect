@@ -28,6 +28,24 @@ import java.util.*
 import com.example.dermtect.pdf.PdfExporter
 import com.example.dermtect.ui.viewmodel.QuestionnaireViewModel
 import androidx.navigation.NavController
+import androidx.compose.ui.window.Dialog
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.window.DialogProperties
 
 
 @Composable
@@ -46,6 +64,7 @@ fun LesionCaseScreen(
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    var fullImagePage by remember { mutableStateOf<Int?>(null) } // 0 = photo, 1 = heatmap
 
     val questions = remember {
         listOf(
@@ -208,11 +227,143 @@ fun LesionCaseScreen(
                             }
                         }
                     },
-                    onFindClinicClick = onFindClinicClick
+                    onFindClinicClick = onFindClinicClick,
+                    onImageClick = { page -> fullImagePage = page }
                 )
+                if (fullImagePage != null) {
+                    Dialog(
+                        onDismissRequest = { fullImagePage = null },
+                        properties = DialogProperties(
+                            usePlatformDefaultWidth = false,   // ⬅️ no width cap; let us fill the screen
+                            decorFitsSystemWindows = false     // ⬅️ avoid system-bar insets shrinking content
+                        )
+                    ) {
+                        // Fullscreen, zero padding, very light black overlay
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.10f)) // 10% opacity
+                                .clickable { fullImagePage = null },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            val bmp = when (fullImagePage) {
+                                0 -> imageBitmap
+                                1 -> heatmapBitmap ?: imageBitmap
+                                else -> null
+                            }
+
+                            bmp?.let {
+                                ZoomableImage(
+                                    bitmap = it,
+                                    onClose = { fullImagePage = null }
+                                )
+                            } ?: Text("No image", color = Color.White)
+
+                        }
+                    }
+                }
 
             }
 
+        }
+    }
+}
+
+@Composable
+private fun ZoomableImage(
+    bitmap: Bitmap,
+    modifier: Modifier = Modifier,
+    minScale: Float = 1f,
+    maxScale: Float = 5f,
+    onClose: () -> Unit
+) {
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+
+    Column(
+        modifier = modifier
+            .padding(10.dp)
+            .fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // ✕ Close ABOVE the photo
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .shadow(
+                        elevation = 6.dp,
+                        shape = CircleShape,
+                        clip = false
+                    )
+                    .background(
+                        color = Color.White, // keep white like BackButton
+                        shape = CircleShape
+                    )
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xFFBFFDFD),
+                                Color(0xFF88E7E7),
+                                Color(0xFF55BFBF)
+                            )
+                        ),
+                        shape = CircleShape
+                    )
+                    .clickable { onClose() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "✕",
+                    color = Color.Black,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+
+
+            // Zoomable square image
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f) // keep square
+                    .pointerInput(Unit) {
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            val newScale = (scale * zoom).coerceIn(minScale, maxScale)
+                            val newOffset = if (newScale > 1f) offset + pan else Offset.Zero
+                            scale = newScale
+                            offset = newOffset
+                        }
+                    }
+                    .pointerInput(Unit) {
+                        detectTapGestures(onDoubleTap = {
+                            scale = 1f
+                            offset = Offset.Zero
+                        })
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                            translationX = offset.x
+                            translationY = offset.y
+                        },
+                    contentScale = ContentScale.Fit
+                )
+            }
         }
     }
 }

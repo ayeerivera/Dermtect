@@ -240,7 +240,8 @@ fun UserHomeScreen(navController: NavController) {
                 },
                 onDecline = {
                     showConsentDialog = false
-                }
+                },
+                onViewTermsClick = { navController.navigate("terms_privacy") }
             )
         }
     }

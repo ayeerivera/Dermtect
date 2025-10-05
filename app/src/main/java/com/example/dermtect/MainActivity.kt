@@ -31,7 +31,7 @@ import com.example.dermtect.ui.components.DermaAssessmentReportScreen
 import com.example.dermtect.ui.components.NearbyClinicsScreen
 import com.example.dermtect.ui.screens.AboutScreen
 import com.example.dermtect.ui.screens.ArticleDetailScreen
-import com.example.dermtect.ui.screens.CaseHistoryScreen
+import com.example.dermtect.ui.screens.DermaHistoryScreen
 import com.example.dermtect.ui.screens.DermaAssessmentScreen
 import com.example.dermtect.ui.screens.Register
 import com.example.dermtect.ui.screens.Login
@@ -62,6 +62,7 @@ import com.example.dermtect.ui.components.ProfileScreenTemplate
 import com.example.dermtect.ui.screens.ClinicTemplateScreen
 import com.example.dermtect.ui.screens.LesionCaseScreen
 import com.example.dermtect.ui.screens.LesionCaseTemplate
+import com.example.dermtect.ui.screens.TermsPrivacyScreen
 import com.example.dermtect.ui.theme.DermtectTheme
 import com.example.dermtect.ui.viewmodel.DermaHomeViewModel
 import com.example.dermtect.ui.viewmodel.SharedProfileViewModel
@@ -146,6 +147,7 @@ class MainActivity : ComponentActivity() {
                     composable("forgot_pass3") { ForgotPass3(navController) }
                     composable("forgot_pass4") { ForgotPass4(navController) }
                     composable("change_pass") { ChangePasswordScreen(navController) }
+                    composable("terms_privacy") { TermsPrivacyScreen(navController) }
                     composable("user_home") {UserHomeScreen(navController = navController) }
                     composable("notifications") {NotificationScreen(navController = navController) }
                     composable("questionnaire") { QuestionnaireScreen(navController = navController)}
@@ -313,7 +315,7 @@ class MainActivity : ComponentActivity() {
                     }
 
                     composable("pending_cases") { PendingCasesScreen(navController) }
-                    composable("case_history") { CaseHistoryScreen(navController) }
+                    composable("case_history") { DermaHistoryScreen(navController) }
                     composable("assessment_report") { DermaAssessmentReportScreen(
                         lesionImage = painterResource(id = R.drawable.sample_skin),
                         onBackClick = { navController.popBackStack() },

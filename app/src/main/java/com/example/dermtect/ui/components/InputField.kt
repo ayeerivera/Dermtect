@@ -52,7 +52,7 @@ fun InputField(
             },
                     trailingIcon = {
                 if (isPassword) {
-                    val icon = if (isPasswordVisible) R.drawable.off else R.drawable.on
+                    val icon = if (isPasswordVisible) R.drawable.on else R.drawable.off
                     IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
                         Icon(
                             painter = painterResource(id = icon),

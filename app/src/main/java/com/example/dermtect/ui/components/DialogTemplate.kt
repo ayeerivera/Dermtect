@@ -2,18 +2,25 @@ package com.example.dermtect.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.CheckboxDefaults.colors
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
@@ -38,7 +45,9 @@ fun DialogTemplate(
     dismissDelay: Long = 1000L,
     onDismiss: () -> Unit,
     extraContent: @Composable (() -> Unit)? = null,
-    primaryEnabled: Boolean = true
+    primaryEnabled: Boolean = true,
+    secondaryEnabled: Boolean = true,   // 👈 ADD THIS
+    tertiaryEnabled: Boolean = true
     ) {
     if (show) {
         LaunchedEffect(show) {
@@ -105,97 +114,113 @@ fun DialogTemplate(
 
                     val buttonCount = listOfNotNull(primaryText, secondaryText, tertiaryText).size
                     val allFilled = buttonCount == 3
+                    val disabledAlpha = 0.45f
 
-                    // PRIMARY
+                    Spacer(modifier = Modifier.height(20.dp))
+
+// 🔹 PRIMARY (Teal gradient)
                     primaryText?.let {
-                        Button(
-                            onClick = {
-                                onPrimary?.invoke()
-                                onDismiss()
-                            },
-                            enabled = primaryEnabled,
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth(0.9f)
-                                .wrapContentHeight(),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF0FB2B2),
-                                contentColor = Color.White
-
-                            )
+                                .height(50.dp)
+                                .shadow(
+                                    elevation = 8.dp,
+                                    shape = RoundedCornerShape(12.dp),
+                                    clip = false
+                                )
+                                .background(
+                                    brush = Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color(0xFF5FEAEA), // top lighter teal
+                                            Color(0xFF2A9D9D), // middle
+                                            Color(0xFF187878)  // bottom darker teal
+                                        )
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .clickable(enabled = primaryEnabled) {
+                                    onPrimary?.invoke()
+                                    onDismiss()
+                                },
+                            contentAlignment = Alignment.Center
                         ) {
-                            Text(it, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
+                            Text(
+                                text = it,
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
 
-                    // SECONDARY
+// 🔹 SECONDARY (Gray gradient)
+                    // 🔹 SECONDARY (Gray gradient same as Login; unclickable if secondaryEnabled = false)
                     secondaryText?.let {
-                        Spacer(modifier = Modifier.height(5.dp))
-                        if (allFilled) {
-                            Button(
-                                onClick = {
-                                    onSecondary?.invoke()
-                                    onDismiss()
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth(0.9f)
-                                    .wrapContentHeight(),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF0FB2B2),
-                                    contentColor = Color.White
-                                )
-                            ) {
-                                Text(it, style = MaterialTheme.typography.bodyLarge,textAlign = TextAlign.Center)
-                            }
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        val buttonColors = if (secondaryEnabled) {
+                            listOf(
+                                Color(0xFFBDBDBD), // top light gray
+                                Color(0xFF9E9E9E), // middle gray
+                                Color(0xFF757575)  // bottom dark gray
+                            )
                         } else {
-                            OutlinedButton(
-                                onClick = {
+                            listOf(
+                                Color(0xFFBDBDBD), // same disabled tones as Login screen
+                                Color(0xFF9E9E9E),
+                                Color(0xFF757575)
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(0.9f)
+                                .height(50.dp)
+                                .shadow(
+                                    elevation = 8.dp,
+                                    shape = RoundedCornerShape(12.dp),
+                                    clip = false
+                                )
+                                .background(
+                                    brush = Brush.verticalGradient(colors = buttonColors),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .clickable(enabled = secondaryEnabled) {
                                     onSecondary?.invoke()
                                     onDismiss()
                                 },
-                                modifier = Modifier
-                                    .fillMaxWidth(0.9f)
-                                    .wrapContentHeight(),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF0FB2B2)),
-                                border = BorderStroke(1.dp, Color(0xFF0FB2B2))
-                            ) {
-                                Text(it, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
-                            }
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = it,
+                                color = if (secondaryEnabled) Color.White else Color.LightGray,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
 
-                    // TERTIARY
+
+// 🔹 TERTIARY (Flat Text Button — “Cancel” style)
                     tertiaryText?.let {
-                        Spacer(modifier = Modifier.height(5.dp))
-                        if (allFilled) {
-                            Button(
-                                onClick = {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = it,
+                            color = Color(0xFF0FB2B2),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth(0.9f)
+                                .clickable {
                                     onTertiary?.invoke()
                                     onDismiss()
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth(0.9f)
-                                    .wrapContentHeight(),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF0FB2B2),
-                                    contentColor = Color.White
-                                )
-                            ) {
-                                Text(it, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
-                            }
-                        } else {
-                            TextButton(
-                                onClick = {
-                                    onTertiary?.invoke()
-                                    onDismiss()
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth(0.9f)
-                                    .wrapContentHeight()
-                            ) {
-                                Text(it, style = MaterialTheme.typography.bodyLarge.copy(color = Color(0xFF0FB2B2),textAlign = TextAlign.Center ))
-                            }
-                        }
+                                }
+                                .padding(vertical = 6.dp)
+                        )
                     }
+
                 }
             }
         }

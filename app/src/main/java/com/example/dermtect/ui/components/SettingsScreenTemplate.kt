@@ -53,11 +53,15 @@ fun SettingsScreenTemplate(
     val lastName by userHomeViewModel.lastName.collectAsState()
     val email by userHomeViewModel.email.collectAsState()
     val isGoogleAccount by userHomeViewModel.isGoogleAccount.collectAsState()
-    val selectedImageUri = sharedProfileViewModel.selectedImageUri.collectAsState().value
+    val selectedImageUri by sharedProfileViewModel.selectedImageUri.collectAsState()
+    val role by userHomeViewModel.role.collectAsState(initial = null)
+    val collection = if (role == "derma") "dermas" else "users"
 
     LaunchedEffect(Unit) {
+        sharedProfileViewModel.loadPhoto("users")
         userHomeViewModel.fetchUserInfo()
     }
+
 
     Column(
         modifier = Modifier

@@ -48,6 +48,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import androidx.compose.ui.platform.LocalContext
 
+
 @Composable
 fun ProfileScreenTemplate(
     navController: NavController,
@@ -73,7 +74,7 @@ fun ProfileScreenTemplate(
     var showEditNameDialog by remember { mutableStateOf(false) }
     var editedFirstName by remember { mutableStateOf(firstName) }
     var editedLastName by remember { mutableStateOf(lastName) }
-
+    val selectedImageUri = sharedProfileViewModel.selectedImageUri.collectAsState().value
     var showDiscardDialog by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -86,12 +87,13 @@ fun ProfileScreenTemplate(
     var passwordInput by remember { mutableStateOf("") }
     var showPasswordError by remember { mutableStateOf(false) }
     var triggerNavigation by remember { mutableStateOf(false) }
-    val selectedImageUri = sharedProfileViewModel.selectedImageUri.collectAsState().value
+
+    val collection = "users"
+    LaunchedEffect(Unit) { sharedProfileViewModel.loadPhoto(collection) }
+
     val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        sharedProfileViewModel.setImageUri(uri) // must call ViewModel
-    }
+        ActivityResultContracts.GetContent()
+    ) { uri -> sharedProfileViewModel.setImageUri(uri, collection) }
 
     val context = LocalContext.current
     val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -345,17 +347,26 @@ fun ProfileScreenTemplate(
             imagePickerLauncher.launch("image/*")
             showPhotoOptions = false
         },
-        secondaryText = "Remove Photo",
+        // 👇 If photo exists, show “Remove Photo”; otherwise, replace it with “Cancel”
+        secondaryText = if (selectedImageUri != null) "Remove Photo" else "Cancel",
         onSecondary = {
-            showPhotoOptions = false
             if (selectedImageUri != null) {
+                // Remove photo flow
+                showPhotoOptions = false
                 showRemoveConfirmDialog = true
+            } else {
+                // Just close dialog if cancel
+                showPhotoOptions = false
             }
         },
-        tertiaryText = "Cancel",
+        // 👇 Show tertiary only when there *is* a photo
+        tertiaryText = if (selectedImageUri != null) "Cancel" else null,
         onTertiary = { showPhotoOptions = false },
         onDismiss = { showPhotoOptions = false }
     )
+
+
+
 
     DialogTemplate(
         show = showRemoveConfirmDialog,
@@ -363,7 +374,7 @@ fun ProfileScreenTemplate(
         description = "This will reset your profile picture to the default image.",
         primaryText = "Yes, Remove",
         onPrimary = {
-            sharedProfileViewModel.clearImageUri()
+            sharedProfileViewModel.clearImageUri(collection)
             showRemoveConfirmDialog = false
         },
         secondaryText = "Cancel",
@@ -373,9 +384,9 @@ fun ProfileScreenTemplate(
 
     DialogTemplate(
         show = showDeleteDialog,
-        title = "Delete Account?",
+        title = "Deactivate Account?",
         description = "Please enter your password to confirm. This action is irreversible.",
-        primaryText = "Yes, Delete my Account",
+        primaryText = "Yes, Deactivate my Account",
         onPrimary = {
             if (passwordInput.isBlank()) {
                 showPasswordError = true
@@ -470,7 +481,7 @@ fun ProfileScreenTemplate(
 
     DialogTemplate(
         show = showDeletedDialog,
-        title = "Your account has been permanently deleted!",
+        title = "Your account has been deactivated!",
         imageResId = R.drawable.success,
         autoDismiss = true,
         onDismiss = { showDeletedDialog = false }
@@ -619,9 +630,8 @@ fun AssessmentRow(
 
         Text(
             text = label,
-            fontSize = fontSize,
             color = Color(0xFF484848),
-            fontWeight = FontWeight.Normal,
+            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal),
             modifier = Modifier.weight(1f)
         )
 

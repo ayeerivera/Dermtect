@@ -2,6 +2,8 @@ package com.example.dermtect.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,6 +14,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -79,9 +83,44 @@ fun NotificationScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Box(modifier = Modifier.align(Alignment.End).padding(end = 20.dp)) {
-                IconButton(onClick = { showFilterMenu = !showFilterMenu }) {
-                    Icon(painter = painterResource(id = R.drawable.filter), contentDescription = "Filter", modifier = Modifier.size(20.dp))
+            Box(
+                modifier = Modifier
+                    .align(Alignment.End)
+                    .padding(end = 20.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .shadow(elevation = 6.dp, shape = RoundedCornerShape(20.dp))
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    Color(0xFFBFFDFD),
+                                    Color(0xFF88E7E7),
+                                    Color(0xFF55BFBF)
+                                )
+                            ),
+                            shape = RoundedCornerShape(20.dp)
+                        )
+                        .border(
+                            width = 1.dp,
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = 0.6f),
+                                    Color.Black.copy(alpha = 0.3f)
+                                )
+                            ),
+                            shape = RoundedCornerShape(20.dp)
+                        )
+                        .clickable { showFilterMenu = !showFilterMenu }
+                        .padding(horizontal = 12.dp, vertical = 6.dp),  // compact chip
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.filter), // keep your drawable
+                        contentDescription = "Filter",
+                        tint = Color.Black,
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
                 DropdownMenu(expanded = showFilterMenu, onDismissRequest = { showFilterMenu = false }, modifier = Modifier.background(Color.White)) {
                     DropdownMenuItem(text = { Text("All", style = MaterialTheme.typography.labelMedium) }, onClick = {

@@ -36,6 +36,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.dermtect.R
 import com.example.dermtect.ui.components.BackButton
 import com.example.dermtect.ui.components.BubblesBackground
@@ -62,7 +64,9 @@ fun LesionCaseTemplate(
     onRetakeClick: (() -> Unit)? = null,
     onImageClick: (page: Int) -> Unit = {},
     unsavedHeightFraction: Float = 0.55f,   // ~bigger before saving
-    savedHeightFraction: Float = 0.35f      // smaller after saving
+    savedHeightFraction: Float = 0.35f,     // smaller after saving
+    isSaving: Boolean = false
+
 ) {
     val riskMessage = generateTherapeuticMessage(probability)
 
@@ -100,7 +104,7 @@ fun LesionCaseTemplate(
             Spacer(Modifier.height(6.dp))
             Text(
                 text = timestamp,
-                style = MaterialTheme.typography.bodySmall.copy(color = Color.Gray),
+                style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray),
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -219,21 +223,25 @@ fun LesionCaseTemplate(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Button(
-                            onClick = { onSaveClick?.invoke() },
+                            onClick = { if (!isSaving) onSaveClick?.invoke() },
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp)
+                            shape = RoundedCornerShape(10.dp),
+                            enabled = !isSaving
                         ) {
                             Text("Save")
                         }
+
                         OutlinedButton(
-                            onClick = { onRetakeClick?.invoke() },
+                            onClick = { if (!isSaving) onRetakeClick?.invoke() },
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp)
+                            shape = RoundedCornerShape(10.dp),
+                            enabled = !isSaving
                         ) {
                             Text("Retake")
                         }
                     }
                     Spacer(Modifier.height(16.dp))
+                }
                 }
 
                 // Post-save actions (small photo)
@@ -263,8 +271,40 @@ fun LesionCaseTemplate(
                 }
             }
         }
+    if (isSaving) {
+        Dialog(
+            onDismissRequest = {},
+            properties = DialogProperties(
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false,
+                usePlatformDefaultWidth = false
+            )
+        ) {
+            // ✨ 50% opacity overlay
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    CircularProgressIndicator(color = Color.White)
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        text = "Saving your scan…",
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
     }
+
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -324,19 +364,19 @@ fun generateTherapeuticMessage(
 
     return if (alerted) {
         when {
-            pPct < 10f -> "Precautionary alert. Still very low, just monitor changes."
-            pPct < 30f -> "Alert with a low chance. Non-urgent check is reasonable."
-            pPct < 60f -> "Some concern. Clinical evaluation advised."
-            pPct < 80f -> "Elevated chance. Please arrange a dermatology visit."
-            else       -> "Higher chance. Prompt dermatologist review recommended."
+            pPct < 10f -> "Your result shows a very low chance of concern. This is reassuring, and there’s no need to worry. It may help to simply check your skin from time to time, just to stay aware of any changes."
+            pPct < 30f -> "Your result suggests only a low chance of concern. Everything appears fine. We encourage you to casually observe your skin every now and then, and let a doctor know if you notice something different."
+            pPct < 60f -> "We noticed some minor changes in your skin. This does not mean there is a serious issue, but talking with a doctor could provide peace of mind and helpful guidance."
+            pPct < 80f -> "Your result shows some concern. To better understand this, we recommend scheduling a skin check with a dermatologist. They can give you clearer answers and reassurance."
+            else       -> "Your result shows a higher level of concern. For your safety and peace of mind, we encourage you to visit a dermatologist soon so you can receive proper care and support."
         }
     } else {
         when {
-            pPct < 10f -> "Very reassuring. Keep up normal skin care."
-            pPct < 30f -> "Low chance. Monitor casually and share if changes appear."
-            pPct < 60f -> "Unclear. Consider professional opinion."
-            pPct < 80f -> "Moderate. Dermatology check would be sensible."
-            else       -> "Higher. Timely dermatologist review is recommended."
+            pPct < 10f -> "Everything looks good. You can continue your normal skincare routine. Just keep being mindful of your skin and how it changes over time."
+            pPct < 30f -> "Your result looks safe at this time. It may be helpful to casually watch for any new changes, but otherwise you can carry on as usual."
+            pPct < 60f -> "The result is a little unclear. This doesn’t mean there is a problem, but checking in with a doctor can give you peace of mind and a more accurate understanding."
+            pPct < 80f -> "There are a few areas that look a little concerning. It would be supportive to have a dermatologist review this, so you can feel more confident about your skin health."
+            else       -> "Your result shows a higher chance of concern. To ensure your health is well taken care of, we recommend visiting a dermatologist soon for proper evaluation and guidance."
         }
     }
 }

@@ -12,17 +12,21 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.dermtect.ui.components.EmbossedButton
 
 @Composable
 fun PrivacyConsentDialog(
     show: Boolean,
     onConsent: () -> Unit,
-    onDecline: () -> Unit
+    onDecline: () -> Unit,
+    onViewTermsClick: () -> Unit = {}
 ) {
     if (!show) return
 
@@ -36,7 +40,8 @@ fun PrivacyConsentDialog(
         ) {
             PrivacyConsentContent(
                 onConsent = onConsent,
-                onDecline = onDecline
+                onDecline = onDecline,
+                onViewTermsClick = onViewTermsClick
             )
         }
     }
@@ -45,11 +50,16 @@ fun PrivacyConsentDialog(
 @Composable
 fun PrivacyConsentContent(
     onConsent: () -> Unit,
-    onDecline: () -> Unit
+    onDecline: () -> Unit,
+    onViewTermsClick: () -> Unit
 ) {
     var isChecked by remember { mutableStateOf(false) }
 
-    val fullText = "DermTect uses cookies and similar technologies to enhance your experience, analyze platform usage, and deliver content tailored to your needs. These tools help us improve our services while ensuring your data remains secure and protected. Granting permission does not give us access to your personal information from other apps or websites."
+    val fullText = "DermTect is committed to protecting your information. We only collect the details necessary to provide accurate results and helpful features. Your skin photos, reports, and related information are stored securely to support analysis, track your progress, and enable dermatologist feedback when needed.\n" +
+            "\n" +
+            "We do not collect personal information from your other apps, websites, or outside sources. Your data is used only within DermTect to improve your experience and ensure accurate assessments. All information is handled with strict security and privacy measures, and will never be shared with third parties without your consent.\n" +
+            "\n" +
+            "By continuing, you acknowledge that DermTect may store and process your information responsibly to support your health journey."
 
     Column(
         modifier = Modifier
@@ -110,37 +120,49 @@ fun PrivacyConsentContent(
 
         Spacer(modifier = Modifier.height(23.dp))
 
-        Button(
+        val activeBrush = Brush.verticalGradient(
+            listOf(Color(0xFF5FEAEA), Color(0xFF2A9D9D), Color(0xFF187878))
+        )
+        val disabledBrush = Brush.verticalGradient(
+            listOf(Color(0xFFBDBDBD), Color(0xFF9E9E9E), Color(0xFF757575))
+        )
+
+        EmbossedButton(
+            text = "Consent",
             onClick = onConsent,
             enabled = isChecked,
+            backgroundBrush = if (isChecked) activeBrush else disabledBrush,
+            textColor = Color.White,
+            cornerRadius = 12.dp,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(46.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (isChecked) Color(0xFF0FB2B2) else Color(0xFF626262),
-                contentColor = Color.White
-            ),
-            shape = RoundedCornerShape(8.dp)
-        ) {
-            Text("Consent", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal))
-        }
+                .height(56.dp)
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        OutlinedButton(
+        EmbossedButton(
+            text = "Do Not Consent",
             onClick = onDecline,
+            backgroundBrush = Brush.linearGradient(
+                listOf(Color(0xFFF0F0F0), Color(0xFFF0F0F0))
+            ),
+            textColor = Color(0xFF0FB2B2),
+            cornerRadius = 12.dp,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(46.dp),
-            border = BorderStroke(0.5.dp, Color(0xFF0FB2B2)),
-            colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = Color(0xFF0FB2B2),
-                containerColor = Color.Transparent
-            ),
-            shape = RoundedCornerShape(8.dp)
-        ) {
-            Text("Do Not Consent", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal))
-        }
+                .height(56.dp)
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // 🔗 New clickable link
+        Text(
+            text = "🔗 View Full Terms & Privacy Policy",
+            color = Color(0xFF0FB2B2),
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+            modifier = Modifier
+                .clickable { onViewTermsClick() }
+                .padding(vertical = 4.dp)
+        )
     }
 }
-
