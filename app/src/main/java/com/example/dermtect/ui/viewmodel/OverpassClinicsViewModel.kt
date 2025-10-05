@@ -50,6 +50,15 @@ class OverpassClinicsViewModel(app: Application) : AndroidViewModel(app) {
     private val _clinics = MutableStateFlow<List<ClinicUi>>(emptyList())
     val clinics: StateFlow<List<ClinicUi>> = _clinics
 
+    // ✅ Only update user location if it actually changed (reduces UI recentering)
+    private fun updateUserIfChanged(new: LatLng) {
+        val cur = _user.value
+        val thresholdMeters = 15.0
+        if (cur == null || haversine(cur.lat, cur.lon, new.lat, new.lon) >= thresholdMeters) {
+            _user.value = new
+        }
+    }
+
     @SuppressLint("MissingPermission") // we gate this with runtime checks below
     fun loadUserLocation() {
         val ctx = getApplication<Application>()
@@ -58,7 +67,7 @@ class OverpassClinicsViewModel(app: Application) : AndroidViewModel(app) {
         if (!fine && !coarse) return
 
         fused.lastLocation.addOnSuccessListener { loc ->
-            loc?.let { _user.value = LatLng(it.latitude, it.longitude) }
+            loc?.let { updateUserIfChanged(LatLng(it.latitude, it.longitude)) }
         }
     }
 
@@ -135,12 +144,12 @@ class OverpassClinicsViewModel(app: Application) : AndroidViewModel(app) {
 }
 
 /** ===== Overpass DTOs ===== */
-@Serializable
+@kotlinx.serialization.Serializable
 data class OverpassResponse(
     val elements: List<OverpassElement> = emptyList()
 )
 
-@Serializable
+@kotlinx.serialization.Serializable
 data class OverpassElement(
     val type: String,
     val id: Long,
@@ -150,7 +159,7 @@ data class OverpassElement(
     val tags: Map<String, String> = emptyMap()
 )
 
-@Serializable
+@kotlinx.serialization.Serializable
 data class Center(
     val lat: Double? = null,
     val lon: Double? = null

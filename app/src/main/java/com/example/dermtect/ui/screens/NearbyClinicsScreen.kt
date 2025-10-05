@@ -40,10 +40,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import android.app.Activity
 import android.content.Intent
 import android.provider.Settings
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.core.app.ActivityCompat
 import org.osmdroid.config.Configuration
-
 
 @Composable
 fun NearbyClinicsScreen(
@@ -96,6 +94,29 @@ fun NearbyClinicsScreen(
                 ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.ACCESS_COARSE_LOCATION)
     }
 
+    // 🔹 NEW: Auto-load location on start if permission is already granted
+    LaunchedEffect(Unit) {
+        val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (fine || coarse) {
+            overpassVm.loadUserLocation()
+        }
+    }
+
+    // ✅ Fetch from Overpass when user location changes (distinct updates)
+    LaunchedEffect(user) {
+        user?.let { overpassVm.fetchNearbyDermatology(radiusMeters = 5000) }
+    }
+
+    // ✅ Remember last map center to avoid re-centering while the user is dragging
+    val lastCentered = remember { mutableStateOf<GeoPoint?>(null) }
+    val recenterMetersThreshold = 25.0
+    fun shouldRecenter(prev: GeoPoint?, next: GeoPoint): Boolean {
+        if (prev == null) return true
+        val d = distanceMeters(prev.latitude, prev.longitude, next.latitude, next.longitude)
+        return d >= recenterMetersThreshold
+    }
+
     BubblesBackground {
         Box(modifier = Modifier.fillMaxSize()) {
             Column {
@@ -146,7 +167,7 @@ fun NearbyClinicsScreen(
                 ) {
                     Text(
                         text = "Turn On Location",
-                        fontSize = 13.sp,
+                        fontSize = 14.sp,
                         color = Color.Black,
                         modifier = Modifier.padding(start = 16.dp)
                     )
@@ -164,62 +185,105 @@ fun NearbyClinicsScreen(
 
                         org.osmdroid.views.MapView(ctx).apply {
                             setMultiTouchControls(true)
+                            setTilesScaledToDpi(true)              // ✅ smoother on high-DPI screens
+                            isHorizontalMapRepetitionEnabled = true // ✅ smoother pan feel
+
                             controller.setZoom(14.0)
-                            // Default center until we have user location
                             controller.setCenter(GeoPoint(14.5995, 120.9842))
+
+                            // ✅ Prevent parent scroll from stealing gestures
+                            setOnTouchListener { v, e ->
+                                when (e.actionMasked) {
+                                    android.view.MotionEvent.ACTION_DOWN,
+                                    android.view.MotionEvent.ACTION_MOVE,
+                                    android.view.MotionEvent.ACTION_POINTER_DOWN -> {
+                                        v.parent?.requestDisallowInterceptTouchEvent(true)
+                                    }
+                                    android.view.MotionEvent.ACTION_UP,
+                                    android.view.MotionEvent.ACTION_CANCEL -> {
+                                        v.parent?.requestDisallowInterceptTouchEvent(false)
+                                    }
+                                }
+                                false // let MapView handle the gesture
+                            }
                         }
                     },
-
 
                     update = { map ->
                         // 1) Clear all markers first
                         map.overlays.removeAll { it is Marker }
 
-                        // 2) If we already have a user, center and draw a RED pin
+                        // 2) Center only if user actually moved far enough
                         user?.let { u ->
-                            map.controller.setCenter(GeoPoint(u.lat, u.lon))
-
-                            val ctx = map.context
-                            val base = ContextCompat.getDrawable(ctx, org.osmdroid.library.R.drawable.marker_default)?.mutate()
-                            val redIcon = base?.also { DrawableCompat.setTint(it, android.graphics.Color.RED) }
-
-                            val me = Marker(map).apply {
-                                position = GeoPoint(u.lat, u.lon)
-                                title = "You are here"
-                                icon = redIcon
-                                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                            val target = GeoPoint(u.lat, u.lon)
+                            if (shouldRecenter(lastCentered.value, target)) {
+                                map.controller.animateTo(target)
+                                lastCentered.value = target
                             }
-                            map.overlays.add(me)
                         } ?: run {
                             // No user yet → keep your Manila default
                             map.controller.setCenter(GeoPoint(14.5995, 120.9842))
                         }
+
+                        // --- USER MARKER (pin current location) ---
+                        user?.let { u ->
+                            val ctx = map.context
+                            val redIcon = ContextCompat.getDrawable(ctx, R.drawable.location_icon)
+                                ?.mutate()
+                                ?.also { DrawableCompat.setTint(it, android.graphics.Color.RED) }
+
+                            val me = Marker(map).apply {
+                                position = GeoPoint(u.lat, u.lon)
+                                title = "You are here"
+                                icon = redIcon   // <- use app drawable instead of osmdroid's marker_default
+                                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                            }
+                            map.overlays.add(me)
+                        }
+
+                        // ------------------------------------------------
 
                         // 3) Add clinic pins (Overpass first)
                         if (osmClinics.isNotEmpty()) {
                             osmClinics.forEach { c ->
                                 val marker = Marker(map).apply {
                                     position = GeoPoint(c.lat, c.lon)
-                                    title = c.name
-                                    snippet = buildString {
-                                        append(String.format("%.2f km away", c.distanceMeters / 1000.0))
-                                        c.address?.let { append("\n$it") }
-                                    }
+                                    title = c.name // clinic name from Overpass
+
+                                    // CLEAN: show only distance (no address)
+                                    snippet = String.format("%.2f km away", c.distanceMeters / 1000.0)
+
                                     setOnMarkerClickListener { m, mv ->
-                                        m.showInfoWindow(); mv.controller.animateTo(m.position); true
+                                        m.showInfoWindow()
+                                        mv.controller.animateTo(m.position)
+                                        true
                                     }
                                 }
                                 map.overlays.add(marker)
                             }
-                        } else {
-                            // Manual fallback
+                        }
+                        else {
+                            // Manual fallback with clinic + doctor + distance (no address)
+                            val u = user
                             ManualClinics.items.forEach { c ->
+                                val distKm = u?.let { uu ->
+                                    distanceMeters(uu.lat, uu.lon, c.lat, c.lon) / 1000.0
+                                }
+
                                 val marker = Marker(map).apply {
                                     position = GeoPoint(c.lat, c.lon)
-                                    title = c.name
-                                    snippet = c.address
+                                    title = c.clinicName // clinic name as the marker title
+
+                                    // CLEAN: keep doctor + distance, drop address
+                                    snippet = buildString {
+                                        c.doctorName?.takeIf { it.isNotBlank() }?.let { appendLine(it) }
+                                        distKm?.let { append(String.format("%.2f km away", it)) }
+                                    }.trim()
+
                                     setOnMarkerClickListener { m, mv ->
-                                        m.showInfoWindow(); mv.controller.animateTo(m.position); true
+                                        m.showInfoWindow()
+                                        mv.controller.animateTo(m.position)
+                                        true
                                     }
                                 }
                                 map.overlays.add(marker)
@@ -227,9 +291,7 @@ fun NearbyClinicsScreen(
                         }
 
                         map.invalidate()
-
                     }
-
                 )
 
                 Spacer(modifier = Modifier.height(30.dp))
@@ -244,7 +306,7 @@ fun NearbyClinicsScreen(
                 ) {
                     Text(
                         text = "Nearby Clinics",
-                        fontSize = 14.sp,
+                        fontSize = 18.sp,
                         color = Color.Black,
                         modifier = Modifier.weight(1f)
                     )
@@ -252,57 +314,26 @@ fun NearbyClinicsScreen(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                if (showLocationDialog) {
-                    showLocationDialog = false
-
-                    val fineGranted = ContextCompat.checkSelfPermission(
-                        context, Manifest.permission.ACCESS_FINE_LOCATION
-                    ) == PackageManager.PERMISSION_GRANTED
-                    val coarseGranted = ContextCompat.checkSelfPermission(
-                        context, Manifest.permission.ACCESS_COARSE_LOCATION
-                    ) == PackageManager.PERMISSION_GRANTED
-
-                    if (fineGranted || coarseGranted) {
-                        overpassVm.loadUserLocation()
-                        overpassVm.fetchNearbyDermatology(radiusMeters = 5000)
-                    } else {
-                        permissionLauncher.launch(arrayOf(
-                            Manifest.permission.ACCESS_FINE_LOCATION,
-                            Manifest.permission.ACCESS_COARSE_LOCATION
-                        ))
-                    }
-                }
-
-                if (showOpenSettings) {
-                    AlertDialog(
-                        onDismissRequest = { showOpenSettings = false },
-                        title = { Text("Enable Location Permission") },
-                        text = { Text("Location is disabled and can’t be requested again. Open App Settings to allow it.") },
-                        confirmButton = {
-                            TextButton(onClick = {
-                                showOpenSettings = false
-                                val intent = Intent(
-                                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                    Uri.parse("package:${context.packageName}")
-                                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                context.startActivity(intent)
-                            }) { Text("Open Settings") }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { showOpenSettings = false }) { Text("Cancel") }
-                        }
-                    )
-                }
+                // build list with clinic title + optional doctor subtitle
+                data class ListItem(
+                    val title: String,        // clinic name
+                    val subtitle: String?,    // doctor
+                    val address: String,      // kept for detail page
+                    val distance: String,
+                    val contact: String?      // keep contact only
+                )
 
 
-                // You can keep your existing Firestore list OR switch to osmClinics below:
-                val finalClinics = when {
+                val finalClinics: List<ListItem> = when {
                     osmClinics.isNotEmpty() -> {
+                        // Overpass has a single name → show it as title, no subtitle
                         osmClinics.map {
-                            Triple(
-                                it.name,
-                                it.address ?: "No address",
-                                String.format("%.2fkm", it.distanceMeters / 1000.0)
+                            ListItem(
+                                title = it.name,
+                                subtitle = null,
+                                address = it.address ?: "No address",
+                                distance = String.format("%.2fkm", it.distanceMeters / 1000.0),
+                                contact = null
                             )
                         }
                     }
@@ -315,14 +346,29 @@ fun NearbyClinicsScreen(
                         } else ManualClinics.items
 
                         sortedManual.map {
-                            val dist = user?.let { u ->
-                                distanceMeters(u.lat, u.lon, it.lat, it.lon) / 1000.0
+                            val dist = user?.let { u2 ->
+                                distanceMeters(u2.lat, u2.lon, it.lat, it.lon) / 1000.0
                             }?.let { "%.2fkm".format(it) } ?: "—"
-                            Triple(it.name, it.address, dist)
+                            ListItem(
+                                title = it.clinicName,
+                                subtitle = it.doctorName,
+                                address = it.address, // kept but not shown
+                                distance = dist,
+                                contact = it.contact
+                            )
                         }
                     }
                     else -> {
-                        clinicList.map { Triple(it.name, it.address, "—") }
+                        // Fallback: Firestore clinics (no subtitle available)
+                        clinicList.map {
+                            ListItem(
+                                title = it.name,
+                                subtitle = null,
+                                address = it.address, // kept but not shown
+                                distance = "—",
+                                contact = null
+                            )
+                        }
                     }
                 }
 
@@ -333,16 +379,24 @@ fun NearbyClinicsScreen(
                 } else if (finalClinics.isEmpty()) {
                     Text("No clinics found.", color = Color.Gray)
                 } else {
-                    finalClinics.forEach { (name, address, dist) ->
+                    // render title + optional subtitle (NO address shown)
+                    finalClinics.forEach { item ->
                         ClinicItem(
-                            name = name,
-                            address = address,
-                            distance = dist,
+                            title = item.title,
+                            subtitle = item.subtitle,
+                            distance = item.distance,
                             onClick = {
-                                // Navigate as you already do
-                                // Here you could pass lat/lon too if you map from osmClinics
                                 val gson = Gson()
-                                val clinicJson = Uri.encode(gson.toJson(mapOf("name" to name, "address" to address)))
+                                val clinicJson = Uri.encode(
+                                    gson.toJson(
+                                        mapOf(
+                                            "name" to item.title,
+                                            "subtitle" to (item.subtitle ?: ""),
+                                            "address" to item.address,
+                                            "contact" to (item.contact ?: "")
+                                        )
+                                    )
+                                )
                                 navController.navigate("clinic_detail/$clinicJson")
                             }
                         )
@@ -368,10 +422,11 @@ private fun distanceMeters(
     return 2 * R * kotlin.math.asin(kotlin.math.sqrt(h))
 }
 
+// ClinicItem now omits the address line from UI
 @Composable
 fun ClinicItem(
-    name: String,
-    address: String,
+    title: String,
+    subtitle: String?,
     distance: String,
     onClick: (() -> Unit)? = null
 ) {
@@ -390,46 +445,45 @@ fun ClinicItem(
                 painter = painterResource(id = R.drawable.location_icon),
                 contentDescription = "Location Icon",
                 modifier = Modifier
-                    .size(20.dp)
+                    .size(22.dp) // a touch bigger
                     .padding(end = 6.dp)
             )
 
-            Text(
-                text = name,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.Black,
-                modifier = Modifier.weight(1f)
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    fontSize = 18.sp,                 // was 14.sp
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.Black
+                )
+                if (!subtitle.isNullOrBlank()) {
+                    Text(
+                        text = subtitle,
+                        fontSize = 14.sp,             // was 12.sp
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF2E2E2E)
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.width(8.dp))
 
             Box(
                 modifier = Modifier
-                    .height(16.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .border(0.5.dp, Color.Black, shape = RoundedCornerShape(8.dp))
-                    .padding(horizontal = 6.dp),
+                    .height(20.dp)                     // was 16.dp
+                    .clip(RoundedCornerShape(10.dp))   // was 8.dp
+                    .border(0.5.dp, Color.Black, shape = RoundedCornerShape(10.dp))
+                    .padding(horizontal = 8.dp),       // was 6.dp
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = distance,
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,                 // was 10.sp
                     fontWeight = FontWeight.Normal,
                     color = Color.Black
                 )
             }
         }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        Text(
-            text = address,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Normal,
-            color = Color(0xFF484848),
-            modifier = Modifier.fillMaxWidth(0.9f)
-        )
-
     }
 }
+
