@@ -271,7 +271,7 @@ fun LesionCaseScreen(
                     com.example.dermtect.ui.components.DialogTemplate(
                         show = showQaRequiredDialog,
                         title = "Complete Assessment Required",
-                        description = "Complete assessment first before exporting your report.",
+                        description = "You can tap the button above, or go manually to:\n Settings → Profile → My Assessment Report",
                         primaryText = "Go to Assessment Report",
                         onPrimary = {
                             showQaRequiredDialog = false
@@ -289,28 +289,12 @@ fun LesionCaseScreen(
                                         8.dp
                                     )
                                 )
-                                Text(
-                                    text = "You can tap the button above, or go manually to:\nSettings → Profile → My Assessment Report",
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        color = Color.DarkGray,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                    ),
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                )
-
-                                androidx.compose.foundation.layout.Spacer(
-                                    modifier = Modifier.height(
-                                        12.dp
-                                    )
-                                )
 
                                 // 👇 "Why this matters" link that navigates to Terms & Privacy screen
                                 Text(
                                     text = "🔗 Why this matters",
                                     color = Color(0xFF0FB2B2),
-                                    style = MaterialTheme.typography.bodySmall.copy(
+                                    style = MaterialTheme.typography.bodyLarge.copy(
                                         fontWeight = FontWeight.SemiBold
                                     ),
                                     modifier = Modifier

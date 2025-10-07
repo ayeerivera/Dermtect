@@ -569,27 +569,6 @@ fun TakePhotoScreen(
                             val r = inferenceResult!!
                             val riskCopy = generateTherapeuticMessage(r.probability)
 
-                            LaunchedEffect(capturedImage, r, hasUploaded) {
-                                if (!hasUploaded && capturedImage != null) {
-                                    if (!isOnline(context)) {
-                                        Toast.makeText(context, "No internet. Upload skipped.", Toast.LENGTH_SHORT).show()
-                                        hasUploaded = true // prevent endless retries; user can Save manually later
-                                        return@LaunchedEffect
-                                    }
-                                    val ok = uploadScanWithLabel(
-                                        bitmap = capturedImage!!,
-                                        heatmap = r.heatmap,
-                                        probability = r.probability,
-                                        prediction = modelFlag
-                                    )
-                                    Log.d("Upload", if (ok) "Scan saved" else "Save failed or timed out")
-                                    hasUploaded = true
-                                    if (!ok) {
-                                        Toast.makeText(context, "Upload failed or timed out. Try again later.", Toast.LENGTH_LONG).show()
-                                    }
-                                }
-                            }
-
 
                             LesionCaseTemplate(
                                 imageBitmap = image,
