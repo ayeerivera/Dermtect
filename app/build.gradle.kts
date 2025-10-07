@@ -15,43 +15,58 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Trim locales (size win)
+        resourceConfigurations += listOf("en", "fil")
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            ndk { debugSymbolLevel = "none" }
+        }
+        debug {
+            ndk { debugSymbolLevel = "none" }
         }
     }
+
+    // ✅ Use splits to generate small per-ABI/density APKs
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a")   // add "armeabi-v7a" only if you truly need it
+            isUniversalApk = false
+        }
+        // Disable density splits → one APK for this ABI
+        density {
+            isEnable = false
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    kotlinOptions {
-        jvmTarget = "11"
-    }
+    kotlinOptions { jvmTarget = "11" }
+
     buildFeatures {
         compose = true
         viewBinding = true
     }
 
-    androidResources {
-        noCompress += "tflite"
-    }
+    androidResources { noCompress += "tflite" }
 
     packaging {
-        resources {
-            // usual boilerplate
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
-
-        }
+        jniLibs { useLegacyPackaging = false }
+        resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
     }
-
 }
 
 dependencies {
