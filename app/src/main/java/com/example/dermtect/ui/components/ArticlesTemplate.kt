@@ -1,6 +1,7 @@
 package com.example.dermtect.ui.components
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
@@ -12,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -30,7 +32,6 @@ fun ArticleTemplate(
     BubblesBackground {
         Column(modifier = Modifier.fillMaxSize()) {
 
-            // --- FIXED HEADER SECTION ---
             Column(
                 modifier = Modifier
                     .wrapContentHeight()
@@ -55,17 +56,40 @@ fun ArticleTemplate(
                         .padding(bottom = 16.dp)
                 )
 
-                // Image
-                newsItem.imageResId?.let { resId ->
-                    Image(
-                        painter = painterResource(id = resId),
+                if (!newsItem.imageUrl.isNullOrBlank()) {
+                    coil.compose.AsyncImage(
+                        model = newsItem.imageUrl,
                         contentDescription = "Article Image",
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 200.dp)
-                            .clip(RoundedCornerShape(12.dp))
+                            .height(200.dp) // ✅ fixed height
+                            .clip(RoundedCornerShape(12.dp)),
+                        contentScale = ContentScale.Crop
                     )
+                } else if (newsItem.imageResId != null) {
+                    Image(
+                        painter = painterResource(id = newsItem.imageResId),
+                        contentDescription = "Article Image",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp) // ✅ fixed height
+                            .clip(RoundedCornerShape(12.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    // Optional: placeholder if neither URL nor drawable is provided
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFFECEFF1)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("No image", color = Color.Gray)
+                    }
                 }
+
 
                 // Source and Date
                 Row(

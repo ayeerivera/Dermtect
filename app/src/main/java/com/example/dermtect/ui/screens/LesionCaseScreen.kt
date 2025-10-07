@@ -286,7 +286,7 @@ private fun ZoomableImage(
             .fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // ✕ Close ABOVE the photo
+        // ✕ Close ABOVE the photo (right aligned)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -303,7 +303,7 @@ private fun ZoomableImage(
                         clip = false
                     )
                     .background(
-                        color = Color.White, // keep white like BackButton
+                        color = Color.White,
                         shape = CircleShape
                     )
                     .border(
@@ -327,43 +327,42 @@ private fun ZoomableImage(
                     style = MaterialTheme.typography.titleMedium
                 )
             }
+        }
 
-
-            // Zoomable square image
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f) // keep square
-                    .pointerInput(Unit) {
-                        detectTransformGestures { _, pan, zoom, _ ->
-                            val newScale = (scale * zoom).coerceIn(minScale, maxScale)
-                            val newOffset = if (newScale > 1f) offset + pan else Offset.Zero
-                            scale = newScale
-                            offset = newOffset
-                        }
+        // ✅ Image is now OUTSIDE the Row, so it won't push the button left
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f) // keep square
+                .pointerInput(Unit) {
+                    detectTransformGestures { _, pan, zoom, _ ->
+                        val newScale = (scale * zoom).coerceIn(minScale, maxScale)
+                        val newOffset = if (newScale > 1f) offset + pan else Offset.Zero
+                        scale = newScale
+                        offset = newOffset
                     }
-                    .pointerInput(Unit) {
-                        detectTapGestures(onDoubleTap = {
-                            scale = 1f
-                            offset = Offset.Zero
-                        })
+                }
+                .pointerInput(Unit) {
+                    detectTapGestures(onDoubleTap = {
+                        scale = 1f
+                        offset = Offset.Zero
+                    })
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        translationX = offset.x
+                        translationY = offset.y
                     },
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    bitmap = bitmap.asImageBitmap(),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                            translationX = offset.x
-                            translationY = offset.y
-                        },
-                    contentScale = ContentScale.Fit
-                )
-            }
+                contentScale = ContentScale.Fit
+            )
         }
     }
 }

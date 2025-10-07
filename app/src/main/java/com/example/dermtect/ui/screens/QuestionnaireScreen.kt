@@ -518,10 +518,11 @@ fun QuestionnaireScreen(navController: NavController) {
                                                 .height(56.dp),
                                             cornerRadius = 12.dp,
                                             backgroundBrush = Brush.linearGradient(
-                                                colors = listOf(Color(0xFFE6F4F4), Color(0xFFD3EBEB)) // subtle light
+                                                colors = listOf(Color(0xFFE6F4F4), Color.LightGray)
                                             ),
-                                            textColor = Color(0xFF0FB2B2)
+                                            textColor = Color.White
                                         )
+                                        Spacer(Modifier.width(8.dp))
                                         EmbossedButton(
                                             text = if (loading) "Saving..." else "Save",
                                             onClick = { saveAnswers() },

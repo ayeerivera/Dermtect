@@ -40,6 +40,8 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 
 
 @Composable
@@ -454,10 +456,6 @@ fun HighlightCard(onHighlightClick: () -> Unit, item: NewsItem) {
 
 
 
-
-
-
-
 @Composable
 fun NewsCarousel(newsItems: List<NewsItem>, onItemClick: (NewsItem) -> Unit) {
     val cornerRadius = 15.dp
@@ -477,9 +475,8 @@ fun NewsCarousel(newsItems: List<NewsItem>, onItemClick: (NewsItem) -> Unit) {
                         clip = false
                     )
             ) {
-                Box(
+                Column(
                     modifier = Modifier
-                        .fillMaxSize()
                         .background(
                             color = Color(0xFFF8F9FA),
                             shape = RoundedCornerShape(cornerRadius)
@@ -494,58 +491,70 @@ fun NewsCarousel(newsItems: List<NewsItem>, onItemClick: (NewsItem) -> Unit) {
                             ),
                             shape = RoundedCornerShape(cornerRadius)
                         )
-                        .drawWithContent {
-                            drawContent()
-                            drawRoundRect(
-                                brush = Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.White.copy(alpha = 0.15f),
-                                        Color.Transparent
-                                    )
-                                ),
-                                cornerRadius = CornerRadius(cornerRadius.toPx(), cornerRadius.toPx()),
-                                blendMode = BlendMode.Lighten
-                            )
-                        }
                 ) {
-                    Column {
-                        item.imageResId?.let { resId ->
-                            Image(
-                                painter = painterResource(id = resId),
+                    // IMAGE (always on top)
+                    when {
+                        !item.imageUrl.isNullOrBlank() -> {
+                            AsyncImage(
+                                model = item.imageUrl,
                                 contentDescription = item.title,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(120.dp)
-                                    .clip(RoundedCornerShape(topStart = cornerRadius, topEnd = cornerRadius))
+                                    .clip(
+                                        RoundedCornerShape(
+                                            topStart = cornerRadius,
+                                            topEnd = cornerRadius
+                                        )
+                                    ),
+                                contentScale = ContentScale.Crop
                             )
                         }
-
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(
-                                text = item.title,
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color.Black
-                                )
-                            )
-
-                            Spacer(modifier = Modifier.height(4.dp))
-
-                            Text(
-                                text = item.description,
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    fontWeight = FontWeight.Normal,
-                                    color = Color.Black
-                                ),
-                                maxLines = 2
+                        item.imageResId != null -> {
+                            Image(
+                                painter = painterResource(id = item.imageResId),
+                                contentDescription = item.title,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(120.dp)
+                                    .clip(
+                                        RoundedCornerShape(
+                                            topStart = cornerRadius,
+                                            topEnd = cornerRadius
+                                        )
+                                    ),
+                                contentScale = ContentScale.Crop
                             )
                         }
+                    }
+
+                    // TEXT (below)
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = item.title,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.Black
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Text(
+                            text = item.description,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = Color.Black
+                            ),
+                            maxLines = 2
+                        )
                     }
                 }
             }
         }
     }
 }
+
+
 
 
 
@@ -688,19 +697,19 @@ fun BottomNavBar(
                 },
             contentAlignment = Alignment.Center
         ) {
+
             Image(
                 painter = painterResource(id = R.drawable.camera_fill),
                 contentDescription = "Camera",
                 modifier = Modifier.size(30.dp)
             )
         }
-
-
-
-
-
     }
 }
+
+
+
+
 
 @Preview(showBackground = true)
 @Composable

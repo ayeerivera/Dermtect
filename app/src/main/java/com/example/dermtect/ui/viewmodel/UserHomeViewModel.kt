@@ -120,8 +120,11 @@ class UserHomeViewModel(application: Application) : AndroidViewModel(application
                             .takeIf { it != 0 }
                     } else null
 
+                    val imageUrl = doc.getString("imageUrl") // ✅ Fetch image URL from Firestore
+
                     NewsItem(
                         imageResId = imageResId,
+                        imageUrl = imageUrl,                  // ✅ Add it here
                         title = doc.getString("title") ?: "",
                         description = doc.getString("description") ?: "",
                         body = doc.getString("body") ?: "",
@@ -130,6 +133,7 @@ class UserHomeViewModel(application: Application) : AndroidViewModel(application
                         isHighlight = doc.getBoolean("isHighlight") ?: false
                     )
                 }
+
 
                 // Split highlight vs normal
                 _highlightItem.value = items.find { it.isHighlight }

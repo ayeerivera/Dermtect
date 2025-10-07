@@ -66,6 +66,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.material3.*
@@ -84,6 +85,7 @@ import com.example.dermtect.util.SkinGateResult
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.style.TextAlign
 import kotlin.math.max
 import kotlin.math.min
@@ -256,7 +258,6 @@ fun TakePhotoScreen(
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .offset(y = (-80).dp)
             ) {
                 drawRect(color = Color.Black.copy(alpha = 0.7f), size = size)
 
@@ -337,7 +338,7 @@ fun TakePhotoScreen(
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 100.dp),
+                .padding(top = 150.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
@@ -386,13 +387,30 @@ fun TakePhotoScreen(
 
             // 📸 Camera button (center) — gated by SkinGate
             val canShoot = canCapture
-            val enabledColor = Color(0xFF0FB2B2)
+            val enabledColor = Color(0xFFCDFFFF)
             val disabledColor = Color(0xFFBDBDBD)
 
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .size(65.dp)
+                    .shadow(
+                        elevation = 6.dp,
+                        shape = CircleShape,
+                        clip = false
+                    )
+                    // Outer border for a thicker, more visible stroke effect
+                    .border(
+                        width = 1.dp, // Thicker outer border for more visibility
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xFFBFFDFD), // Lighter outer shade
+                                Color(0xFF88E7E7), // Medium teal
+                                Color(0xFF41A6A6)  // Darker teal
+                            )
+                        ),
+                        shape = CircleShape
+                    )
                     .background(if (canShoot) enabledColor else disabledColor, shape = CircleShape)
                     .then(
                         if (canShoot) {
@@ -455,9 +473,6 @@ fun TakePhotoScreen(
                 )
             }
 
-
-            // ⚡ Flash mode (right, cyan text/icon, no circle background)
-            // ⚡ Flash mode (right) — same position, cyan color, fully clickable
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
