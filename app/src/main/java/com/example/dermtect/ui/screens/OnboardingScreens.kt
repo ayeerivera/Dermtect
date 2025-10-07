@@ -44,6 +44,9 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.example.dermtect.ui.components.BackButton
 import com.example.dermtect.ui.components.ProgressIndicator
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import com.example.dermtect.data.OnboardingPrefs
 
 
 @Composable
@@ -257,18 +260,29 @@ fun OnboardingScreen2(navController: NavController) {
 
 @Composable
 fun OnboardingScreen3(navController: NavController) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
     OnboardingScreen(
         imageRes = com.example.dermtect.R.drawable.skin_health,
         title = "Your Skin Health,\nJust a Tap Away",
         description = "Easy, private, and reliable early detection—anytime, anywhere.",
-        onNextClick = { navController.navigate("login") },
+        onNextClick = {
+            scope.launch {
+                // ✅ mark onboarding as completed (stored in DataStore)
+                OnboardingPrefs.setSeen(context)
+
+                // then go to Login
+                navController.navigate("login") {
+                    popUpTo(0) { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
+        },
         onBackClick = { navController.popBackStack() }, // ✅ back to previous
         currentIndex = 2
-
-
     )
 }
-
 
 @Preview(showBackground = true)
 @Composable

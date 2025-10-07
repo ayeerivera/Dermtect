@@ -82,6 +82,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.navigation.NavController
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.delay
+import com.example.dermtect.data.OnboardingPrefs
+import com.google.firebase.auth.FirebaseAuth
 
 
 class MainActivity : ComponentActivity() {
@@ -103,46 +109,61 @@ class MainActivity : ComponentActivity() {
                 val authState by authVm.authState.collectAsState()
 
                 NavHost(navController = navController, startDestination = "splash") {
+
                     composable("splash") {
+                        val context = LocalContext.current
                         SplashScreen(navController)
 
-                        // Ensure we only navigate once
-                        var didRoute by remember { mutableStateOf(false) }
+                        var didRoute by rememberSaveable { mutableStateOf(false) }
 
+                        // 🔹 Fast-path: if Firebase already has a user, skip onboarding/login immediately
+                        LaunchedEffect(Unit) {
+                            if (didRoute) return@LaunchedEffect
+                            val existingUser = FirebaseAuth.getInstance().currentUser
+                            if (existingUser != null) {
+                                // tiny delay so splash paints at least a frame
+                                delay(250)
+                                didRoute = true
+                                navController.navigate("user_home") {
+                                    popUpTo("splash") { inclusive = true }
+                                    launchSingleTop = true
+                                }
+                            }
+                        }
+
+                        // 🔹 Otherwise, react to your AuthViewModel state
                         LaunchedEffect(authState) {
                             if (didRoute) return@LaunchedEffect
 
                             when (authState) {
                                 AuthViewModel.AuthUiState.Loading -> {
-                                    // Do nothing; show Splash until Firebase resolves session
-                                }
-
-                                AuthViewModel.AuthUiState.SignedOut -> {
-                                    // Let the splash actually draw once
-                                    kotlinx.coroutines.delay(400)
-                                    didRoute = true
-                                    navController.navigate("login") {
-                                        popUpTo("splash") { inclusive = true }
-                                        launchSingleTop = true
-                                    }
-                                }
-
-                                is AuthViewModel.AuthUiState.EmailUnverified -> {
-                                    kotlinx.coroutines.delay(400)
-                                    didRoute = true
-                                    navController.navigate("login") {
-                                        popUpTo("splash") { inclusive = true }
-                                        launchSingleTop = true
-                                    }
+                                    // show Splash while Firebase restores session
                                 }
 
                                 is AuthViewModel.AuthUiState.SignedIn -> {
-                                    // If user is logged in, skip splash+login entirely
-                                    kotlinx.coroutines.delay(400)
+                                    delay(250)
                                     didRoute = true
                                     navController.navigate("user_home") {
                                         popUpTo("splash") { inclusive = true }
                                         launchSingleTop = true
+                                    }
+                                }
+
+                                AuthViewModel.AuthUiState.SignedOut,
+                                is AuthViewModel.AuthUiState.EmailUnverified -> {
+                                    val seen = OnboardingPrefs.hasSeen(context)
+                                    delay(250)
+                                    didRoute = true
+                                    if (!seen) {
+                                        navController.navigate("onboarding_screen1") {
+                                            popUpTo("splash") { inclusive = true }
+                                            launchSingleTop = true
+                                        }
+                                    } else {
+                                        navController.navigate("login") {
+                                            popUpTo("splash") { inclusive = true }
+                                            launchSingleTop = true
+                                        }
                                     }
                                 }
                             }

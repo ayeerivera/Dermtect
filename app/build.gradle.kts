@@ -128,4 +128,7 @@ dependencies {
     implementation ("com.squareup.okhttp3:okhttp:4.12.0") // for Overpass API calls
     implementation ("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1") // parse JSON
     implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    implementation ("androidx.datastore:datastore-preferences:1.1.1")
+
 }
