@@ -78,6 +78,9 @@ import androidx.compose.ui.platform.LocalContext
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.example.cameradermtect.CameraPermissionGate
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 
 
 class MainActivity : ComponentActivity() {
@@ -102,13 +105,21 @@ class MainActivity : ComponentActivity() {
                     composable("splash") {
                         SplashScreen(navController)
 
+                        // Ensure we only navigate once
+                        var didRoute by remember { mutableStateOf(false) }
+
                         LaunchedEffect(authState) {
+                            if (didRoute) return@LaunchedEffect
+
                             when (authState) {
                                 AuthViewModel.AuthUiState.Loading -> {
-                                    // do nothing; wait for Firebase to restore the session
+                                    // Do nothing; show Splash until Firebase resolves session
                                 }
 
                                 AuthViewModel.AuthUiState.SignedOut -> {
+                                    // Let the splash actually draw once
+                                    kotlinx.coroutines.delay(400)
+                                    didRoute = true
                                     navController.navigate("login") {
                                         popUpTo("splash") { inclusive = true }
                                         launchSingleTop = true
@@ -116,7 +127,8 @@ class MainActivity : ComponentActivity() {
                                 }
 
                                 is AuthViewModel.AuthUiState.EmailUnverified -> {
-                                    // Minimal: still send to login (or create a VerifyEmail screen later)
+                                    kotlinx.coroutines.delay(400)
+                                    didRoute = true
                                     navController.navigate("login") {
                                         popUpTo("splash") { inclusive = true }
                                         launchSingleTop = true
@@ -124,6 +136,9 @@ class MainActivity : ComponentActivity() {
                                 }
 
                                 is AuthViewModel.AuthUiState.SignedIn -> {
+                                    // If user is logged in, skip splash+login entirely
+                                    kotlinx.coroutines.delay(400)
+                                    didRoute = true
                                     navController.navigate("user_home") {
                                         popUpTo("splash") { inclusive = true }
                                         launchSingleTop = true

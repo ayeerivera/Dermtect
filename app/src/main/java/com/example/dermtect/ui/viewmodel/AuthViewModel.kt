@@ -2,7 +2,6 @@ package com.example.dermtect.ui.viewmodel
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import com.example.dermtect.domain.usecase.AuthUseCase
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
@@ -20,7 +19,7 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
     private val auth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
 
-    // --- Loading / Result flags (kept for backward compatibility) --- //
+    // --- Loading / Result flags (legacy/back-compat) --- //
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading
 
@@ -40,27 +39,33 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
     sealed interface AuthUiState {
         data object Loading : AuthUiState
         data object SignedOut : AuthUiState
-        data class EmailUnverified(val user: FirebaseUser) : AuthUiState
-        data class SignedIn(val user: FirebaseUser) : AuthUiState
+        data class EmailUnverified(val uid: String, val email: String?) : AuthUiState
+        data class SignedIn(val uid: String, val emailVerified: Boolean) : AuthUiState
     }
 
     private val _authState = MutableStateFlow<AuthUiState>(AuthUiState.Loading)
     val authState: StateFlow<AuthUiState> = _authState
 
+    // We rely on the Firebase listener (which fires once upon add). Do NOT call it manually.
+    private var gotFirstCallback = false
+
     private val authListener = FirebaseAuth.AuthStateListener { fa ->
         val user = fa.currentUser
+        gotFirstCallback = true
         if (user == null) {
+            // No session -> SignedOut
             _authState.value = AuthUiState.SignedOut
         } else {
-            // Evaluate role-based access + email verification on every session restore
+            // Have session -> evaluate role & verification from Firestore
             evaluateUserState(user)
         }
     }
 
     init {
+        // Keep UI in Loading until listener fires the FIRST time.
+        // This lets your Splash actually show while Firebase restores session.
+        _authState.value = AuthUiState.Loading
         auth.addAuthStateListener(authListener)
-        // Fire immediately to reflect current session on cold start
-        authListener.onAuthStateChanged(auth)
     }
 
     override fun onCleared() {
@@ -85,16 +90,24 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
 
     // --- Helper: Evaluate current user for routing (derma bypass) --- //
     private fun evaluateUserState(user: FirebaseUser) {
-        _authState.value = AuthUiState.Loading
+        // Avoid unnecessary flicker back to Loading if we already know the user is logged in.
         firestore.collection("users").document(user.uid).get()
             .addOnSuccessListener { doc ->
                 val role = doc.getString("role") ?: "patient"
-                val allow = role == "derma" || user.isEmailVerified
-                _authState.value = if (allow) AuthUiState.SignedIn(user) else AuthUiState.EmailUnverified(user)
+                val allow = (role == "derma") || user.isEmailVerified
+                _authState.value = if (allow) {
+                    AuthUiState.SignedIn(user.uid, user.isEmailVerified)
+                } else {
+                    AuthUiState.EmailUnverified(user.uid, user.email)
+                }
             }
             .addOnFailureListener {
                 // If role fetch fails, fall back to plain email verification
-                _authState.value = if (user.isEmailVerified) AuthUiState.SignedIn(user) else AuthUiState.EmailUnverified(user)
+                _authState.value = if (user.isEmailVerified) {
+                    AuthUiState.SignedIn(user.uid, true)
+                } else {
+                    AuthUiState.EmailUnverified(user.uid, user.email)
+                }
             }
     }
 
@@ -116,8 +129,8 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
                     return@addOnCompleteListener
                 }
 
-                val formattedFirstName = firstName.lowercase().replaceFirstChar { it.uppercaseChar().toString() }
-                val formattedLastName = lastName.lowercase().replaceFirstChar { it.uppercaseChar().toString() }
+                val formattedFirstName = firstName.lowercase().replaceFirstChar { it.uppercaseChar() }
+                val formattedLastName = lastName.lowercase().replaceFirstChar { it.uppercaseChar() }
 
                 val userData = hashMapOf(
                     "uid" to user.uid,
@@ -187,16 +200,16 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
                                 ).addOnSuccessListener {
                                     logAudit(user.uid, user.email, "login")
                                     _authSuccess.value = true
-                                    _navigateToHome.value = true // kept for backward compatibility
+                                    _navigateToHome.value = true // legacy signal
                                     onSuccess()
-                                    // Listener will emit SignedIn soon after
+                                    // Listener will emit SignedIn after this anyway
                                 }.addOnFailureListener {
                                     onError("Verified but failed to update Firestore.")
                                 }
                             } else {
-                                // IMPORTANT: do NOT sign out here. Keep session and let UI show Verify screen.
+                                // Keep session; UI can show a Verify screen if you have one.
                                 onError("Please verify your email first.")
-                                evaluateUserState(user) // will emit EmailUnverified
+                                _authState.value = AuthUiState.EmailUnverified(user.uid, user.email)
                             }
                         }
                         .addOnFailureListener {
@@ -340,6 +353,7 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
     // --- Error helpers --- //
     fun clearError() { _errorMessage.value = null }
     fun resetAuthSuccess() { _authSuccess.value = false }
-}
 
-// Optional: Factory for creating AuthViewModel with AuthUseCase
+    // --- Optional helpers --- //
+    fun currentUserUid(): String? = auth.currentUser?.uid
+}

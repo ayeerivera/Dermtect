@@ -43,6 +43,7 @@ import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import org.osmdroid.config.Configuration
 import android.widget.Toast
+import org.osmdroid.util.BoundingBox // 🔹 added
 
 @Composable
 fun NearbyClinicsScreen(
@@ -117,13 +118,8 @@ fun NearbyClinicsScreen(
         user?.let { overpassVm.fetchNearbyDermatology(radiusMeters = 5000) }
     }
 
-    val lastCentered = remember { mutableStateOf<GeoPoint?>(null) }
-    val recenterMetersThreshold = 25.0
-    fun shouldRecenter(prev: GeoPoint?, next: GeoPoint): Boolean {
-        if (prev == null) return true
-        val d = distanceMeters(prev.latitude, prev.longitude, next.latitude, next.longitude)
-        return d >= recenterMetersThreshold
-    }
+    // Track last “fit set” so we don’t keep re-fitting unless points changed
+    val lastFitSignature = remember { mutableStateOf<String?>(null) }
 
     BubblesBackground {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -159,7 +155,7 @@ fun NearbyClinicsScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // =======================================
-                // 🔹 FIXED Turn On Location button
+                // 🔹 Turn On Location button (unchanged)
                 // =======================================
                 Box(
                     modifier = Modifier
@@ -204,7 +200,7 @@ fun NearbyClinicsScreen(
 
                 Spacer(modifier = Modifier.height(25.dp))
 
-                // === map and other existing code remain unchanged ===
+                // === Map view (UI unchanged; internals updated to fit bounds) ===
                 AndroidView(
                     modifier = Modifier
                         .size(width = 335.dp, height = 248.dp)
@@ -216,7 +212,8 @@ fun NearbyClinicsScreen(
                             setTilesScaledToDpi(true)
                             isHorizontalMapRepetitionEnabled = true
                             controller.setZoom(14.0)
-                            controller.setCenter(GeoPoint(14.5995, 120.9842))
+                            controller.setCenter(GeoPoint(14.5995, 120.9842)) // default (Manila)
+
                             setOnTouchListener { v, e ->
                                 when (e.actionMasked) {
                                     android.view.MotionEvent.ACTION_DOWN,
@@ -234,18 +231,13 @@ fun NearbyClinicsScreen(
                         }
                     },
                     update = { map ->
+                        // Clear old markers
                         map.overlays.removeAll { it is Marker }
 
-                        user?.let { u ->
-                            val target = GeoPoint(u.lat, u.lon)
-                            if (shouldRecenter(lastCentered.value, target)) {
-                                map.controller.animateTo(target)
-                                lastCentered.value = target
-                            }
-                        } ?: run {
-                            map.controller.setCenter(GeoPoint(14.5995, 120.9842))
-                        }
+                        // Collect all points we want to keep in view
+                        val points = mutableListOf<GeoPoint>()
 
+                        // User marker (red)
                         user?.let { u ->
                             val ctx = map.context
                             val redIcon = ContextCompat.getDrawable(ctx, R.drawable.location_icon)
@@ -259,8 +251,10 @@ fun NearbyClinicsScreen(
                                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                             }
                             map.overlays.add(me)
+                            points += me.position
                         }
 
+                        // Clinics (OSM first; else manual; else fallback list)
                         if (osmClinics.isNotEmpty()) {
                             osmClinics.forEach { c ->
                                 val marker = Marker(map).apply {
@@ -274,8 +268,9 @@ fun NearbyClinicsScreen(
                                     }
                                 }
                                 map.overlays.add(marker)
+                                points += marker.position
                             }
-                        } else {
+                        } else if (ManualClinics.items.isNotEmpty()) {
                             val u = user
                             ManualClinics.items.forEach { c ->
                                 val distKm = u?.let { uu ->
@@ -295,6 +290,51 @@ fun NearbyClinicsScreen(
                                     }
                                 }
                                 map.overlays.add(marker)
+                                points += marker.position
+                            }
+                        } else {
+                            // Fallback Firestore list (no coordinates => just leave the map as-is)
+                            // (Your list below handles the textual list)
+                            if (user != null) {
+                                // keep user-centered if no clinic coords
+                                // (handled by fit logic below)
+                            }
+                        }
+
+                        // ==============================
+                        // 🔹 Auto-fit: center user & show ALL clinics on first render/when set changes
+                        // ==============================
+                        if (points.isNotEmpty()) {
+                            val signature = buildString {
+                                points.sortedBy { it.latitude * 1000 + it.longitude }.forEach {
+                                    append("%.5f,%.5f|".format(it.latitude, it.longitude))
+                                }
+                            }
+                            if (signature != lastFitSignature.value) {
+                                // New/changed set => fit bounds
+                                val bbox = BoundingBox.fromGeoPointsSafe(points)
+                                // Small padding in degrees via a tiny expansion (about ~1–2%):
+                                val padLat = (bbox.latNorth - bbox.latSouth) * 0.10
+                                val padLon = (bbox.lonEast - bbox.lonWest) * 0.10
+
+                                val padded = BoundingBox(
+                                    bbox.latNorth + padLat,
+                                    bbox.lonEast + padLon,
+                                    bbox.latSouth - padLat,
+                                    bbox.lonWest - padLon
+                                )
+                                // Animate to show everything
+                                map.zoomToBoundingBox(padded, true)
+                                lastFitSignature.value = signature
+                            }
+                        } else {
+                            // Nothing to fit yet: center default (or user if present)
+                            if (user != null) {
+                                map.controller.setZoom(15.0)
+                                map.controller.setCenter(GeoPoint(user!!.lat, user!!.lon))
+                            } else {
+                                map.controller.setZoom(12.0)
+                                map.controller.setCenter(GeoPoint(14.5995, 120.9842))
                             }
                         }
 
@@ -333,8 +373,13 @@ fun NearbyClinicsScreen(
                 val finalClinics: List<ListItem> = when {
                     osmClinics.isNotEmpty() -> {
                         osmClinics.map {
-                            ListItem(it.name, null, it.address ?: "No address",
-                                String.format("%.2fkm", it.distanceMeters / 1000.0), null)
+                            ListItem(
+                                it.name,
+                                null,
+                                it.address ?: "No address",
+                                String.format("%.2fkm", it.distanceMeters / 1000.0),
+                                null
+                            )
                         }
                     }
                     ManualClinics.items.isNotEmpty() -> {

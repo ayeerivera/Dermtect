@@ -13,7 +13,7 @@ object ManualClinics {
     // TODO: fill in real contact numbers if you have them
     val items = listOf(
         ManualClinic(
-            clinicName = "DERM.I.S.",
+            clinicName = "SKINscription PH",
             doctorName = "Dr. Giselle Tioleco-Ver",
             address = "Rm. 212, City Medical Plaza, B. Mendoza, San Fernando, 2000 Pampanga",
             contact = "0910 422 8687",
@@ -29,7 +29,7 @@ object ManualClinics {
             lon = 120.68453683779991
         ),
         ManualClinic(
-            clinicName = "SKINscription PH",
+            clinicName = "DERM.I.S.",
             doctorName = "Dr. Celina Faye Manalastas, MD, DPDS",
             address = "Brgy, Santo Rosario St, Angeles, 2009 Pampanga",
             contact = "0961 409 6490",
