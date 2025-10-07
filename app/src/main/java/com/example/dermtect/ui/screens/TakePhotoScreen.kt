@@ -92,7 +92,11 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import com.example.dermtect.util.SkinGateConfig
 import com.example.dermtect.util.analyzeImageForSkin
-
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 
 // ---------- Small utilities ----------
 fun nowTimestamp(): String {
@@ -526,13 +530,23 @@ fun TakePhotoScreen(
 
                     if (!isRunning && inferenceResult == null) {
                         isRunning = true
-                        val r = withContext(Dispatchers.Default) { tfService.infer(image) }
-                        modelFlag = if (r.probability >= 0.0112f) "Malignant" else "Benign"
-                        val merged = r.heatmap?.let { overlayBitmaps(image, it, 115) }
-                        inferenceResult = r.copy(heatmap = merged)
-                        isRunning = false
+                        try {
+                            val r = withTimeout(TimeoutConfig.INFER_MS) {
+                                withContext(Dispatchers.Default) { tfService.infer(image) }
+                            }
+                            modelFlag = if (r.probability >= 0.0112f) "Malignant" else "Benign"
+                            val merged = r.heatmap?.let { overlayBitmaps(image, it, 115) }
+                            inferenceResult = r.copy(heatmap = merged)
+                        } catch (t: TimeoutCancellationException) {
+                            inferenceResult = null
+                            Toast.makeText(context, "Analysis took too long. Please retake or try again.", Toast.LENGTH_LONG).show()
+                            capturedImage = null
+                        } finally {
+                            isRunning = false
+                        }
                     }
                 }
+
 
                 Box(
                     modifier = Modifier
@@ -555,19 +569,27 @@ fun TakePhotoScreen(
                             val r = inferenceResult!!
                             val riskCopy = generateTherapeuticMessage(r.probability)
 
-                            // Auto-upload once per capture
                             LaunchedEffect(capturedImage, r, hasUploaded) {
                                 if (!hasUploaded && capturedImage != null) {
+                                    if (!isOnline(context)) {
+                                        Toast.makeText(context, "No internet. Upload skipped.", Toast.LENGTH_SHORT).show()
+                                        hasUploaded = true // prevent endless retries; user can Save manually later
+                                        return@LaunchedEffect
+                                    }
                                     val ok = uploadScanWithLabel(
                                         bitmap = capturedImage!!,
                                         heatmap = r.heatmap,
                                         probability = r.probability,
                                         prediction = modelFlag
                                     )
-                                    Log.d("Upload", if (ok) "Scan saved" else "Save failed")
+                                    Log.d("Upload", if (ok) "Scan saved" else "Save failed or timed out")
                                     hasUploaded = true
+                                    if (!ok) {
+                                        Toast.makeText(context, "Upload failed or timed out. Try again later.", Toast.LENGTH_LONG).show()
+                                    }
                                 }
                             }
+
 
                             LesionCaseTemplate(
                                 imageBitmap = image,
@@ -810,10 +832,17 @@ fun TakePhotoScreen(
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return false
         val db = FirebaseFirestore.getInstance()
 
+        // Tighter retry windows so Firebase SDK doesn’t keep retrying forever in the background
+        FirebaseStorage.getInstance().apply {
+            maxUploadRetryTimeMillis = TimeoutConfig.UPLOAD_MS
+            maxOperationRetryTimeMillis = TimeoutConfig.UPLOAD_MS
+            maxDownloadRetryTimeMillis = TimeoutConfig.URL_MS
+        }
+
         // 1) Reserve Firestore doc id + "Scan N" label (you already have this repo)
         val (caseId, label) = ScanRepository.reserveScanLabelAndId(db, uid)
 
-        // 2) Prepare Storage refs
+
         val storage = FirebaseStorage.getInstance().reference
         val photoRef = storage.child("users/$uid/scans/$caseId.jpg")
         val heatmapRef = storage.child("users/$uid/scans/${caseId}_heatmap.jpg")
@@ -822,8 +851,15 @@ fun TakePhotoScreen(
         val photoBytes = ByteArrayOutputStream().apply {
             bitmap.compress(Bitmap.CompressFormat.JPEG, 90, this)
         }.toByteArray()
-        photoRef.putBytes(photoBytes).await()
-        val photoUrl = photoRef.downloadUrl.await().toString()
+        val photoTask = photoRef.putBytes(photoBytes)
+        val photoSnap = withTimeoutOrNull(TimeoutConfig.UPLOAD_MS) { photoTask.await() }
+            ?: run {
+                photoTask.cancel()
+                return false
+            }
+        val photoUrl = withTimeoutOrNull(TimeoutConfig.URL_MS) {
+            photoRef.downloadUrl.await().toString()
+        } ?: return false
 
         // 4) Upload heatmap (if provided)
         var heatmapUrl: String? = null
@@ -831,9 +867,16 @@ fun TakePhotoScreen(
             val heatmapBytes = ByteArrayOutputStream().apply {
                 heatmap.compress(Bitmap.CompressFormat.JPEG, 90, this)
             }.toByteArray()
-            heatmapRef.putBytes(heatmapBytes).await()
-            heatmapUrl = heatmapRef.downloadUrl.await().toString()
-        }
+            val heatTask = heatmapRef.putBytes(heatmapBytes)
+            val heatSnap = withTimeoutOrNull(TimeoutConfig.UPLOAD_MS) { heatTask.await() }
+                ?: run {
+                    heatTask.cancel()
+                    return false // or proceed without heatmap if you prefer
+                }
+
+            heatmapUrl = withTimeoutOrNull(TimeoutConfig.URL_MS) {
+                heatmapRef.downloadUrl.await().toString()
+            } ?: return false        }
 
         // 5) Firestore metadata
         val doc = hashMapOf(
@@ -848,10 +891,12 @@ fun TakePhotoScreen(
             "heatmap_url" to heatmapUrl            // may be null if no heatmap
         )
 
+        val writeOk = withTimeoutOrNull(TimeoutConfig.FIRESTORE_MS) {
+            db.collection("lesion_case").document(caseId).set(doc).await()
+            true
+        } ?: false
 
-        db.collection("lesion_case").document(caseId).set(doc).await()
-        return true
-
+        return writeOk
     }
 
     @Composable
@@ -1007,4 +1052,18 @@ private fun ImageProxy.toBitmapFast(): Bitmap {
         postRotate(imageInfo.rotationDegrees.toFloat())
     }
     return Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, matrix, true)
+}
+private object TimeoutConfig {
+    const val INFER_MS = 120_000L           // max time allowed for local model
+    const val UPLOAD_MS = 15_000L         // max time per Storage upload
+    const val URL_MS = 15_000L             // max time to get downloadUrl
+    const val FIRESTORE_MS = 15_000L       // max time for Firestore write
+}
+
+// ---- Network guard (fast check) ----
+private fun isOnline(ctx: Context): Boolean {
+    val cm = ctx.getSystemService(ConnectivityManager::class.java)
+    val nc = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
+    return nc.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) ||
+            nc.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
 }

@@ -92,12 +92,7 @@ fun HistoryScreenTemplate(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(end = 10.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), // light background
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    .padding(horizontal = 12.dp, vertical = 6.dp), // internal padding inside the background
+                    .padding(end = 10.dp),
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {

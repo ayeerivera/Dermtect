@@ -81,6 +81,7 @@ import com.example.cameradermtect.CameraPermissionGate
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.navigation.NavController
 
 
 class MainActivity : ComponentActivity() {
@@ -206,9 +207,12 @@ class MainActivity : ComponentActivity() {
                     composable("case_detail/{caseId}") { backStackEntry ->
                         val caseId = backStackEntry.arguments?.getString("caseId")!!
                         LesionCaseScreen(
+                            navController = navController,
                             caseId = caseId,
                             onBackClick = { navController.popBackStack()},
-                            onFindClinicClick = { navController.navigate("nearby_clinics")}
+                            onFindClinicClick = { navController.navigate("nearby_clinics")},
+                            onNavigateToAssessment = { navController.navigate("questionnaire") }   // ✅
+
                         )
                     }
 

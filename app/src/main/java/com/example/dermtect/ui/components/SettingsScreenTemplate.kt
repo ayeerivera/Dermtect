@@ -24,6 +24,9 @@ import androidx.navigation.NavController
 import com.example.dermtect.R
 import com.example.dermtect.ui.viewmodel.UserHomeViewModel
 import android.net.Uri
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.Icons
@@ -35,8 +38,16 @@ import coil.compose.AsyncImage
 import androidx.compose.material.icons.filled.Close
 import com.example.dermtect.ui.viewmodel.SharedProfileViewModel
 import androidx.compose.material.icons.filled.Logout
-
-
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.provider.Settings
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 @Composable
 fun SettingsScreenTemplate(
@@ -46,8 +57,9 @@ fun SettingsScreenTemplate(
     onLogout: () -> Unit = {}
 ) {
     var showPhoto by remember { mutableStateOf(false) }
-    var notificationsEnabled by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var showNotifTurnOffDialog by remember { mutableStateOf(false) }
+
     val userHomeViewModel: UserHomeViewModel = viewModel()
     val firstName by userHomeViewModel.firstName.collectAsState()
     val lastName by userHomeViewModel.lastName.collectAsState()
@@ -56,6 +68,31 @@ fun SettingsScreenTemplate(
     val selectedImageUri by sharedProfileViewModel.selectedImageUri.collectAsState()
     val role by userHomeViewModel.role.collectAsState(initial = null)
     val collection = if (role == "derma") "dermas" else "users"
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+// ✅ initialize toggle based on actual permission
+    var notificationsEnabled by remember(context) {
+        mutableStateOf(isNotificationPermissionGranted(context))
+    }
+
+// ✅ request permission; when result returns, update the toggle
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        notificationsEnabled = granted
+    }
+
+// ✅ when we return from system dialog / app settings, re-check permission
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                notificationsEnabled = isNotificationPermissionGranted(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     LaunchedEffect(Unit) {
         sharedProfileViewModel.loadPhoto("users")
@@ -215,8 +252,24 @@ fun SettingsScreenTemplate(
                         },
                         label = "Notification",
                         checked = notificationsEnabled,
-                        onCheckedChange = { notificationsEnabled = it },
-                        onClick = {
+                        onCheckedChange = { newValue ->
+                            if (newValue) {
+                                // Turn ON
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                } else {
+                                    notificationsEnabled = true
+                                }
+                            } else {
+                                // Ask first before jumping to Settings
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    showNotifTurnOffDialog = true
+                                } else {
+                                    notificationsEnabled = false
+                                }
+                            }
+                        },
+                                onClick = {
                             navController.navigate("notifications")
                         }
                     )
@@ -300,6 +353,30 @@ fun SettingsScreenTemplate(
         secondaryText = "Stay logged in",
         onSecondary = { showLogoutDialog = false },
         onDismiss = { showLogoutDialog = false }
+    )
+    DialogTemplate(
+        show = showNotifTurnOffDialog,
+        title = "Turn off notifications?",
+        description = "You’ll stop receiving alerts from Dermtect.",
+        primaryText = "Confirm",
+        onPrimary = {
+            // Reflect OFF locally
+            notificationsEnabled = false
+            // Optional: take them to app settings if they want to fully disable it
+            openAppNotificationSettings(context)
+            showNotifTurnOffDialog = false
+        },
+        secondaryText = "Cancel",
+        onSecondary = {
+            // Keep it ON
+            notificationsEnabled = true
+            showNotifTurnOffDialog = false
+        },
+        onDismiss = {
+            // Keep it ON if dismissed
+            notificationsEnabled = true
+            showNotifTurnOffDialog = false
+        }
     )
 }
 @Composable
@@ -456,4 +533,18 @@ fun NotificationRow(
                 .clickable { onCheckedChange(!checked) }
         )
     }
+}
+private fun isNotificationPermissionGranted(context: Context): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+    return ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.POST_NOTIFICATIONS
+    ) == PackageManager.PERMISSION_GRANTED
+}
+
+private fun openAppNotificationSettings(context: Context) {
+    val intent = android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+        putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+    }
+    context.startActivity(intent)
 }

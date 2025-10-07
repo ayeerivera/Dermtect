@@ -45,14 +45,17 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 
 
 @Composable
 fun LesionCaseScreen(
+    navController: NavController,
     caseId: String,
     onBackClick: () -> Unit,
-    onFindClinicClick: () -> Unit
+    onFindClinicClick: () -> Unit,
+    onNavigateToAssessment: () -> Unit
 ) {
     // --- Essentials
     val db = remember { FirebaseFirestore.getInstance() }
@@ -65,6 +68,7 @@ fun LesionCaseScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     var fullImagePage by remember { mutableStateOf<Int?>(null) } // 0 = photo, 1 = heatmap
+    var showQaRequiredDialog by remember { mutableStateOf(false) }  // ✅ ADD
 
     val questions = remember {
         listOf(
@@ -186,17 +190,18 @@ fun LesionCaseScreen(
                             val qa = existingAnswers
                             val notCompleted = (qa == null) || qa.any { it == null }
                             if (notCompleted) {
-                                snackbarHostState.showSnackbar(
-                                    "Please complete the questionnaire before downloading the PDF."
-                                )
+                                showQaRequiredDialog =
+                                    true    // ✅ show the clickable dialog instead of snackbar
                                 return@launch
                             }
 
+
                             // Build (Q → Yes/No) pairs for the PDF, using the same order
-                            val answerPairs: List<Pair<String, String>> = questions.indices.map { i ->
-                                val a = qa!![i] ?: false
-                                questions[i] to if (a) "Yes" else "No"
-                            }
+                            val answerPairs: List<Pair<String, String>> =
+                                questions.indices.map { i ->
+                                    val a = qa!![i] ?: false
+                                    questions[i] to if (a) "Yes" else "No"
+                                }
 
                             try {
                                 val photo = imageBitmap
@@ -262,6 +267,63 @@ fun LesionCaseScreen(
                         }
                     }
                 }
+                if (showQaRequiredDialog) {
+                    com.example.dermtect.ui.components.DialogTemplate(
+                        show = showQaRequiredDialog,
+                        title = "Complete Assessment Required",
+                        description = "Complete assessment first before exporting your report.",
+                        primaryText = "Go to Assessment Report",
+                        onPrimary = {
+                            showQaRequiredDialog = false
+                            onNavigateToAssessment()
+                        },
+                        secondaryText = "Cancel",
+                        onSecondary = { showQaRequiredDialog = false },
+                        onDismiss = { showQaRequiredDialog = false },
+                        extraContent = {
+                            androidx.compose.foundation.layout.Column(
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                androidx.compose.foundation.layout.Spacer(
+                                    modifier = Modifier.height(
+                                        8.dp
+                                    )
+                                )
+                                Text(
+                                    text = "You can tap the button above, or go manually to:\nSettings → Profile → My Assessment Report",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = Color.DarkGray,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    ),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+
+                                androidx.compose.foundation.layout.Spacer(
+                                    modifier = Modifier.height(
+                                        12.dp
+                                    )
+                                )
+
+                                // 👇 "Why this matters" link that navigates to Terms & Privacy screen
+                                Text(
+                                    text = "🔗 Why this matters",
+                                    color = Color(0xFF0FB2B2),
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontWeight = FontWeight.SemiBold
+                                    ),
+                                    modifier = Modifier
+                                        .clickable {
+                                            showQaRequiredDialog = false
+                                            navController.navigate("terms_privacy")
+                                        }
+                                        .padding(vertical = 4.dp)
+                                )
+                            }
+                        }
+                    )
+                }
 
             }
 
@@ -270,7 +332,7 @@ fun LesionCaseScreen(
 }
 
 @Composable
-private fun ZoomableImage(
+fun ZoomableImage(
     bitmap: Bitmap,
     modifier: Modifier = Modifier,
     minScale: Float = 1f,

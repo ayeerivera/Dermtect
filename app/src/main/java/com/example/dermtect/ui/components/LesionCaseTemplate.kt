@@ -18,6 +18,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,6 +44,7 @@ import com.example.dermtect.R
 import com.example.dermtect.ui.components.BackButton
 import com.example.dermtect.ui.components.BubblesBackground
 import java.util.Locale
+
 
 @Composable
 fun LesionCaseTemplate(
@@ -68,6 +71,7 @@ fun LesionCaseTemplate(
     isSaving: Boolean = false
 
 ) {
+
     val riskMessage = generateTherapeuticMessage(probability)
 
     val frameShape = RoundedCornerShape(12.dp)
@@ -82,6 +86,8 @@ fun LesionCaseTemplate(
             screenHeight * savedHeightFraction,
         label = "imageHeightAnim"
     )
+// add near the top of LesionCaseTemplate, after other vals
+    var fullImagePage by remember { mutableStateOf<Int?>(null) } // 0 = photo, 1 = heatmap
 
     BubblesBackground {
         Column(
@@ -136,7 +142,10 @@ fun LesionCaseTemplate(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(targetHeight)                 // << animated height
-                                .clickable { onImageClick(pagerState.currentPage) }                        ) {
+                                .clickable {
+                                    fullImagePage = pagerState.currentPage
+
+                                }) {
                             HorizontalPager(
                                 state = pagerState,
                                 modifier = Modifier.fillMaxSize()
@@ -176,25 +185,26 @@ fun LesionCaseTemplate(
                             }
                         }
 
-                        Spacer(Modifier.height(8.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            repeat(pages) { i ->
-                                Box(
-                                    Modifier
-                                        .size(8.dp)
-                                        .clip(CircleShape)
-                                        .background(
-                                            if (i == pagerState.currentPage) Color(0xFF90A4AE)
-                                            else Color(0xFFE0E0E0)
-                                        )
-                                )
+                            Spacer(Modifier.height(8.dp))
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                repeat(pages) { i ->
+                                    Box(
+                                        Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (i == pagerState.currentPage) Color(0xFF90A4AE)
+                                                else Color(0xFFE0E0E0)
+                                            )
+                                    )
+                                }
                             }
                         }
                     }
-                }
+
 
                 Spacer(Modifier.height(20.dp))
 
@@ -239,38 +249,72 @@ fun LesionCaseTemplate(
                         ) {
                             Text("Retake")
                         }
+
+                    Spacer(Modifier.height(16.dp))
+                }
+            }
+
+            // Post-save actions (small photo)
+            if (showSecondaryActions) {
+                Text(
+                    text = "You can also",
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(16.dp))
+
+                ResultActionCard(
+                    text = "Download Full PDF Report\n& Risk Assessment Questionnaires",
+                    backgroundColor = Color(0xFFBAFFFF),
+                    imageResId = R.drawable.risk_image,
+                    onClick = onDownloadClick
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                ResultActionCard(
+                    text = "Find Nearby Derma Clinics \nNear You",
+                    backgroundColor = Color(0xFFBAFFD7),
+                    imageResId = R.drawable.nearby_clinics,
+                    onClick = onFindClinicClick
+                )
+            }
+            if (fullImagePage != null) {
+                Dialog(
+                    onDismissRequest = { fullImagePage = null },
+                    properties = DialogProperties(
+                        usePlatformDefaultWidth = false,
+                        decorFitsSystemWindows = false
+                    )
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.10f))
+                            .clickable { fullImagePage = null },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // pick which bitmap to show
+                        val bmp = when (fullImagePage) {
+                            0 -> imageBitmap
+                            1 -> camBitmap ?: imageBitmap
+                            else -> null
+                        }
+
+                        if (bmp != null) {
+                            ZoomableImage(
+                                bitmap = bmp,
+                                onClose = { fullImagePage = null }
+                            )
+                        } else {
+                            Text("No image", color = Color.White)
+                        }
                     }
-                    Spacer(Modifier.height(16.dp))
-                }
-                }
-
-                // Post-save actions (small photo)
-                if (showSecondaryActions) {
-                    Text(
-                        text = "You can also",
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(16.dp))
-
-                    ResultActionCard(
-                        text = "Download Full PDF Report\n& Risk Assessment Questionnaires",
-                        backgroundColor = Color(0xFFBAFFFF),
-                        imageResId = R.drawable.risk_image,
-                        onClick = onDownloadClick
-                    )
-
-                    Spacer(Modifier.height(16.dp))
-
-                    ResultActionCard(
-                        text = "Find Nearby Derma Clinics \nNear You",
-                        backgroundColor = Color(0xFFBAFFD7),
-                        imageResId = R.drawable.nearby_clinics,
-                        onClick = onFindClinicClick
-                    )
                 }
             }
         }
+        }
+
     if (isSaving) {
         Dialog(
             onDismissRequest = {},
@@ -303,7 +347,7 @@ fun LesionCaseTemplate(
         }
     }
 
-}
+}}
 
 
 @OptIn(ExperimentalMaterial3Api::class)

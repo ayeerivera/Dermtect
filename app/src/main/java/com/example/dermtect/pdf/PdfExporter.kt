@@ -238,13 +238,15 @@ fun CreateCasePdfWithDialog(
             show = showDialog,
             title = "Questionnaire Required",
             description = "You must complete your questionnaire before exporting your report.",
+            // Primary = take them to Assessment
             primaryText = "Go to Assessment Report",
             onPrimary = {
-                onNavigateToAssessment()
                 showDialog = false
+                onNavigateToAssessment()
             },
-            tertiaryText = "Cancel",
-            onTertiary = { showDialog = false },
+            // Secondary = cancel/close
+            secondaryText = "Cancel",
+            onSecondary = { showDialog = false },
             onDismiss = { showDialog = false },
             extraContent = {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
