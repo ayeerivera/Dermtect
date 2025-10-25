@@ -10,10 +10,19 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.dermtect.ui.components.HistoryFilterButton
 import com.example.dermtect.ui.components.HistoryScreenTemplate
+import com.example.dermtect.ui.viewmodel.DermaFeed
+import com.example.dermtect.ui.viewmodel.DermaHistoryViewModel
+import com.example.dermtect.ui.viewmodel.DermaHistoryVmFactory
 import com.example.dermtect.ui.viewmodel.HistoryViewModel
 
+// com/example/dermtect/ui/screens/DermaHistoryScreen.kt
 @Composable
-fun DermaHistoryScreen(navController: NavController, vm: HistoryViewModel = viewModel()) {
+fun DermaHistoryScreen(
+    navController: NavController,
+) {
+    val vm: DermaHistoryViewModel = viewModel(
+        factory = DermaHistoryVmFactory(DermaFeed.ALL_CASES)
+    )
     val uiState by vm.state.collectAsState()
 
     var statusFilter by rememberSaveable { mutableStateOf(StatusFilter.ALL) }
@@ -38,13 +47,15 @@ fun DermaHistoryScreen(navController: NavController, vm: HistoryViewModel = view
                     ResultFilter.MALIGNANT -> c.result.equals("malignant", true)
                 }
             }
-            val sorted = filteredByResult.sortedBy { it.createdAt }.let { if (newestFirst) it.reversed() else it }
+            val sorted = filteredByResult
+                .sortedBy { it.createdAt }
+                .let { if (newestFirst) it.reversed() else it }
 
             HistoryScreenTemplate(
                 navController = navController,
                 screenTitle = "History Cases",
                 caseList = sorted,
-                showIndicators = true, // derma: dots allowed
+                showIndicators = true,
                 actions = {
                     HistoryFilterButton(
                         isDerma = true,
@@ -60,3 +71,4 @@ fun DermaHistoryScreen(navController: NavController, vm: HistoryViewModel = view
         }
     }
 }
+

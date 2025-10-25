@@ -47,7 +47,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
-import kotlin.random.Random
 
 
 @Composable
@@ -168,9 +167,6 @@ fun LesionCaseScreen(
             else -> {
                 val tau = 0.0112f
                 val alert = probability >= tau
-                val riskCopy = remember(caseId, probability) {
-                    generateTherapeuticMessage(probability)
-                }
                 val uiPrediction = if (alert) "Malignant" else "Benign"
 
                 LesionCaseTemplate(
@@ -179,13 +175,14 @@ fun LesionCaseScreen(
                     camBitmap = heatmapBitmap,
                     title = title,
                     timestamp = timestampText,
-                    riskTitle = "Risk Assessment:",
-                    riskDescription = riskCopy,
+                    riskTitle = "Risk Assessment",
+                    riskDescription = "", // not used anymore
                     prediction = uiPrediction,
                     probability = probability,
                     onBackClick = onBackClick,
                     showPrimaryButtons = false,
                     showSecondaryActions = true,
+
 
                     onDownloadClick = {
                         scope.launch {

@@ -11,10 +11,19 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.dermtect.ui.components.HistoryFilterButton
 import com.example.dermtect.ui.components.HistoryScreenTemplate
+import com.example.dermtect.ui.viewmodel.DermaFeed
+import com.example.dermtect.ui.viewmodel.DermaHistoryViewModel
+import com.example.dermtect.ui.viewmodel.DermaHistoryVmFactory
 import com.example.dermtect.ui.viewmodel.HistoryViewModel
 
+// com/example/dermtect/ui/screens/PendingCasesScreen.kt
 @Composable
-fun PendingCasesScreen(navController: NavController, vm: HistoryViewModel = viewModel()) {
+fun PendingCasesScreen(
+    navController: NavController,
+) {
+    val vm: DermaHistoryViewModel = viewModel(
+        factory = DermaHistoryVmFactory(DermaFeed.PENDING_ONLY)
+    )
     val uiState by vm.state.collectAsState()
 
     var newestFirst by rememberSaveable { mutableStateOf(true) }
@@ -23,21 +32,22 @@ fun PendingCasesScreen(navController: NavController, vm: HistoryViewModel = view
         uiState.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(uiState.error ?: "Error") }
         else -> {
-            val pendingOnly = uiState.items.filter { it.status.equals("pending", true) }
-            val sorted = pendingOnly.sortedBy { it.createdAt }.let { if (newestFirst) it.reversed() else it }
+            val sorted = uiState.items
+                .sortedBy { it.createdAt }
+                .let { if (newestFirst) it.reversed() else it }
 
             HistoryScreenTemplate(
                 navController = navController,
                 screenTitle = "Pending Cases",
                 caseList = sorted,
-                showIndicators = true, // keep dots
+                showIndicators = true,
                 actions = {
                     HistoryFilterButton(
-                        isDerma = false, // no status/result filter here
+                        isDerma = false,
                         statusFilter = StatusFilter.ALL,
-                        onStatusChange = { },
+                        onStatusChange = { /* no-op for pending-only feed */ },
                         resultFilter = ResultFilter.ALL,
-                        onResultChange = { },
+                        onResultChange = { /* no-op for pending-only feed */ },
                         newestFirst = newestFirst,
                         onSortChange = { newestFirst = it }
                     )

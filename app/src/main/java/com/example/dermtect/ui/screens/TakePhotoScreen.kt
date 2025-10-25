@@ -154,6 +154,8 @@ fun TakePhotoScreen(
     var liveGateResult by remember { mutableStateOf<SkinGateResult?>(null) }
     var canCapture by remember { mutableStateOf(false) }
 
+    var showPrivacyDialog by remember { mutableStateOf(false) }
+    var consentToSave by remember { mutableStateOf(false) }
     // === NEW: questionnaire state (gate PDF download) ===
     val qvm = remember { QuestionnaireViewModel() }
     val existingAnswers by qvm.existingAnswers.collectAsState()
@@ -520,434 +522,489 @@ fun TakePhotoScreen(
 
 
 
-            // Show captured result / analysis
-            capturedImage?.let { image ->
-                // New image → reset state and run inference
-                LaunchedEffect(image) {
-                    hasSaved = false
-                    hasUploaded = false
-                    fullImagePage = null
+        // Show captured result / analysis
+        capturedImage?.let { image ->
+            // New image → reset state and run inference
+            LaunchedEffect(image) {
+                hasSaved = false
+                hasUploaded = false
+                fullImagePage = null
 
-                    if (!isRunning && inferenceResult == null) {
-                        isRunning = true
-                        try {
-                            val r = withTimeout(TimeoutConfig.INFER_MS) {
-                                withContext(Dispatchers.Default) { tfService.infer(image) }
-                            }
-                            modelFlag = if (r.probability >= 0.0112f) "Malignant" else "Benign"
-                            val merged = r.heatmap?.let { overlayBitmaps(image, it, 115) }
-                            inferenceResult = r.copy(heatmap = merged)
-                        } catch (t: TimeoutCancellationException) {
-                            inferenceResult = null
-                            Toast.makeText(context, "Analysis took too long. Please retake or try again.", Toast.LENGTH_LONG).show()
-                            capturedImage = null
-                        } finally {
-                            isRunning = false
+                if (!isRunning && inferenceResult == null) {
+                    isRunning = true
+                    try {
+                        val r = withTimeout(TimeoutConfig.INFER_MS) {
+                            withContext(Dispatchers.Default) { tfService.infer(image) }
                         }
+                        modelFlag = if (r.probability >= 0.0112f) "Malignant" else "Benign"
+                        val merged = r.heatmap?.let { overlayBitmaps(image, it, 115) }
+                        inferenceResult = r.copy(heatmap = merged)
+                    } catch (t: TimeoutCancellationException) {
+                        inferenceResult = null
+                        Toast.makeText(context, "Analysis took too long. Please retake or try again.", Toast.LENGTH_LONG).show()
+                        capturedImage = null
+                    } finally {
+                        isRunning = false
                     }
                 }
+            }
 
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.White)
-                ) {
-                    when {
-                        isRunning -> {
-                            Column(
-                                modifier = Modifier.align(Alignment.Center),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                CircularProgressIndicator()
-                                Spacer(Modifier.height(8.dp))
-                                Text("Analyzing...", color = Color.Gray)
-                            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.White)
+            ) {
+                when {
+                    isRunning -> {
+                        Column(
+                            modifier = Modifier.align(Alignment.Center),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            CircularProgressIndicator()
+                            Spacer(Modifier.height(8.dp))
+                            Text("Analyzing...", color = Color.Gray)
+                        }
+                    }
+
+                    inferenceResult != null -> {
+                        val r = inferenceResult!!
+                        val riskCopy = generateTherapeuticMessage(r.probability)
+
+
+                        LesionCaseTemplate(
+                            imageBitmap = image,
+                            camBitmap = r.heatmap,
+                            title = "Result",
+                            timestamp = nowTimestamp(),
+                            riskTitle = "Risk Assessment:",
+                            riskDescription = riskCopy,
+                            prediction = modelFlag,
+                            probability = r.probability,
+
+                            showPrimaryButtons = !hasSaved,   // big image before saving
+                            showSecondaryActions = hasSaved,   // actions after saving
+
+                            // NEW: tap image to open fullscreen
+                            onImageClick = { page ->
+                                fullImagePage = page
+                            },  // << was: { showFullImage = true }
+                            isSaving = isSaving,
+                            onSaveClick = {
+                                showPrivacyDialog = true
+                            },
+                            onRetakeClick = {
+                                inferenceResult = null
+                                capturedImage = null
+                                hasSaved = false
+                                hasUploaded = false
+                                fullImagePage = null
+                            },
+                            onBackClick = {
+                                inferenceResult = null
+                                capturedImage = null
+                                hasSaved = false
+                                hasUploaded = false
+                                fullImagePage = null
+                                onBackClick()
+                            },
+                            onDownloadClick = {
+                                coroutineScope.launch {
+                                    // Gate: questionnaire must be complete (8 answers, none null)
+                                    val qa = existingAnswers
+                                    val notCompleted =
+                                        (qa == null) || (qa.size != questions.size) || qa.any { it == null }
+                                    if (notCompleted) {
+                                        Toast.makeText(
+                                            context,
+                                            "Please complete the questionnaire before downloading the PDF.",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                        return@launch
+                                    }
+
+                                    try {
+                                        val answerPairs: List<Pair<String, String>> =
+                                            questions.indices.map { i ->
+                                                val a = qa!![i] ?: false
+                                                questions[i] to if (a) "Yes" else "No"
+                                            }
+
+                                        val data = PdfExporter.CasePdfData(
+                                            title = "Result",
+                                            timestamp = nowTimestamp(),
+                                            photo = image,
+                                            heatmap = r.heatmap,
+                                            shortMessage = generateTherapeuticMessage(r.probability),
+                                            answers = answerPairs
+                                        )
+
+                                        val uri = withContext(Dispatchers.IO) {
+                                            PdfExporter.createCasePdf(context, data)
+                                        }
+                                        PdfExporter.openPdf(context, uri)
+                                        Toast.makeText(
+                                            context,
+                                            "PDF saved successfully",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+
+                                    } catch (t: Throwable) {
+                                        Log.e("TakePhotoScreen", "PDF export failed", t)
+                                        Toast.makeText(
+                                            context,
+                                            "Failed to create PDF: ${t.message ?: "Unknown error"}",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                }
+
+                            },
+                            onFindClinicClick = { onFindClinicClick() }
+                        )
+                        if (showPrivacyDialog) {
+                            AlertDialog(
+                                onDismissRequest = {
+                                    if (!isSaving) {
+                                        showPrivacyDialog = false
+                                        consentToSave = false
+                                    }
+                                },
+                                title = { Text("Save & Privacy") },
+                                text = {
+                                    Column {
+                                        Text(
+                                            "We’ll store this scan (photo and optional heatmap) securely in your account. " +
+                                                    "Some scans may require a dermatologist’s review based on the analysis. " +
+                                                    "If that happens, we’ll ask to securely send it for review."
+                                        )
+                                        Spacer(Modifier.height(12.dp))
+
+                                        // Optional: show what will happen for THIS scan
+                                        val pPct = ((inferenceResult?.probability ?: 0f) * 100f)
+                                        val needsDermaReview = pPct >= 60f
+
+                                        Text(
+                                            if (needsDermaReview)
+                                                "This scan may be sent for dermatologist review."
+                                            else
+                                                "This scan will only be saved to your account (not sent).",
+                                            color = if (needsDermaReview) Color(0xFFB00020) else Color.Gray,
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+
+                                        Spacer(Modifier.height(12.dp))
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Checkbox(
+                                                checked = consentToSave,
+                                                onCheckedChange = { consentToSave = it }
+                                            )
+                                            Spacer(Modifier.width(8.dp))
+                                            Text(
+                                                "I agree to save this scan to my account and, if this scan needs dermatologist review, " +
+                                                        "to securely send it for review."
+                                            )
+                                        }
+                                    }
+                                },
+                                confirmButton = {
+                                    TextButton(
+                                        enabled = consentToSave && !isSaving,
+                                        onClick = {
+                                            coroutineScope.launch {
+                                                try {
+                                                    isSaving = true
+                                                    val uid = FirebaseAuth.getInstance().currentUser?.uid
+                                                    if (uid == null) {
+                                                        Toast.makeText(context, "Please sign in first.", Toast.LENGTH_SHORT).show()
+                                                        return@launch
+                                                    }
+                                                    if (capturedImage == null) {
+                                                        Toast.makeText(context, "No image to save.", Toast.LENGTH_SHORT).show()
+                                                        return@launch
+                                                    }
+
+                                                    val pPctNow = ((inferenceResult?.probability ?: 0f) * 100f)
+                                                    val shouldSendToDerma = pPctNow >= 60f && pPctNow < 80f
+
+                                                    val ok = uploadScanWithLabel(
+                                                        bitmap = capturedImage!!,
+                                                        heatmap = inferenceResult?.heatmap,
+                                                        probability = inferenceResult?.probability ?: 0f,
+                                                        prediction = modelFlag,
+                                                        status = if (shouldSendToDerma) "pending" else "completed"
+                                                    )
+
+                                                    if (ok) {
+                                                        hasSaved = true
+                                                        Toast.makeText(
+                                                            context,
+                                                            if (shouldSendToDerma) "Sent to dermatologist for review." else "Scan saved",
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+                                                    } else {
+                                                        Toast.makeText(context, "Save failed (rules or network).", Toast.LENGTH_LONG).show()
+                                                    }
+                                                } catch (t: Throwable) {
+                                                    Log.e("TakePhotoScreen", "Save failed", t)
+                                                    Toast.makeText(context, "Save failed: ${t.message}", Toast.LENGTH_LONG).show()
+                                                } finally {
+                                                    isSaving = false
+                                                    showPrivacyDialog = false
+                                                    consentToSave = false
+                                                }
+                                            }
+                                        }
+                                    ) {
+                                        if (isSaving) {
+                                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                        } else {
+                                            Text("Save")
+                                        }
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton(
+                                        onClick = {
+                                            if (!isSaving) {
+                                                showPrivacyDialog = false
+                                                consentToSave = false
+                                            }
+                                        }
+                                    ) { Text("Cancel") }
+                                }
+                            )
                         }
 
-                        inferenceResult != null -> {
-                            val r = inferenceResult!!
-                            val riskCopy = generateTherapeuticMessage(r.probability)
 
-
-                            LesionCaseTemplate(
-                                imageBitmap = image,
-                                camBitmap = r.heatmap,
-                                title = "Result",
-                                timestamp = nowTimestamp(),
-                                riskTitle = "Risk Assessment:",
-                                riskDescription = riskCopy,
-                                prediction = modelFlag,
-                                probability = r.probability,
-
-                                showPrimaryButtons = !hasSaved,   // big image before saving
-                                showSecondaryActions = hasSaved,   // actions after saving
-
-                                // NEW: tap image to open fullscreen
-                                onImageClick = { page ->
-                                    fullImagePage = page
-                                },  // << was: { showFullImage = true }
-                                isSaving = isSaving,
-                                onSaveClick = {
-                                    coroutineScope.launch {
-                                        try {
-                                            isSaving = true
-                                            val uid = FirebaseAuth.getInstance().currentUser?.uid
-                                            Log.d(
-                                                "TakePhotoScreen",
-                                                "onSaveClick fired. uid=$uid, hasImage=${capturedImage != null}, pred=$modelFlag"
-                                            )
-
-                                            if (uid == null) {
-                                                Toast.makeText(
-                                                    context,
-                                                    "Please sign in first.",
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
-                                                return@launch
-                                            }
-                                            if (capturedImage == null) {
-                                                Toast.makeText(
-                                                    context,
-                                                    "No image to save.",
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
-                                                return@launch
-                                            }
-
-                                            val ok = uploadScanWithLabel(
-                                                bitmap = capturedImage!!,
-                                                heatmap = inferenceResult?.heatmap,
-                                                probability = inferenceResult?.probability ?: 0f,
-                                                prediction = modelFlag
-                                            )
-                                            Log.d("TakePhotoScreen", "uploadScanWithLabel -> $ok")
-                                            if (ok) {
-                                                hasSaved = true
-                                                Toast.makeText(
-                                                    context,
-                                                    "Scan saved",
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
-                                            } else {
-                                                Toast.makeText(
-                                                    context,
-                                                    "Save failed (uid or rules).",
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
-                                            }
-                                        } catch (t: Throwable) {
-                                            Log.e(
-                                                "TakePhotoScreen",
-                                                "Save failed with exception",
-                                                t
-                                            )
-                                            Toast.makeText(
-                                                context,
-                                                "Save failed: ${t.message}",
-                                                Toast.LENGTH_LONG
-                                            ).show()
-                                        }finally {
-                                            isSaving = false
-                                            }
+                        if (fullImagePage != null) {
+                            androidx.compose.ui.window.Dialog(onDismissRequest = {
+                                fullImagePage = null
+                            }) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    val displayBmp = when (fullImagePage) {
+                                        0 -> image                       // captured photo
+                                        1 -> r.heatmap
+                                            ?: image          // heatmap (fallback to photo if null)
+                                        else -> null
                                     }
-                                },
-                                onRetakeClick = {
-                                    inferenceResult = null
-                                    capturedImage = null
-                                    hasSaved = false
-                                    hasUploaded = false
-                                    fullImagePage = null
-                                },
-                                onBackClick = {
-                                    inferenceResult = null
-                                    capturedImage = null
-                                    hasSaved = false
-                                    hasUploaded = false
-                                    fullImagePage = null
-                                    onBackClick()
-                                },
-                                onDownloadClick = {
-                                    coroutineScope.launch {
-                                        // Gate: questionnaire must be complete (8 answers, none null)
-                                        val qa = existingAnswers
-                                        val notCompleted =
-                                            (qa == null) || (qa.size != questions.size) || qa.any { it == null }
-                                        if (notCompleted) {
-                                            Toast.makeText(
-                                                context,
-                                                "Please complete the questionnaire before downloading the PDF.",
-                                                Toast.LENGTH_LONG
-                                            ).show()
-                                            return@launch
-                                        }
-
-                                        try {
-                                            val answerPairs: List<Pair<String, String>> =
-                                                questions.indices.map { i ->
-                                                    val a = qa!![i] ?: false
-                                                    questions[i] to if (a) "Yes" else "No"
-                                                }
-
-                                            val data = PdfExporter.CasePdfData(
-                                                title = "Result",
-                                                timestamp = nowTimestamp(),
-                                                photo = image,
-                                                heatmap = r.heatmap,
-                                                shortMessage = generateTherapeuticMessage(r.probability),
-                                                answers = answerPairs
-                                            )
-
-                                            val uri = withContext(Dispatchers.IO) {
-                                                PdfExporter.createCasePdf(context, data)
-                                            }
-                                            PdfExporter.openPdf(context, uri)
-                                            Toast.makeText(
-                                                context,
-                                                "PDF saved successfully",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
-
-                                        } catch (t: Throwable) {
-                                            Log.e("TakePhotoScreen", "PDF export failed", t)
-                                            Toast.makeText(
-                                                context,
-                                                "Failed to create PDF: ${t.message ?: "Unknown error"}",
-                                                Toast.LENGTH_LONG
-                                            ).show()
-                                        }
-                                    }
-                                },
-                                onFindClinicClick = { onFindClinicClick() }
-                            )
-
-                            if (fullImagePage != null) {
-                                androidx.compose.ui.window.Dialog(onDismissRequest = {
-                                    fullImagePage = null
-                                }) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(Color.Black),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        val displayBmp = when (fullImagePage) {
-                                            0 -> image                       // captured photo
-                                            1 -> r.heatmap
-                                                ?: image          // heatmap (fallback to photo if null)
-                                            else -> null
-                                        }
-                                        if (displayBmp != null) {
-                                            Image(
-                                                bitmap = displayBmp.asImageBitmap(),
-                                                contentDescription = null,
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .clickable { fullImagePage = null },
-                                                contentScale = ContentScale.Fit
-                                            )
-                                        } else {
-                                            Text("No image", color = Color.White)
-                                        }
+                                    if (displayBmp != null) {
+                                        Image(
+                                            bitmap = displayBmp.asImageBitmap(),
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable { fullImagePage = null },
+                                            contentScale = ContentScale.Fit
+                                        )
+                                    } else {
+                                        Text("No image", color = Color.White)
                                     }
                                 }
                             }
-
                         }
+
                     }
                 }
             }
         }
-        }
+    }
+}
 
 
 
-    // ---------- Helpers (non-Compose) ----------
-    fun overlayBitmaps(base: Bitmap, overlay: Bitmap, alpha: Int = 115): Bitmap {
-        val config = base.config ?: Bitmap.Config.ARGB_8888
-        val result = Bitmap.createBitmap(base.width, base.height, config)
-        val canvas = android.graphics.Canvas(result)
-        canvas.drawBitmap(base, 0f, 0f, null)
+// ---------- Helpers (non-Compose) ----------
+fun overlayBitmaps(base: Bitmap, overlay: Bitmap, alpha: Int = 115): Bitmap {
+    val config = base.config ?: Bitmap.Config.ARGB_8888
+    val result = Bitmap.createBitmap(base.width, base.height, config)
+    val canvas = android.graphics.Canvas(result)
+    canvas.drawBitmap(base, 0f, 0f, null)
 
-        val paint = android.graphics.Paint().apply { this.alpha = alpha }
-        val scaled = if (overlay.width == base.width && overlay.height == base.height)
-            overlay
-        else
-            Bitmap.createScaledBitmap(overlay, base.width, base.height, true)
+    val paint = android.graphics.Paint().apply { this.alpha = alpha }
+    val scaled = if (overlay.width == base.width && overlay.height == base.height)
+        overlay
+    else
+        Bitmap.createScaledBitmap(overlay, base.width, base.height, true)
 
-        canvas.drawBitmap(scaled, 0f, 0f, paint)
-        return result
+    canvas.drawBitmap(scaled, 0f, 0f, paint)
+    return result
+}
+
+fun rotateBitmapAccordingToExif(context: Context, file: File): Bitmap {
+    val exif = ExifInterface(file.absolutePath)
+    val orientation =
+        exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+    val rotationAngle = when (orientation) {
+        ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+        ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+        ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+        else -> 0f
     }
 
-    fun rotateBitmapAccordingToExif(context: Context, file: File): Bitmap {
-        val exif = ExifInterface(file.absolutePath)
-        val orientation =
-            exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
-        val rotationAngle = when (orientation) {
-            ExifInterface.ORIENTATION_ROTATE_90 -> 90f
-            ExifInterface.ORIENTATION_ROTATE_180 -> 180f
-            ExifInterface.ORIENTATION_ROTATE_270 -> 270f
-            else -> 0f
-        }
+    val bitmap = MediaStore.Images.Media.getBitmap(context.contentResolver, Uri.fromFile(file))
+    val matrix = Matrix().apply { postRotate(rotationAngle) }
+    return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+}
 
-        val bitmap = MediaStore.Images.Media.getBitmap(context.contentResolver, Uri.fromFile(file))
-        val matrix = Matrix().apply { postRotate(rotationAngle) }
-        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+/**
+ * Uploads the cropped photo to Storage and writes the scan metadata into Firestore:
+ * - Storage path: users/{uid}/scans/{caseId}.jpg
+ * - Firestore doc: lesion_case/{caseId}
+ * Includes a friendly label "Scan N".
+ */
+
+suspend fun uploadScanWithLabel(
+    bitmap: Bitmap,            // original cropped photo
+    heatmap: Bitmap?,          // heatmap/overlay to save (can be null)
+    probability: Float,
+    prediction: String,
+    status: String = "completed"
+): Boolean {
+    val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return false
+    val db = FirebaseFirestore.getInstance()
+
+    // Tighter retry windows so Firebase SDK doesn’t keep retrying forever in the background
+    FirebaseStorage.getInstance().apply {
+        maxUploadRetryTimeMillis = TimeoutConfig.UPLOAD_MS
+        maxOperationRetryTimeMillis = TimeoutConfig.UPLOAD_MS
+        maxDownloadRetryTimeMillis = TimeoutConfig.URL_MS
     }
 
-    /**
-     * Uploads the cropped photo to Storage and writes the scan metadata into Firestore:
-     * - Storage path: users/{uid}/scans/{caseId}.jpg
-     * - Firestore doc: lesion_case/{caseId}
-     * Includes a friendly label "Scan N".
-     */
+    // 1) Reserve Firestore doc id + "Scan N" label (you already have this repo)
+    val (caseId, label) = ScanRepository.reserveScanLabelAndId(db, uid)
 
-    suspend fun uploadScanWithLabel(
-        bitmap: Bitmap,            // original cropped photo
-        heatmap: Bitmap?,          // heatmap/overlay to save (can be null)
-        probability: Float,
-        prediction: String
-    ): Boolean {
-        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return false
-        val db = FirebaseFirestore.getInstance()
 
-        // Tighter retry windows so Firebase SDK doesn’t keep retrying forever in the background
-        FirebaseStorage.getInstance().apply {
-            maxUploadRetryTimeMillis = TimeoutConfig.UPLOAD_MS
-            maxOperationRetryTimeMillis = TimeoutConfig.UPLOAD_MS
-            maxDownloadRetryTimeMillis = TimeoutConfig.URL_MS
+    val storage = FirebaseStorage.getInstance().reference
+    val photoRef = storage.child("users/$uid/scans/$caseId.jpg")
+    val heatmapRef = storage.child("users/$uid/scans/${caseId}_heatmap.jpg")
+
+    // 3) Upload original photo
+    val photoBytes = ByteArrayOutputStream().apply {
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, this)
+    }.toByteArray()
+    val photoTask = photoRef.putBytes(photoBytes)
+    val photoSnap = withTimeoutOrNull(TimeoutConfig.UPLOAD_MS) { photoTask.await() }
+        ?: run {
+            photoTask.cancel()
+            return false
         }
+    val photoUrl = withTimeoutOrNull(TimeoutConfig.URL_MS) {
+        photoRef.downloadUrl.await().toString()
+    } ?: return false
 
-        // 1) Reserve Firestore doc id + "Scan N" label (you already have this repo)
-        val (caseId, label) = ScanRepository.reserveScanLabelAndId(db, uid)
-
-
-        val storage = FirebaseStorage.getInstance().reference
-        val photoRef = storage.child("users/$uid/scans/$caseId.jpg")
-        val heatmapRef = storage.child("users/$uid/scans/${caseId}_heatmap.jpg")
-
-        // 3) Upload original photo
-        val photoBytes = ByteArrayOutputStream().apply {
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, this)
+    // 4) Upload heatmap (if provided)
+    var heatmapUrl: String? = null
+    if (heatmap != null) {
+        val heatmapBytes = ByteArrayOutputStream().apply {
+            heatmap.compress(Bitmap.CompressFormat.JPEG, 90, this)
         }.toByteArray()
-        val photoTask = photoRef.putBytes(photoBytes)
-        val photoSnap = withTimeoutOrNull(TimeoutConfig.UPLOAD_MS) { photoTask.await() }
+        val heatTask = heatmapRef.putBytes(heatmapBytes)
+        val heatSnap = withTimeoutOrNull(TimeoutConfig.UPLOAD_MS) { heatTask.await() }
             ?: run {
-                photoTask.cancel()
-                return false
+                heatTask.cancel()
+                return false // or proceed without heatmap if you prefer
             }
-        val photoUrl = withTimeoutOrNull(TimeoutConfig.URL_MS) {
-            photoRef.downloadUrl.await().toString()
-        } ?: return false
 
-        // 4) Upload heatmap (if provided)
-        var heatmapUrl: String? = null
-        if (heatmap != null) {
-            val heatmapBytes = ByteArrayOutputStream().apply {
-                heatmap.compress(Bitmap.CompressFormat.JPEG, 90, this)
-            }.toByteArray()
-            val heatTask = heatmapRef.putBytes(heatmapBytes)
-            val heatSnap = withTimeoutOrNull(TimeoutConfig.UPLOAD_MS) { heatTask.await() }
-                ?: run {
-                    heatTask.cancel()
-                    return false // or proceed without heatmap if you prefer
-                }
+        heatmapUrl = withTimeoutOrNull(TimeoutConfig.URL_MS) {
+            heatmapRef.downloadUrl.await().toString()
+        } ?: return false        }
 
-            heatmapUrl = withTimeoutOrNull(TimeoutConfig.URL_MS) {
-                heatmapRef.downloadUrl.await().toString()
-            } ?: return false        }
+    // 5) Firestore metadata
+    val doc = hashMapOf(
+        "user_id" to uid,
+        "label" to label,
+        "scan_url" to photoUrl,
+        "timestamp" to FieldValue.serverTimestamp(),
+        "timestamp_ms" to System.currentTimeMillis(),
+        "prediction" to prediction,
+        "probability" to probability.toDouble(),
+        "status" to status,
+        "heatmap_url" to heatmapUrl            // may be null if no heatmap
+    )
 
-        // 5) Firestore metadata
-        val doc = hashMapOf(
-            "user_id" to uid,
-            "label" to label,
-            "scan_url" to photoUrl,
-            "timestamp" to FieldValue.serverTimestamp(),
-            "timestamp_ms" to System.currentTimeMillis(),
-            "prediction" to prediction,
-            "probability" to probability.toDouble(),
-            "status" to "completed",
-            "heatmap_url" to heatmapUrl            // may be null if no heatmap
-        )
+    val writeOk = withTimeoutOrNull(TimeoutConfig.FIRESTORE_MS) {
+        db.collection("lesion_case").document(caseId).set(doc).await()
+        true
+    } ?: false
 
-        val writeOk = withTimeoutOrNull(TimeoutConfig.FIRESTORE_MS) {
-            db.collection("lesion_case").document(caseId).set(doc).await()
-            true
-        } ?: false
+    return writeOk
+}
 
-        return writeOk
+@Composable
+fun CameraPermissionGate(
+    onGranted: @Composable () -> Unit,
+    // optional UI if denied; keep it simple by default
+    deniedContent: @Composable () -> Unit = {
+        Text("Camera permission is required to continue.")
+    }
+) {
+    val context = LocalContext.current
+    val activity = context as? Activity
+    var checked by remember { mutableStateOf(false) }
+    var granted by remember { mutableStateOf(false) }
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        granted = isGranted
+        checked = true
+        if (!isGranted) {
+            Toast.makeText(context, "Camera permission denied", Toast.LENGTH_SHORT).show()
+        }
     }
 
-    @Composable
-    fun CameraPermissionGate(
-        onGranted: @Composable () -> Unit,
-        // optional UI if denied; keep it simple by default
-        deniedContent: @Composable () -> Unit = {
-            Text("Camera permission is required to continue.")
-        }
-    ) {
-        val context = LocalContext.current
-        val activity = context as? Activity
-        var checked by remember { mutableStateOf(false) }
-        var granted by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
 
-        val launcher = rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.RequestPermission()
-        ) { isGranted ->
-            granted = isGranted
+        if (hasPermission) {
+            granted = true
             checked = true
-            if (!isGranted) {
-                Toast.makeText(context, "Camera permission denied", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        LaunchedEffect(Unit) {
-            val hasPermission = ContextCompat.checkSelfPermission(
-                context, Manifest.permission.CAMERA
-            ) == PackageManager.PERMISSION_GRANTED
-
-            if (hasPermission) {
-                granted = true
-                checked = true
-            } else {
-                launcher.launch(Manifest.permission.CAMERA)
-            }
-        }
-
-        // If user denied and checked is true, optionally show rationale + re-request button
-        if (checked && !granted) {
-            val shouldShowRationale =
-                activity?.let {
-                    ActivityCompat.shouldShowRequestPermissionRationale(
-                        it,
-                        Manifest.permission.CAMERA
-                    )
-                } == true
-
-            Column {
-                deniedContent()
-                if (shouldShowRationale) {
-                    Text("We use the camera to take/scan images. Please allow it to continue.")
-                    Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) {
-                        Text("Allow Camera")
-                    }
-                } else {
-                    // "Don’t ask again" or first hard denial → guide to Settings
-                    Button(onClick = {
-                        Toast.makeText(
-                            context,
-                            "Go to App Settings → Permissions → Camera",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }) {
-                        Text("Open Settings")
-                    }
-                }
-            }
-        } else if (granted) {
-            onGranted()
+        } else {
+            launcher.launch(Manifest.permission.CAMERA)
         }
     }
+
+    // If user denied and checked is true, optionally show rationale + re-request button
+    if (checked && !granted) {
+        val shouldShowRationale =
+            activity?.let {
+                ActivityCompat.shouldShowRequestPermissionRationale(
+                    it,
+                    Manifest.permission.CAMERA
+                )
+            } == true
+
+        Column {
+            deniedContent()
+            if (shouldShowRationale) {
+                Text("We use the camera to take/scan images. Please allow it to continue.")
+                Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) {
+                    Text("Allow Camera")
+                }
+            } else {
+                // "Don’t ask again" or first hard denial → guide to Settings
+                Button(onClick = {
+                    Toast.makeText(
+                        context,
+                        "Go to App Settings → Permissions → Camera",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }) {
+                    Text("Open Settings")
+                }
+            }
+        }
+    } else if (granted) {
+        onGranted()
+    }
+}
 
 
 private fun mapViewRectToImageSquare(

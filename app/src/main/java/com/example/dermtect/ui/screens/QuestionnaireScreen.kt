@@ -23,27 +23,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import com.example.dermtect.ui.components.BackButton
 import com.example.dermtect.ui.components.BubblesBackground
 import com.example.dermtect.ui.components.DialogTemplate
 import com.example.dermtect.ui.viewmodel.QuestionnaireViewModel
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.draw.drawWithContent
 import com.example.dermtect.ui.components.EmbossedButton
 
 @Composable
 fun QuestionnaireScreen(navController: NavController) {
     val questionnaireViewModel = remember { QuestionnaireViewModel() }
 
-    val loading by questionnaireViewModel.loading.collectAsState()
     val existingAnswers by questionnaireViewModel.existingAnswers.collectAsState()
     val context = LocalContext.current
 
@@ -65,6 +57,7 @@ fun QuestionnaireScreen(navController: NavController) {
     var showBackDialog by remember { mutableStateOf(false) }
     var showCancelDialog by remember { mutableStateOf(false) }
     var showWarning by remember { mutableStateOf(false) }
+    var loading by remember { mutableStateOf(false) }
 
     var step by rememberSaveable { mutableStateOf(0) }          // 0..7
     var inReview by rememberSaveable { mutableStateOf(false) }  // review screen

@@ -51,7 +51,8 @@ data class CaseData(
     val status: String?,               // "completed"/"pending"
     val imageUrl: String? = null,      // Storage URL
     val imageRes: Int? = null,
-    val createdAt: Long = 0
+    val createdAt: Long = 0,
+    val heatmapUrl: String? = null
 )
 
 @Composable
@@ -148,7 +149,7 @@ fun HistoryScreenTemplate(
 }
 
 
-            @Composable
+@Composable
 fun CaseListItem(
     title: String,
     result: String?,
