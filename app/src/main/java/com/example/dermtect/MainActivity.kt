@@ -88,6 +88,8 @@ import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.delay
 import com.example.dermtect.data.OnboardingPrefs
 import com.google.firebase.auth.FirebaseAuth
+import com.example.dermtect.ui.tutorial.TutorialManager
+import com.example.dermtect.ui.tutorial.TutorialOverlay
 
 
 class MainActivity : ComponentActivity() {
@@ -101,12 +103,20 @@ class MainActivity : ComponentActivity() {
         setContent {
             DermtectTheme {
                 val navController = rememberNavController()
+                val tutorialManager = remember { TutorialManager() } // ✅ create once here
+                UserHomeScreen(
+                    navController = navController,
+                    tutorialManager = tutorialManager // ✅ Passed to screen
+                )
+
                 val sharedProfileViewModel: SharedProfileViewModel = viewModel()
                 val userHomeViewModel: UserHomeViewModel = viewModel()
 
                 val authUseCase = AuthUseCase(repository = AuthRepositoryImpl())
                 val authVm: AuthViewModel = viewModel(factory = AuthViewModelFactory(authUseCase))
                 val authState by authVm.authState.collectAsState()
+
+
 
                 NavHost(navController = navController, startDestination = "splash") {
 
@@ -185,7 +195,11 @@ class MainActivity : ComponentActivity() {
                     composable("forgot_pass4") { ForgotPass4(navController) }
                     composable("change_pass") { ChangePasswordScreen(navController) }
                     composable("terms_privacy") { TermsPrivacyScreen(navController) }
-                    composable("user_home") {UserHomeScreen(navController = navController) }
+                    composable("user_home") {UserHomeScreen(
+                        navController = navController,
+                        tutorialManager = tutorialManager
+                        )
+                    }
                     composable("notifications") {NotificationScreen(navController = navController) }
                     composable("questionnaire") { QuestionnaireScreen(navController = navController)}
                     composable("camera") {

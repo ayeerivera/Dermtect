@@ -42,11 +42,19 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
+import com.example.dermtect.ui.tutorial.TutorialManager
+import com.example.dermtect.ui.tutorial.TutorialOverlay
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInRoot
+
+
 
 
 @Composable
-fun UserHomeScreen(navController: NavController) {
-
+fun UserHomeScreen(
+    navController: NavController,
+    tutorialManager: TutorialManager
+) {
     val viewModel: UserHomeViewModel = viewModel()
     var showConsentDialog by remember { mutableStateOf(false) }
     val firstName by viewModel.firstName.collectAsState()
@@ -58,6 +66,10 @@ fun UserHomeScreen(navController: NavController) {
     val isLoadingNews by viewModel.isLoadingNews.collectAsState()
     val highlightItem by viewModel.highlightItem.collectAsState()
     val gson = remember { Gson() }
+
+    // ✅ NEW STATE: Control the visibility of the tutorial
+    var showTutorial by remember { mutableStateOf(true) }
+
     LaunchedEffect(Unit) {
         viewModel.fetchUserInfo()
         viewModel.checkConsentStatus()
@@ -70,168 +82,200 @@ fun UserHomeScreen(navController: NavController) {
         }
     }
 
-
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
     ) {
-        // Add vertical space above the welcome section
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(176.dp) // matches your light blue container height
-                .background(Color(0x3DCDFFFF)) // 24% opacity of #CDFFFF
-                .padding(start = 20.dp, end = 20.dp, top = 26.dp) // spacing from top
-        ) {
-            Column(
-                modifier = Modifier.align(Alignment.CenterStart)
-            ) {
-                Text(
-                    text = "Hello,",
-                    style = MaterialTheme.typography.displayMedium.copy(
-                        fontWeight = FontWeight.Normal,
-                        fontSize = 32.sp,
-                        color = Color(0xFF1D1D1D)
-                    )
-                )
-                Text(
-                    text = "$firstName!",
-                    style = MaterialTheme.typography.displayLarge.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 42.sp,
-                        color = Color(0xFF1D1D1D)
-                    )
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "Early Detection Saves Lives.",
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.Normal,
-                        fontStyle = FontStyle.Italic,
-                        fontSize = 16.sp,
-                        color = Color(0xFF1D1D1D)
-                    )
-                )
-            }
-
-            TopRightNotificationIcon(
-                onNotifClick = {
-                    if (!hasConsented) {
-                        showConsentDialog = true
-                        return@TopRightNotificationIcon
-                    }
-                    navController.navigate("notifications")
-                },
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 15.dp)
-                    .size(50.dp)
-                    .shadow(
-                        elevation = 6.dp,
-                        shape = CircleShape,
-                        clip = false
-                    )
-                    .background(
-                        brush = Brush.linearGradient(
-                            colors = listOf(
-                                Color(0xFFBFFDFD),
-                                Color(0xFF88E7E7),
-                                Color(0xFF55BFBF)
-                            )
-                        ),
-                        shape = CircleShape
-                    )
-                    .border(
-                        width = 1.dp,
-                        brush = Brush.linearGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = 0.6f),
-                                Color.Black.copy(alpha = 0.3f)
-                            )
-                        ),
-                        shape = CircleShape
-                    )
-                    .padding(5.dp) // inner padding for the icon
-            )
-        }
-
 
         Column(
             modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            horizontalAlignment = Alignment.Start
+                .fillMaxSize()
+                .background(Color.White)
         ) {
+            // Add vertical space above the welcome section
+            Spacer(modifier = Modifier.height(10.dp))
 
-            HomeFeatureButtonsRow(
-                hasConsented = hasConsented,
-                onShowConsentDialog = { showConsentDialog = true },
-                onSkinReportClick = { navController.navigate("history") },
-                onNearbyClinicsClick = { navController.navigate("nearby_clinics") }
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(176.dp) // matches your light blue container height
+                    .background(Color(0x3DCDFFFF)) // 24% opacity of #CDFFFF
+                    .padding(start = 20.dp, end = 20.dp, top = 26.dp) // spacing from top
+            ) {
+                Column(
+                    modifier = Modifier.align(Alignment.CenterStart)
+                ) {
+                    Text(
+                        text = "Hello,",
+                        style = MaterialTheme.typography.displayMedium.copy(
+                            fontWeight = FontWeight.Normal,
+                            fontSize = 32.sp,
+                            color = Color(0xFF1D1D1D)
+                        )
+                    )
+                    Text(
+                        text = "$firstName!",
+                        style = MaterialTheme.typography.displayLarge.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 42.sp,
+                            color = Color(0xFF1D1D1D)
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Early Detection Saves Lives.",
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontWeight = FontWeight.Normal,
+                            fontStyle = FontStyle.Italic,
+                            fontSize = 16.sp,
+                            color = Color(0xFF1D1D1D)
+                        )
+                    )
+                }
 
-            Spacer(modifier = Modifier.height(15.dp))
-
-            highlightItem?.let { item ->
-                HighlightCard(
-                    item = item,
-                    onHighlightClick = {
-                        val json = Uri.encode(Gson().toJson(item))
-                        navController.navigate("highlightarticle?newsJson=$json")
-                    }
+                TopRightNotificationIcon(
+                    onNotifClick = {
+                        if (!hasConsented) {
+                            showConsentDialog = true
+                            return@TopRightNotificationIcon
+                        }
+                        navController.navigate("notifications")
+                    },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 15.dp)
+                        .size(50.dp)
+                        .shadow(
+                            elevation = 6.dp,
+                            shape = CircleShape,
+                            clip = false
+                        )
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    Color(0xFFBFFDFD),
+                                    Color(0xFF88E7E7),
+                                    Color(0xFF55BFBF)
+                                )
+                            ),
+                            shape = CircleShape
+                        )
+                        .border(
+                            width = 1.dp,
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = 0.6f),
+                                    Color.Black.copy(alpha = 0.3f)
+                                )
+                            ),
+                            shape = CircleShape
+                        )
+                        .padding(5.dp) // inner padding for the icon
+                        .onGloballyPositioned { coordinates ->
+                            if (tutorialManager.getStepKey() == "notification") {
+                                tutorialManager.currentTargetBounds = coordinates.boundsInRoot()
+                            }
+                        }
                 )
             }
 
-            Spacer(modifier = Modifier.height(5.dp))
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp) // 👈 Apply horizontal padding here
+                    .padding(top = 20.dp), // Add some top padding if needed
+                horizontalAlignment = Alignment.Start
+            ) {
 
-            Spacer(modifier = Modifier.height(10.dp))
-            when {
-                isLoadingNews -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(100.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
+                HomeFeatureButtonsRow(
+                    hasConsented = hasConsented,
+                    tutorialManager = tutorialManager,
+                    onShowConsentDialog = { showConsentDialog = true },
+                    onSkinReportClick = { navController.navigate("history") },
+                    onNearbyClinicsClick = { navController.navigate("nearby_clinics") }
+                )
+
+                Spacer(modifier = Modifier.height(15.dp))
+
+                highlightItem?.let { item ->
+                    HighlightCard(
+                        item = item,
+                        onHighlightClick = {
+                            val json = Uri.encode(Gson().toJson(item))
+                            navController.navigate("highlightarticle?newsJson=$json")
+                        },
+                        tutorialManager = tutorialManager
+                    )
+                }
+
+
+
+                Spacer(modifier = Modifier.height(15.dp))
+
+                when {
+                    isLoadingNews -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(100.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                    newsItems.isEmpty() -> {
+                        Text(
+                            text = "No news available at the moment.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(10.dp)
+                        )
+                    }
+                    else -> {
+                        NewsCarousel(
+                            newsItems = newsItems,
+                            onItemClick = { item ->
+                                val json = Uri.encode(gson.toJson(item))
+                                navController.navigate("article_detail_screen/$json")
+                            },
+                            tutorialManager = tutorialManager
+                        )
                     }
                 }
-                newsItems.isEmpty() -> {
-                    Text(
-                        text = "No news available at the moment.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(10.dp)
-                    )
-                }
-                else -> {
-                    NewsCarousel(
-                        newsItems = newsItems,
-                        onItemClick = { item ->
-                            val json = Uri.encode(gson.toJson(item))
-                            navController.navigate("article_detail_screen/$json")
-                        }
-                    )
-
                 }
             }
+
+            BottomNavBar(
+                navController = navController,
+                hasConsented = hasConsented,
+                onShowConsentDialog = {
+                    pendingCameraAction = true
+                    showConsentDialog = true
+                },
+                setPendingCameraAction = { pendingCameraAction = it },
+                coroutineScope = coroutineScope,
+                viewModel = viewModel,
+                tutorialManager = tutorialManager, // ✅ pass it here
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter) // 👈 Ensure it sticks to the bottom of the parent Box
+            )
         }
 
-        BottomNavBar(
-            navController = navController,
-            hasConsented = hasConsented,
-            onShowConsentDialog = {
-                pendingCameraAction = true
-                showConsentDialog = true
-            },
-            setPendingCameraAction = { pendingCameraAction = it },
-            coroutineScope = coroutineScope,
-            viewModel = viewModel,
-            modifier = Modifier.fillMaxWidth()
+    // ────────────── Tutorial Overlay ──────────────
+    // ✅ CONDITIONALLY RENDER the TutorialOverlay based on the state
+    if (showTutorial) {
+        TutorialOverlay(
+            tutorialManager = tutorialManager,
+            onFinish = {
+                // 1. Hide the overlay
+                showTutorial = false
+                // 2. Clear the target bounds (as you had it)
+                tutorialManager.currentTargetBounds = null
+            }
         )
+    }
 
         if (showConsentDialog && !hasConsented) {
             PrivacyConsentDialog(
@@ -247,12 +291,12 @@ fun UserHomeScreen(navController: NavController) {
             )
         }
     }
-}
 
 
 @Composable
 fun HomeFeatureButtonsRow(
     hasConsented: Boolean,
+    tutorialManager: TutorialManager, // add this
     onShowConsentDialog: () -> Unit,
     onSkinReportClick: () -> Unit,
     onNearbyClinicsClick:  () -> Unit
@@ -268,7 +312,13 @@ fun HomeFeatureButtonsRow(
             HomeFeatureButton(
                 label = "Skin Report",
                 imageRes = R.drawable.skin_report,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .onGloballyPositioned { coordinates ->
+                        if (tutorialManager.getStepKey() == "skin_report") {
+                            tutorialManager.currentTargetBounds = coordinates.boundsInRoot()
+                        }
+                    },
                 onClick = {
                     if (!hasConsented) {
                         onShowConsentDialog()
@@ -281,7 +331,13 @@ fun HomeFeatureButtonsRow(
             HomeFeatureButton(
                 label = "Nearby Clinics",
                 imageRes = R.drawable.nearby_clinics,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .onGloballyPositioned { coordinates ->
+                        if (tutorialManager.getStepKey() == "nearby_clinics") {
+                            tutorialManager.currentTargetBounds = coordinates.boundsInRoot()
+                        }
+                    },
                 onClick = {
                     if (!hasConsented) {
                         onShowConsentDialog()
@@ -376,7 +432,11 @@ fun HomeFeatureButton(
 
 
 @Composable
-fun HighlightCard(onHighlightClick: () -> Unit, item: NewsItem) {
+fun HighlightCard(
+    onHighlightClick: () -> Unit,
+    item: NewsItem,
+    tutorialManager: TutorialManager // ✅ add this
+) {
     val cornerRadius = 15.dp
     val gradient = Brush.linearGradient(
         colors = listOf(
@@ -424,6 +484,11 @@ fun HighlightCard(onHighlightClick: () -> Unit, item: NewsItem) {
                         blendMode = BlendMode.Lighten
                     )
                 }
+                .onGloballyPositioned { coords ->
+                    if (tutorialManager.getStepKey() == "highlight_card") {
+                        tutorialManager.currentTargetBounds = coords.boundsInRoot()
+                    }
+                }
                 .padding(15.dp)
         ) {
             Row(
@@ -457,13 +522,33 @@ fun HighlightCard(onHighlightClick: () -> Unit, item: NewsItem) {
 
 
 @Composable
-fun NewsCarousel(newsItems: List<NewsItem>, onItemClick: (NewsItem) -> Unit) {
+fun NewsCarousel(
+    newsItems: List<NewsItem>,
+    onItemClick: (NewsItem) -> Unit,
+    tutorialManager: TutorialManager
+) {
     val cornerRadius = 15.dp
 
+    // 1. Define the tutorial modifier OUTSIDE the LazyRow items scope
+    val tutorialModifier = if (tutorialManager.getStepKey() == "news_carousel") {
+        // This modifier captures the bounds of the composable it's attached to
+        Modifier.onGloballyPositioned { coordinates ->
+            // Convert the bounds of the entire LazyRow to the root coordinate system
+            val bounds = coordinates.boundsInRoot()
+            // Update the tutorial manager with the LazyRow's full bounds
+            tutorialManager.currentTargetBounds = bounds
+        }
+    } else {
+        Modifier // Use an empty modifier if not the current tutorial step
+    }
+
+    // 2. APPLY the tutorialModifier to the root LazyRow
     LazyRow(
+        modifier = tutorialModifier, // ✅ APPLIED HERE to highlight the whole row
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(horizontal = 20.dp)
     ) {
+        // The items block is now clean and focuses only on rendering the cards
         items(newsItems) { item ->
             Box(
                 modifier = Modifier
@@ -474,6 +559,7 @@ fun NewsCarousel(newsItems: List<NewsItem>, onItemClick: (NewsItem) -> Unit) {
                         shape = RoundedCornerShape(cornerRadius),
                         clip = false
                     )
+
             ) {
                 Column(
                     modifier = Modifier
@@ -567,6 +653,7 @@ fun BottomNavBar(
     setPendingCameraAction: (Boolean) -> Unit,
     coroutineScope: CoroutineScope,
     viewModel: UserHomeViewModel,
+    tutorialManager: TutorialManager, // ✅ add this
     modifier: Modifier = Modifier
 ) {
 
@@ -620,13 +707,24 @@ fun BottomNavBar(
                 Image(
                     painter = painterResource(id = R.drawable.home_icon),
                     contentDescription = "Home",
-                    modifier = Modifier.size(30.dp)
+                    modifier = Modifier
+                        .size(30.dp)
+                        .onGloballyPositioned { coords ->
+                            if (tutorialManager.getStepKey() == "home") {
+                                tutorialManager.currentTargetBounds = coords.boundsInRoot()
+                            }
+                        }
                 )
                 Image(
                     painter = painterResource(id = R.drawable.user_vector),
                     contentDescription = "Settings",
                     modifier = Modifier
                         .size(26.dp)
+                        .onGloballyPositioned { coords ->
+                            if (tutorialManager.getStepKey() == "settings") {
+                                tutorialManager.currentTargetBounds = coords.boundsInRoot()
+                            }
+                        }
                         .clickable {
                             if (!hasConsented) {
                                 onShowConsentDialog()
@@ -679,6 +777,11 @@ fun BottomNavBar(
                     shape = CircleShape
                 )
                 .padding(5.dp) // Inner padding for the icon
+                .onGloballyPositioned { coordinates ->
+                    if (tutorialManager.getStepKey() == "camera") {
+                        tutorialManager.currentTargetBounds = coordinates.boundsInRoot()
+                    }
+                }
                 .clickable {
                     if (!hasConsented) {
                         setPendingCameraAction(true)
@@ -714,5 +817,9 @@ fun BottomNavBar(
 @Preview(showBackground = true)
 @Composable
 fun UserHomeScreenPreview() {
-    UserHomeScreen(navController = rememberNavController())
+    val tutorialManager = TutorialManager() // ✅ Create a dummy TutorialManager for preview
+    UserHomeScreen(
+        navController = rememberNavController(),
+        tutorialManager = tutorialManager
+    )
 }
