@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.example.dermtect.R
-import com.example.dermtect.ui.components.TopRightNotificationIcon
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -46,8 +45,93 @@ import com.example.dermtect.ui.tutorial.TutorialManager
 import com.example.dermtect.ui.tutorial.TutorialOverlay
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 
 
+@Composable
+fun ProfileDropdownMenu(
+    name: String,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onNotificationsClick: () -> Unit,
+    onSettingsClick: () -> Unit,
+    onProfileClick: () -> Unit,
+    onLogoutClick: () -> Unit
+) {
+    Box {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clip(RoundedCornerShape(80))
+                .clickable { onExpandedChange(true) }
+                .padding(horizontal = 6.dp, vertical = 6.dp)
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.profilepicture),
+                contentDescription = "Profile",
+                modifier = Modifier
+                    .size(35.dp)
+                    .clip(CircleShape)
+            )
+
+            Spacer(modifier = Modifier.width(6.dp))
+
+            Icon(
+                imageVector = Icons.Default.ArrowDropDown,
+                contentDescription = "Menu",
+                modifier = Modifier.size(35.dp),
+                tint = Color(0xFF1D1D1D)
+            )
+        }
+
+        MaterialTheme(
+            shapes = MaterialTheme.shapes.copy(extraSmall = RoundedCornerShape(16.dp))
+        ) {
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { onExpandedChange(false) },
+                modifier = Modifier.width(200.dp)
+            ) {
+                val itemFontSize = 18.sp
+                val itemPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+
+                DropdownMenuItem(
+                    text = { Text("Notifications", fontSize = itemFontSize) },
+                    onClick = {
+                        onExpandedChange(false)
+                        onNotificationsClick()
+                    },
+                    contentPadding = itemPadding
+                )
+                DropdownMenuItem(
+                    text = { Text("Settings", fontSize = itemFontSize) },
+                    onClick = {
+                        onExpandedChange(false)
+                        onSettingsClick()
+                    },
+                    contentPadding = itemPadding
+                )
+                DropdownMenuItem(
+                    text = { Text("Profile", fontSize = itemFontSize) },
+                    onClick = {
+                        onExpandedChange(false)
+                        onProfileClick()
+                    },
+                    contentPadding = itemPadding
+                )
+                DropdownMenuItem(
+                    text = { Text("Logout", fontSize = itemFontSize) },
+                    onClick = {
+                        onExpandedChange(false)
+                        onLogoutClick()
+                    },
+                    contentPadding = itemPadding
+                )
+            }
+        }
+    }
+}
 
 
 @Composable
@@ -57,7 +141,13 @@ fun UserHomeScreen(
 ) {
     val viewModel: UserHomeViewModel = viewModel()
     var showConsentDialog by remember { mutableStateOf(false) }
+
     val firstName by viewModel.firstName.collectAsState()
+    val lastName by viewModel.lastName.collectAsState()
+    val email by viewModel.email.collectAsState()
+    val isGoogleAccount by viewModel.isGoogleAccount.collectAsState()
+    val userRole = "user"
+
     val hasConsented by viewModel.hasConsented.collectAsState()
     val coroutineScope = rememberCoroutineScope()
     val consentChecked by viewModel.consentChecked.collectAsState()
@@ -67,8 +157,9 @@ fun UserHomeScreen(
     val highlightItem by viewModel.highlightItem.collectAsState()
     val gson = remember { Gson() }
 
-    // ✅ NEW STATE: Control the visibility of the tutorial
     var showTutorial by remember { mutableStateOf(true) }
+
+    var menuExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.fetchUserInfo()
@@ -93,15 +184,14 @@ fun UserHomeScreen(
                 .fillMaxSize()
                 .background(Color.White)
         ) {
-            // Add vertical space above the welcome section
             Spacer(modifier = Modifier.height(10.dp))
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(176.dp) // matches your light blue container height
-                    .background(Color(0x3DCDFFFF)) // 24% opacity of #CDFFFF
-                    .padding(start = 20.dp, end = 20.dp, top = 26.dp) // spacing from top
+                    .height(176.dp)
+                    .background(Color(0x3DCDFFFF))
+                    .padding(start = 20.dp, end = 20.dp, top = 26.dp)
             ) {
                 Column(
                     modifier = Modifier.align(Alignment.CenterStart)
@@ -134,58 +224,49 @@ fun UserHomeScreen(
                     )
                 }
 
-                TopRightNotificationIcon(
-                    onNotifClick = {
-                        if (!hasConsented) {
-                            showConsentDialog = true
-                            return@TopRightNotificationIcon
-                        }
-                        navController.navigate("notifications")
-                    },
+                Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(top = 15.dp)
-                        .size(50.dp)
-                        .shadow(
-                            elevation = 6.dp,
-                            shape = CircleShape,
-                            clip = false
-                        )
-                        .background(
-                            brush = Brush.linearGradient(
-                                colors = listOf(
-                                    Color(0xFFBFFDFD),
-                                    Color(0xFF88E7E7),
-                                    Color(0xFF55BFBF)
-                                )
-                            ),
-                            shape = CircleShape
-                        )
-                        .border(
-                            width = 1.dp,
-                            brush = Brush.linearGradient(
-                                colors = listOf(
-                                    Color.White.copy(alpha = 0.6f),
-                                    Color.Black.copy(alpha = 0.3f)
-                                )
-                            ),
-                            shape = CircleShape
-                        )
-                        .padding(5.dp) // inner padding for the icon
+                        .padding(top = 8.dp)
                         .onGloballyPositioned { coordinates ->
                             if (tutorialManager.getStepKey() == "notification") {
                                 tutorialManager.currentTargetBounds = coordinates.boundsInRoot()
                             }
                         }
-                )
+                ) {
+                    ProfileDropdownMenu(
+                        name = firstName,
+                        expanded = menuExpanded,
+                        onExpandedChange = { menuExpanded = it },
+                        onNotificationsClick = {
+                            if (!hasConsented) {
+                                showConsentDialog = true
+                                return@ProfileDropdownMenu
+                            }
+                            navController.navigate("notifications")
+                        },
+                        onSettingsClick = {
+                            navController.navigate("user_settings")
+                        },
+                        onProfileClick = {
+                            val encodedFirstName = Uri.encode(firstName)
+                            val encodedLastName = Uri.encode(lastName)
+                            val encodedEmail = Uri.encode(email)
+                            navController.navigate("profile/$encodedFirstName/$encodedLastName/$encodedEmail/$isGoogleAccount/$userRole")
+                        },
+                        onLogoutClick = {
+                            navController.navigate("login")
+                        }
+                    )
+                }
             }
 
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp) // 👈 Apply horizontal padding here
-                    .padding(top = 20.dp), // Add some top padding if needed
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 20.dp),
                 horizontalAlignment = Alignment.Start
             ) {
 
@@ -243,60 +324,65 @@ fun UserHomeScreen(
                         )
                     }
                 }
-                }
             }
-
-            BottomNavBar(
-                navController = navController,
-                hasConsented = hasConsented,
-                onShowConsentDialog = {
-                    pendingCameraAction = true
-                    showConsentDialog = true
-                },
-                setPendingCameraAction = { pendingCameraAction = it },
-                coroutineScope = coroutineScope,
-                viewModel = viewModel,
-                tutorialManager = tutorialManager, // ✅ pass it here
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomCenter) // 👈 Ensure it sticks to the bottom of the parent Box
-            )
         }
 
-    // ────────────── Tutorial Overlay ──────────────
-    // ✅ CONDITIONALLY RENDER the TutorialOverlay based on the state
+        BottomNavBar(
+            navController = navController,
+            hasConsented = hasConsented,
+            onShowConsentDialog = {
+                pendingCameraAction = true
+                showConsentDialog = true
+            },
+            setPendingCameraAction = { pendingCameraAction = it },
+            coroutineScope = coroutineScope,
+            viewModel = viewModel,
+            tutorialManager = tutorialManager,
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+        )
+    }
+
+    if (menuExpanded) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f))
+                .clickable { menuExpanded = false }
+        )
+    }
+
     if (showTutorial) {
         TutorialOverlay(
             tutorialManager = tutorialManager,
             onFinish = {
-                // 1. Hide the overlay
                 showTutorial = false
-                // 2. Clear the target bounds (as you had it)
                 tutorialManager.currentTargetBounds = null
             }
         )
     }
 
-        if (showConsentDialog && !hasConsented) {
-            PrivacyConsentDialog(
-                show = showConsentDialog,
-                onConsent = {
-                    viewModel.saveUserConsent()
-                    showConsentDialog = false
-                },
-                onDecline = {
-                    showConsentDialog = false
-                },
-                onViewTermsClick = { navController.navigate("terms_privacy") }
-            )
-        }
+    if (showConsentDialog && !hasConsented) {
+        PrivacyConsentDialog(
+            show = showConsentDialog,
+            onConsent = {
+                viewModel.saveUserConsent()
+                showConsentDialog = false
+            },
+            onDecline = {
+                showConsentDialog = false
+            },
+            onViewTermsClick = { navController.navigate("terms_privacy") }
+        )
     }
+}
 
 
 @Composable
 fun HomeFeatureButtonsRow(
     hasConsented: Boolean,
-    tutorialManager: TutorialManager, // add this
+    tutorialManager: TutorialManager,
     onShowConsentDialog: () -> Unit,
     onSkinReportClick: () -> Unit,
     onNearbyClinicsClick:  () -> Unit
@@ -376,9 +462,9 @@ fun HomeFeatureButton(
                 .background(
                     brush = Brush.linearGradient(
                         colors = listOf(
-                            Color(0xFFBFFDFD), // slightly darker than 0xFFCCFFFF
-                            Color(0xFF88E7E7), // slightly darker than 0xFF99EEEE
-                            Color(0xFF55BFBF)  // slightly darker than 0xFF66CCCC
+                            Color(0xFFBFFDFD),
+                            Color(0xFF88E7E7),
+                            Color(0xFF55BFBF)
                         )
                     ),
                     shape = RoundedCornerShape(cornerRadius)
@@ -435,13 +521,13 @@ fun HomeFeatureButton(
 fun HighlightCard(
     onHighlightClick: () -> Unit,
     item: NewsItem,
-    tutorialManager: TutorialManager // ✅ add this
+    tutorialManager: TutorialManager
 ) {
     val cornerRadius = 15.dp
     val gradient = Brush.linearGradient(
         colors = listOf(
-            Color(0xFFFFE5D0), // lighter peach
-            Color(0xFFFFD1A3)  // slightly darker peach/orange
+            Color(0xFFFFE5D0),
+            Color(0xFFFFD1A3)
         )
     )
 
@@ -529,26 +615,20 @@ fun NewsCarousel(
 ) {
     val cornerRadius = 15.dp
 
-    // 1. Define the tutorial modifier OUTSIDE the LazyRow items scope
     val tutorialModifier = if (tutorialManager.getStepKey() == "news_carousel") {
-        // This modifier captures the bounds of the composable it's attached to
         Modifier.onGloballyPositioned { coordinates ->
-            // Convert the bounds of the entire LazyRow to the root coordinate system
             val bounds = coordinates.boundsInRoot()
-            // Update the tutorial manager with the LazyRow's full bounds
             tutorialManager.currentTargetBounds = bounds
         }
     } else {
-        Modifier // Use an empty modifier if not the current tutorial step
+        Modifier
     }
 
-    // 2. APPLY the tutorialModifier to the root LazyRow
     LazyRow(
-        modifier = tutorialModifier, // ✅ APPLIED HERE to highlight the whole row
+        modifier = tutorialModifier,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(horizontal = 20.dp)
     ) {
-        // The items block is now clean and focuses only on rendering the cards
         items(newsItems) { item ->
             Box(
                 modifier = Modifier
@@ -578,7 +658,6 @@ fun NewsCarousel(
                             shape = RoundedCornerShape(cornerRadius)
                         )
                 ) {
-                    // IMAGE (always on top)
                     when {
                         !item.imageUrl.isNullOrBlank() -> {
                             AsyncImage(
@@ -614,7 +693,6 @@ fun NewsCarousel(
                         }
                     }
 
-                    // TEXT (below)
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
                             text = item.title,
@@ -653,7 +731,7 @@ fun BottomNavBar(
     setPendingCameraAction: (Boolean) -> Unit,
     coroutineScope: CoroutineScope,
     viewModel: UserHomeViewModel,
-    tutorialManager: TutorialManager, // ✅ add this
+    tutorialManager: TutorialManager,
     modifier: Modifier = Modifier
 ) {
 
@@ -662,11 +740,10 @@ fun BottomNavBar(
             .fillMaxWidth()
             .background(Color.White)
     ) {
-        // Embossed BottomNav background
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .align(Alignment.BottomCenter) // <- stick it to bottom
+                .align(Alignment.BottomCenter)
                 .shadow(
                     elevation = 8.dp,
                     shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
@@ -736,8 +813,6 @@ fun BottomNavBar(
             }
         }
 
-        // Embossed floating camera button with notification-style border
-        // Floating camera button fully styled like notification
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -749,34 +824,32 @@ fun BottomNavBar(
                     clip = false
                 )
                 .background(
-                    color = Color(0xFFCDFFFF), // Solid light blue background
+                    color = Color(0xFFCDFFFF),
                     shape = CircleShape
                 )
-                // Outer border for a thicker, more visible stroke effect
                 .border(
-                    width = 1.dp, // Thicker outer border for more visibility
+                    width = 1.dp,
                     brush = Brush.linearGradient(
                         colors = listOf(
-                            Color(0xFFBFFDFD), // Lighter outer shade
-                            Color(0xFF88E7E7), // Medium teal
-                            Color(0xFF41A6A6)  // Darker teal
+                            Color(0xFFBFFDFD),
+                            Color(0xFF88E7E7),
+                            Color(0xFF41A6A6)
                         )
                     ),
                     shape = CircleShape
                 )
-                // Inner gradient border to maintain the original style
                 .border(
-                    width = 5.dp, // Inner border thickness
+                    width = 5.dp,
                     brush = Brush.linearGradient(
                         colors = listOf(
-                            Color(0xFFBFFDFD), // Lighter outer shade
-                            Color(0xFF88E7E7), // Medium teal
-                            Color(0xFF55BFBF)  // Darker teal
+                            Color(0xFFBFFDFD),
+                            Color(0xFF88E7E7),
+                            Color(0xFF55BFBF)
                         )
                     ),
                     shape = CircleShape
                 )
-                .padding(5.dp) // Inner padding for the icon
+                .padding(5.dp)
                 .onGloballyPositioned { coordinates ->
                     if (tutorialManager.getStepKey() == "camera") {
                         tutorialManager.currentTargetBounds = coordinates.boundsInRoot()
@@ -811,15 +884,100 @@ fun BottomNavBar(
 }
 
 
-
-
-
 @Preview(showBackground = true)
 @Composable
 fun UserHomeScreenPreview() {
-    val tutorialManager = TutorialManager() // ✅ Create a dummy TutorialManager for preview
-    UserHomeScreen(
-        navController = rememberNavController(),
-        tutorialManager = tutorialManager
-    )
+    val tutorialManager = TutorialManager()
+    val navController = rememberNavController()
+
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.White)
+        ) {
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(176.dp)
+                    .background(Color(0x3DCDFFFF))
+                    .padding(start = 20.dp, end = 20.dp, top = 26.dp)
+            ) {
+                Column(modifier = Modifier.align(Alignment.CenterStart)) {
+                    Text(
+                        text = "Hello,",
+                        style = MaterialTheme.typography.displayMedium.copy(
+                            fontWeight = FontWeight.Normal,
+                            fontSize = 32.sp,
+                            color = Color(0xFF1D1D1D)
+                        )
+                    )
+                    Text(
+                        text = "User!",
+                        style = MaterialTheme.typography.displayLarge.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 42.sp,
+                            color = Color(0xFF1D1D1D)
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Early Detection Saves Lives.",
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontWeight = FontWeight.Normal,
+                            fontStyle = FontStyle.Italic,
+                            fontSize = 16.sp,
+                            color = Color(0xFF1D1D1D)
+                        )
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 8.dp)
+                ) {
+                    ProfileDropdownMenu(
+                        name = "User",
+                        expanded = menuExpanded,
+                        onExpandedChange = { menuExpanded = it },
+                        onNotificationsClick = {},
+                        onSettingsClick = {},
+                        onProfileClick = {},
+                        onLogoutClick = {}
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 20.dp),
+                horizontalAlignment = Alignment.Start
+            ) {
+                HomeFeatureButtonsRow(
+                    hasConsented = true,
+                    tutorialManager = tutorialManager,
+                    onShowConsentDialog = { },
+                    onSkinReportClick = { },
+                    onNearbyClinicsClick = { }
+                )
+            }
+        }
+
+        if (menuExpanded) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .clickable { menuExpanded = false }
+            )
+        }
+    }
 }
