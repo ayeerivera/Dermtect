@@ -1,5 +1,6 @@
 package com.example.dermtect.ui.screens
 
+import android.R.attr.textColor
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
@@ -9,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
@@ -30,7 +32,8 @@ import com.example.dermtect.ui.components.BubblesBackground
 import com.example.dermtect.ui.components.DialogTemplate
 import com.example.dermtect.ui.viewmodel.QuestionnaireViewModel
 import androidx.compose.ui.graphics.Brush
-import com.example.dermtect.ui.components.EmbossedButton
+import com.example.dermtect.ui.components.PrimaryButton
+import com.example.dermtect.ui.components.SecondaryButton
 
 @Composable
 fun QuestionnaireScreen(navController: NavController) {
@@ -271,20 +274,14 @@ fun QuestionnaireScreen(navController: NavController) {
                                     modifier = Modifier.fillMaxWidth(0.9f)
                                 )
                                 Spacer(Modifier.height(24.dp))
-                                EmbossedButton(
+                                PrimaryButton(
                                     text = "Next",
                                     onClick = { showIntro = false },
                                     modifier = Modifier
                                         .fillMaxWidth(0.9f)
-                                        .height(56.dp),
-                                    cornerRadius = 12.dp,
-                                    backgroundBrush = Brush.verticalGradient(
-                                        colors = listOf(
-                                            Color(0xFF5FEAEA), Color(0xFF2A9D9D), Color(0xFF187878)
-                                        )
-                                    ),
-                                    textColor = Color.White
+                                        .height(56.dp)
                                 )
+
                             }
 
                             // ============== EDIT / FIRST-TIME: STEP-BY-STEP ==============
@@ -352,27 +349,6 @@ fun QuestionnaireScreen(navController: NavController) {
 // selection flags
                                     val yesSelected = answers[step] == true
                                     val noSelected  = answers[step] == false
-
-                                    val yesActiveBrush = Brush.verticalGradient(
-                                        listOf(Color (0xFF5FEAEA),  // bright cyan
-                                            Color(0xFF2A9D9D),  // medium teal
-                                            Color(0xFF187878) )
-                                    )
-                                    val yesIdleBrush = Brush.linearGradient(
-                                        listOf( Color(0xFFBDBDBD),
-                                            Color(0xFF9E9E9E),
-                                            Color(0xFF757575))
-                                    )
-                                    val noActiveBrush = Brush.linearGradient(
-                                        listOf(Color (0xFF5FEAEA),  // bright cyan
-                                            Color(0xFF2A9D9D),  // medium teal
-                                            Color(0xFF187878) )
-                                    )
-                                    val noIdleBrush = Brush.linearGradient(
-                                        listOf( Color(0xFFBDBDBD),
-                                            Color(0xFF9E9E9E),
-                                            Color(0xFF757575))
-                                    )
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -380,32 +356,48 @@ fun QuestionnaireScreen(navController: NavController) {
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         // YES
-                                        EmbossedButton(
-                                            text = "YES",
-                                            onClick = { answers[step] = true },
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .height(btnHeight),
-                                            cornerRadius = 12.dp,
-                                            backgroundBrush = if (yesSelected) yesActiveBrush else yesIdleBrush,
-                                            textColor = if (yesSelected) Color.White else Color.White,
-                                            selected = yesSelected
-                                        )
+                                        if (yesSelected) {
+                                            PrimaryButton(
+                                                text = "YES",
+                                                onClick = { answers[step] = true }, // keep behavior consistent
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .height(btnHeight),
+                                                enabled = true
+                                            )
+                                        } else {
+                                            SecondaryButton(
+                                                text = "YES",
+                                                onClick = { answers[step] = true },
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .height(btnHeight),
+                                                enabled = true
+                                            )
+                                        }
 
                                         Spacer(Modifier.width(10.dp))
 
                                         // NO
-                                        EmbossedButton(
-                                            text = "NO",
-                                            onClick = { answers[step] = false },
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .height(btnHeight),
-                                            cornerRadius = 12.dp,
-                                            backgroundBrush = if (noSelected) noActiveBrush else noIdleBrush,
-                                            textColor = if (noSelected) Color.White else Color.White,
-                                            selected = noSelected
-                                        )
+                                        if (noSelected) {
+                                            PrimaryButton(
+                                                text = "NO",
+                                                onClick = { answers[step] = false },
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .height(btnHeight),
+                                                enabled = true
+                                            )
+                                        } else {
+                                            SecondaryButton(
+                                                text = "NO",
+                                                onClick = { answers[step] = false },
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .height(btnHeight),
+                                                enabled = true
+                                            )
+                                        }
                                     }
 
                                     Spacer(Modifier.height(8.dp))
@@ -501,61 +493,36 @@ fun QuestionnaireScreen(navController: NavController) {
                                         modifier = Modifier.fillMaxWidth(0.9f),
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        EmbossedButton(
+                                        SecondaryButton(
                                             text = "Previous",
                                             onClick = {
-                                                inReview = false; step = questions.lastIndex
+                                                inReview = false
+                                                step = questions.lastIndex
                                             },
                                             modifier = Modifier
                                                 .weight(1f)
-                                                .height(56.dp),
-                                            cornerRadius = 12.dp,
-                                            backgroundBrush = Brush.linearGradient(
-                                                colors = listOf(Color(0xFFE6F4F4), Color.LightGray)
-                                            ),
-                                            textColor = Color.White
+                                                .height(56.dp)
                                         )
                                         Spacer(Modifier.width(8.dp))
-                                        EmbossedButton(
+                                        PrimaryButton(
                                             text = if (loading) "Saving..." else "Save",
                                             onClick = { saveAnswers() },
+                                            enabled = !loading,
                                             modifier = Modifier
                                                 .weight(1f)
-                                                .height(56.dp),
-                                            enabled = !loading,
-                                            cornerRadius = 12.dp,
-                                            backgroundBrush = if (!loading) {
-                                                Brush.verticalGradient(
-                                                    colors = listOf(
-                                                        Color(0xFF5FEAEA), Color(0xFF2A9D9D), Color(0xFF187878)
-                                                    )
-                                                )
-                                            } else {
-                                                // disabled gradient — same as your Login disabled
-                                                Brush.verticalGradient(
-                                                    colors = listOf(
-                                                        Color(0xFFBDBDBD), Color(0xFF9E9E9E), Color(0xFF757575)
-                                                    )
-                                                )
-                                            },
-                                            textColor = Color.White
+                                                .height(56.dp)
                                         )
-
                                     }
 
                                     Spacer(Modifier.height(8.dp))
-                                    EmbossedButton(
+                                    SecondaryButton(
                                         text = "Cancel",
                                         onClick = { showCancelDialog = true },
                                         modifier = Modifier
                                             .fillMaxWidth(0.9f)
-                                            .height(56.dp),
-                                        cornerRadius = 12.dp,
-                                        backgroundBrush = Brush.linearGradient(
-                                            colors = listOf(Color(0xFFF0F0F0), Color(0xFFF0F0F0))
-                                        ),
-                                        textColor = Color(0xFF0FB2B2)
+                                            .height(56.dp)
                                     )
+
 
                                 }
                             }
@@ -601,7 +568,7 @@ fun QuestionnaireScreen(navController: NavController) {
                                     }
                                 }
 
-                                EmbossedButton(
+                                PrimaryButton(
                                     text = "Edit",
                                     onClick = {
                                         isEditMode = true
@@ -613,14 +580,7 @@ fun QuestionnaireScreen(navController: NavController) {
                                     },
                                     modifier = Modifier
                                         .fillMaxWidth(0.9f)
-                                        .height(56.dp),
-                                    cornerRadius = 12.dp,
-                                    backgroundBrush = Brush.verticalGradient(
-                                        colors = listOf(
-                                            Color(0xFF5FEAEA), Color(0xFF2A9D9D), Color(0xFF187878)
-                                        )
-                                    ),
-                                    textColor = Color.White
+                                        .height(56.dp)
                                 )
 
 
@@ -685,5 +645,46 @@ fun QuestionnaireScreen(navController: NavController) {
                 }
             }
         }
+    }
+}
+@Composable
+fun BubblesBackground(content: @Composable BoxScope.() -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+    ) {
+        // Top-left circle
+        Box(
+            modifier = Modifier
+                .size(180.dp)
+                .offset(x = (-90).dp, y = (-30).dp)
+                .background(Color(0x8800FFFF).copy(alpha = 0.3f), shape = CircleShape)
+        )
+        Box(
+            modifier = Modifier
+                .size(180.dp)
+                .offset(x = 10.dp, y = (-90).dp)
+                .background(Color(0x8800FFFF).copy(alpha = 0.3f) , shape = CircleShape)
+        )
+
+
+        // Bottom-right circle
+        Box(
+            modifier = Modifier
+                .size(200.dp)
+                .align(Alignment.BottomEnd)
+                .offset(x = 90.dp, y = 30.dp)
+                .background(Color(0x8800FFFF).copy(alpha = 0.3f), shape = CircleShape)
+        )
+        Box(
+            modifier = Modifier
+                .size(200.dp)
+                .align(Alignment.BottomEnd)
+                .offset(x = (-10).dp, y = 90.dp)
+                .background(Color(0x8800FFFF).copy(alpha = 0.3f), shape = CircleShape)
+        )
+
+        content()
     }
 }

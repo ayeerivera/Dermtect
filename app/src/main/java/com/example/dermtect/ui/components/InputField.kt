@@ -28,11 +28,14 @@ fun InputField(
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
-    iconRes: Int,
-    modifier: Modifier = Modifier,
-    textColor: Color = Color.Black,
+    iconRes: Int?= null,
     isPassword: Boolean = false,
-    errorMessage: String? = null
+    errorMessage: String? = null,
+    modifier: Modifier = Modifier,
+    // NEW: styles you can override per-screen
+    textStyle: TextStyle = MaterialTheme.typography.bodyMedium,
+    placeholderStyle: TextStyle = MaterialTheme.typography.labelMedium,
+    textColor: Color = Color.Black,
 ) {
     var isPasswordVisible by remember { mutableStateOf(false) }
 
@@ -40,17 +43,19 @@ fun InputField(
         TextField(
             value = value,
             onValueChange = onValueChange,
-            placeholder = { Text(placeholder) },
             singleLine = true,
             visualTransformation = if (isPassword && !isPasswordVisible) PasswordVisualTransformation() else VisualTransformation.None,
+
             leadingIcon = {
-                Icon(
-                    painter = painterResource(id = iconRes),
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
+                if (iconRes != null) {    // <- only show icon if available
+                    Icon(
+                        painter = painterResource(id = iconRes),
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             },
-                    trailingIcon = {
+            trailingIcon = {
                 if (isPassword) {
                     val icon = if (isPasswordVisible) R.drawable.on else R.drawable.off
                     IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
@@ -62,22 +67,32 @@ fun InputField(
                     }
                 }
             },
+            textStyle = textStyle.copy(fontWeight = FontWeight.Bold),
+            placeholder = {
+                Text(
+                    text = placeholder,
+                    style = placeholderStyle.copy(fontWeight = FontWeight.Normal),
+                    color = Color.DarkGray,
+                    maxLines = 1,
+                    softWrap = false
+                )
+            },
 
-            textStyle = TextStyle(
-                color = textColor,
-                fontWeight = FontWeight.Normal
-            ),
             shape = RoundedCornerShape(10.dp),
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color(0xFFFFFFFF),      // light soft gray
                 unfocusedContainerColor = Color(0xFFF7F7F7),    // subtle contrast
                 disabledContainerColor = Color(0xFFF0F0F0),     // light gray for disabled
                 focusedIndicatorColor = Color.Transparent,      // your brand teal
-                unfocusedIndicatorColor = Color.Transparent     // very subtle gray
+                unfocusedIndicatorColor = Color.Transparent,
+                focusedTextColor = textColor,
+                unfocusedTextColor = textColor,
+                cursorColor = textColor// very subtle gray
             ),
             modifier = modifier
-                .fillMaxWidth(0.85f)
+                .fillMaxWidth(0.9f)
                 .height(56.dp)
+
         )
 
         // Error message display

@@ -7,8 +7,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -21,10 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.example.dermtect.R
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.remember
@@ -37,6 +32,24 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.sp
+
+// Dialog-style gradient brushes (same as your modal buttons)
+private val PrimaryBrushEnabled = Brush.verticalGradient(
+    colors = listOf(
+        Color(0xFF5FEAEA), // top lighter teal
+        Color(0xFF2A9D9D), // middle teal
+        Color(0xFF187878)  // bottom darker teal
+    )
+)
+
+private val PrimaryBrushDisabled = Brush.verticalGradient(
+    colors = listOf(
+        Color(0xFFBDBDBD),
+        Color(0xFF9E9E9E),
+        Color(0xFF757575)
+    )
+)
 
 @Composable
 fun TopRightNotificationIcon(
@@ -106,129 +119,71 @@ fun PrimaryButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    selected: Boolean = false, // optional: show ✓ when selected
+    height: Dp = 56.dp,
+    cornerRadius: Dp = 12.dp
 ) {
-    EmbossedButton(
-        text = text,
-        onClick = onClick,
+    Box(
         modifier = modifier
-            .fillMaxWidth(0.8f)
-            .height(56.dp),
-        enabled = enabled,
-        selected = selected,
-        cornerRadius = 12.dp, // pill-like
-        // same cyan family you’re using across the app
-        backgroundBrush = if (enabled) {
-            Brush.verticalGradient(
-                colors = listOf(
-                    Color(0xFF5FEAEA),
-                    Color(0xFF2A9D9D),
-                    Color(0xFF187878)
-                )
+            .shadow(
+                elevation = 8.dp,
+                shape = RoundedCornerShape(cornerRadius),
+                clip = false
             )
-        } else {
-            Brush.verticalGradient(
-                colors = listOf(
-                    Color(0xFFBDBDBD),
-                    Color(0xFF9E9E9E),
-                    Color(0xFF757575)
-                )
+            .background(
+                brush = if (enabled) PrimaryBrushEnabled else PrimaryBrushDisabled,
+                shape = RoundedCornerShape(cornerRadius)
             )
-        }
-    )
+            .clickable(enabled = enabled) { onClick() }
+            .height(height),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = Color.White,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
 }
 
 
 @Composable
-fun EmbossedButton(
+fun SecondaryButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    selected: Boolean = false,                // 👈 NEW
-    cornerRadius: Dp = 12.dp,
-    backgroundBrush: Brush? = Brush.linearGradient(
-        colors = listOf(
-            Color(0xFF5FEAEA),
-            Color(0xFF2A9D9D),
-            Color(0xFF187878)
-        ),
-        start = Offset(0f, 0f),
-        end = Offset(0f, Float.POSITIVE_INFINITY)
-    ),
-    disabledBrush: Brush? = Brush.linearGradient(
-        colors = listOf(
-            Color(0xFFC0C0C0),
-            Color(0xFF9E9E9E)
-        )
-    ),
-    textColor: Color = Color.White
+    height: Dp = 56.dp,
+    cornerRadius: Dp = 12.dp
 ) {
-    val borderColor =
-        if (!enabled) Color(0x33000000)
-        else if (selected) Color(0xFF0FB2B2)   // thicker teal border when selected
-        else Color(0x33000000)
-
-    val borderWidth = if (selected) 2.dp else 1.dp
-    val displayText = if (selected) "$text ✓" else text
+    val shape = RoundedCornerShape(cornerRadius)
 
     Box(
         modifier = modifier
-            .height(56.dp)
             .shadow(
-                elevation = if (enabled) 0.dp else 2.dp,
-                shape = RoundedCornerShape(cornerRadius),
+                elevation = 6.dp, // soft embossed feel
+                shape = shape,
                 clip = false
             )
-            .clip(RoundedCornerShape(cornerRadius))
-            .background(
-                brush = if (enabled) backgroundBrush!! else disabledBrush!!,
-                shape = RoundedCornerShape(cornerRadius)
+            .background(color = Color.White, shape = shape)
+            .border(
+                width = 1.dp,
+                color = Color(0xFFDDDDDD), // light gray accent border
+                shape = shape
             )
-            .border(borderWidth, borderColor, RoundedCornerShape(cornerRadius))
-            .clickable(
-                enabled = enabled,
-                onClick = onClick,
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() }
-            )
+            .clickable(enabled = enabled) { onClick() }
+            .height(height),
+        contentAlignment = Alignment.Center
     ) {
-        // Shine overlay + content
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .drawWithContent {
-                    drawContent()
-                    if (enabled) {
-                        drawRoundRect(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.White.copy(alpha = 0.15f),
-                                    Color.Transparent
-                                )
-                            ),
-                            cornerRadius = CornerRadius(cornerRadius.toPx(), cornerRadius.toPx()),
-                            blendMode = BlendMode.Lighten
-                        )
-                    }
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = displayText,
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = if (selected) Color.White else textColor,   // white text when selected
-                    shadow = if (enabled) Shadow(
-                        color = Color.Black.copy(alpha = 0.4f),
-                        offset = Offset(1f, 2f),
-                        blurRadius = 4f
-                    ) else null
-                )
-            )
-        }
+        Text(
+            text = text,
+            color = if (enabled) Color(0xFF4F4F4F) else Color(0xFFBDBDBD),
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
+
 
 
 

@@ -39,7 +39,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import com.example.dermtect.ui.components.BackButton
 import kotlinx.coroutines.launch
-import com.example.dermtect.ui.components.EmbossedButton
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -251,7 +250,7 @@ fun Register(navController: NavController) {
                     isPassword = true,
                     errorMessage = when {
                         password.isNotBlank() && !viewModel.isPasswordStrong(password) ->
-                            "Use at least 8 characters with uppercase, lowercase, number and special character (e.g. DermTect@2024)"
+                            "Use at least 6 characters with uppercase, lowercase, number and special character (e.g. DermTect@2024)"
                         else -> null
                     }
                 )

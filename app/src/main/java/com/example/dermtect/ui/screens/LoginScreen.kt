@@ -52,7 +52,7 @@ import androidx.compose.material3.Scaffold
 import com.example.dermtect.ui.components.BackButton
 import com.example.dermtect.ui.components.DialogTemplate
 import com.example.dermtect.ui.components.GifImage
-import com.example.dermtect.ui.components.EmbossedButton
+import com.example.dermtect.ui.components.SecondaryButton
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.shape.RoundedCornerShape

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -35,7 +36,6 @@ import com.example.dermtect.ui.screens.DermaHistoryScreen
 import com.example.dermtect.ui.screens.DermaAssessmentScreen
 import com.example.dermtect.ui.screens.Register
 import com.example.dermtect.ui.screens.Login
-import com.example.dermtect.ui.screens.ChangePasswordScreen
 import com.example.dermtect.ui.screens.DermaHomeScreen
 import com.example.dermtect.ui.screens.ForgotPass1
 import com.example.dermtect.ui.screens.ForgotPass2
@@ -193,7 +193,6 @@ class MainActivity : ComponentActivity() {
 
                     composable("forgot_pass3") { ForgotPass3(navController) }
                     composable("forgot_pass4") { ForgotPass4(navController) }
-                    composable("change_pass") { ChangePasswordScreen(navController) }
                     composable("terms_privacy") { TermsPrivacyScreen(navController) }
                     composable("user_home") {UserHomeScreen(
                         navController = navController,
@@ -411,4 +410,27 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+}
+@Composable
+fun DemoLesionCaseScreen(navController: androidx.navigation.NavController) {
+    // quick timestamp
+    val ts = java.text.SimpleDateFormat("MMM dd, yyyy HH:mm", java.util.Locale.getDefault())
+        .format(java.util.Date())
+
+    com.example.dermtect.ui.screens.LesionCaseTemplate(
+        imageResId = com.example.dermtect.R.drawable.sample_skin, // use any placeholder you have
+        imageBitmap = null,                     // we’ll let the template show from imageResId
+        camBitmap = null,                       // will auto-fallback to a dummy “heatmap”-like tile
+        title = "Result (Demo)",
+        timestamp = ts,
+        riskTitle = "Risk Assessment",
+        riskDescription = "",                   // template now generates copy itself
+        prediction = "Benign",
+        probability = 0.07f,                    // 7% → will trigger “low concern” flow (≥ 1.12% tau)
+        onBackClick = { navController.popBackStack() },
+        onDownloadClick = { /* no-op in demo */ },
+        onFindClinicClick = { /* no-op in demo */ },
+        showPrimaryButtons = false,             // show the post-save actions
+        showSecondaryActions = true
+    )
 }

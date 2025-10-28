@@ -19,8 +19,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
 import com.example.dermtect.ui.components.GifImage
+import com.example.dermtect.ui.components.PrimaryButton
 import com.example.dermtect.ui.components.ProgressIndicator
-import com.example.dermtect.ui.components.EmbossedButton
+import com.example.dermtect.ui.components.SecondaryButton
 
 @Composable
 fun TutorialScreenTemplate(
@@ -114,30 +115,22 @@ fun TutorialScreenTemplate(
                 }
                 Spacer(modifier = Modifier.height(35.dp))
 
-                EmbossedButton(
+                PrimaryButton(
                     text = nextButtonText,
                     onClick = { navController.navigate(nextRoute) },
                     modifier = Modifier
                         .fillMaxWidth(0.9f)
-                        .wrapContentHeight(),
-                    textColor = Color(0xFFFFFFFF)
+                        .wrapContentHeight()
                 )
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                EmbossedButton(
+                SecondaryButton(
                     onClick = onSkipClick,
                     text = skipButtonText,
                     modifier = Modifier
                         .fillMaxWidth(0.9f)
-                        .wrapContentHeight(),
-                    backgroundBrush = Brush.verticalGradient(
-                            colors = listOf(
-                                Color(0xFFBDBDBD), // top light grey
-                                Color(0xFF9E9E9E), // middle grey
-                                Color(0xFF757575)  // bottom dark grey
-                            )
-                        )
+                        .wrapContentHeight()
                 )
 
             }

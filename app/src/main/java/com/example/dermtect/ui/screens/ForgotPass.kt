@@ -36,8 +36,11 @@ import com.google.firebase.auth.FirebaseAuth
 import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 import android.net.Uri
-
-
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.dermtect.data.repository.AuthRepositoryImpl
+import com.example.dermtect.domain.usecase.AuthUseCase
+import com.example.dermtect.ui.viewmodel.AuthViewModel
+import com.example.dermtect.ui.viewmodel.AuthViewModelFactory
 
 
 @Composable
@@ -242,10 +245,12 @@ fun ForgotPass3(navController: NavController) {
 
 @Composable
 fun ForgotPass4(navController: NavController) {
+    val viewModel: AuthViewModel = viewModel(factory = AuthViewModelFactory(AuthUseCase(AuthRepositoryImpl())))
+
     var password by remember { mutableStateOf("") }
     var confirmPass by remember { mutableStateOf("") }
 
-    val isPasswordValid = password.length >= 6
+    val isPasswordValid = password.length >= 8
     val isMatch = password == confirmPass
     val canSubmit = password.isNotBlank() && confirmPass.isNotBlank() && isPasswordValid && isMatch
 
@@ -282,7 +287,11 @@ fun ForgotPass4(navController: NavController) {
                 placeholder = "Password",
                 iconRes = R.drawable.icon_pass,
                 isPassword = true,
-                errorMessage = if (password.isNotBlank() && !isPasswordValid) "Password must be at least 6 characters" else null
+                errorMessage = when {
+                    password.isNotBlank() && !isPasswordValid ->
+                        "Use at least 8 characters with uppercase, lowercase, number and special character (e.g. DermTect@2024)"
+                    else -> null
+                }
             )
 
             Spacer(modifier = Modifier.height(20.dp))

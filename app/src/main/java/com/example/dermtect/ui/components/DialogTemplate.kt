@@ -3,6 +3,7 @@ package com.example.dermtect.ui.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -46,9 +47,9 @@ fun DialogTemplate(
     onDismiss: () -> Unit,
     extraContent: @Composable (() -> Unit)? = null,
     primaryEnabled: Boolean = true,
-    secondaryEnabled: Boolean = true,   // 👈 ADD THIS
+    secondaryEnabled: Boolean = true,
     tertiaryEnabled: Boolean = true
-    ) {
+) {
     if (show) {
         LaunchedEffect(show) {
             if (autoDismiss && primaryText == null && secondaryText == null && tertiaryText == null) {
@@ -60,7 +61,7 @@ fun DialogTemplate(
         Dialog(onDismissRequest = { onDismiss() }) {
             Card(
                 modifier = Modifier
-                    .fillMaxWidth(0.85f)
+                    .fillMaxWidth()
                     .wrapContentSize(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White)
@@ -155,35 +156,25 @@ fun DialogTemplate(
                     }
 
 // 🔹 SECONDARY (Gray gradient)
-                    // 🔹 SECONDARY (Gray gradient same as Login; unclickable if secondaryEnabled = false)
                     secondaryText?.let {
                         Spacer(modifier = Modifier.height(8.dp))
-
-                        val buttonColors = if (secondaryEnabled) {
-                            listOf(
-                                Color(0xFFBDBDBD), // top light gray
-                                Color(0xFF9E9E9E), // middle gray
-                                Color(0xFF757575)  // bottom dark gray
-                            )
-                        } else {
-                            listOf(
-                                Color(0xFFBDBDBD), // same disabled tones as Login screen
-                                Color(0xFF9E9E9E),
-                                Color(0xFF757575)
-                            )
-                        }
 
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth(0.9f)
                                 .height(50.dp)
                                 .shadow(
-                                    elevation = 8.dp,
+                                    elevation = 6.dp, // soft shadow for embossed effect
                                     shape = RoundedCornerShape(12.dp),
                                     clip = false
                                 )
                                 .background(
-                                    brush = Brush.verticalGradient(colors = buttonColors),
+                                    color = Color.White,
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    color = Color(0xFFDDDDDD), // light gray accent border
                                     shape = RoundedCornerShape(12.dp)
                                 )
                                 .clickable(enabled = secondaryEnabled) {
@@ -194,31 +185,51 @@ fun DialogTemplate(
                         ) {
                             Text(
                                 text = it,
-                                color = if (secondaryEnabled) Color.White else Color.LightGray,
+                                color = if (secondaryEnabled) Color(0xFF4F4F4F) else Color(
+                                    0xFFBDBDBD
+                                ), // darker gray text
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                     }
 
-
 // 🔹 TERTIARY (Flat Text Button — “Cancel” style)
                     tertiaryText?.let {
                         Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = it,
-                            color = Color(0xFF0FB2B2),
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            textAlign = TextAlign.Center,
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth(0.9f)
-                                .clickable {
-                                    onTertiary?.invoke()
+                                .height(50.dp)
+                                .shadow(
+                                    elevation = 6.dp, // soft shadow for embossed effect
+                                    shape = RoundedCornerShape(12.dp),
+                                    clip = false
+                                )
+                                .background(
+                                    color = Color.White,
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    color = Color(0xFFDDDDDD), // light gray accent border
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .clickable(enabled = secondaryEnabled) {
+                                    onSecondary?.invoke()
                                     onDismiss()
-                                }
-                                .padding(vertical = 6.dp)
-                        )
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = it,
+                                color = if (secondaryEnabled) Color(0xFF4F4F4F) else Color(
+                                    0xFFBDBDBD
+                                ), // darker gray text
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
 
                 }
@@ -272,22 +283,4 @@ fun Dialog3(navController: NavController) {
         onTertiary = { /* Handle info */ },
         onDismiss = { show = false }
     )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun Dialog1Preview() {
-    Dialog1(navController = rememberNavController())
-}
-
-@Preview(showBackground = true)
-@Composable
-fun Dialog2Preview() {
-    Dialog2(navController = rememberNavController())
-}
-
-@Preview(showBackground = true)
-@Composable
-fun Dialog3Preview() {
-    Dialog3(navController = rememberNavController())
 }

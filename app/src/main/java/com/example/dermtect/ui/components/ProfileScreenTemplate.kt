@@ -1,6 +1,5 @@
 package com.example.dermtect.ui.components
 
-import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.example.dermtect.ui.viewmodel.AuthViewModel
@@ -47,7 +46,13 @@ import com.example.dermtect.domain.usecase.AuthUseCase
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import androidx.compose.ui.platform.LocalContext
-
+import com.google.firebase.auth.EmailAuthProvider
+import android.widget.Toast
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import com.google.firebase.auth.FirebaseAuth
+import androidx.compose.material3.Icon
 
 @Composable
 fun ProfileScreenTemplate(
@@ -83,11 +88,11 @@ fun ProfileScreenTemplate(
         factory = AuthViewModelFactory(AuthUseCase(AuthRepositoryImpl()))
     )
     val coroutineScope = rememberCoroutineScope()
-
+    var showChangePass by remember { mutableStateOf(false) }
+    var isLoadingChange by remember { mutableStateOf(false) }
     var passwordInput by remember { mutableStateOf("") }
     var showPasswordError by remember { mutableStateOf(false) }
     var triggerNavigation by remember { mutableStateOf(false) }
-
     val collection = "users"
     LaunchedEffect(Unit) { sharedProfileViewModel.loadPhoto(collection) }
 
@@ -214,7 +219,7 @@ fun ProfileScreenTemplate(
                         .clip(RoundedCornerShape(12.dp))
                         .background(Color(0xFFEDFFFF))
                 ) {
-                    AccountInfoRow(email = email, isGoogleAccount = isGoogleAccount)
+                    AccountIdentityRow(email = email, isGoogleAccount = isGoogleAccount)
                 }
 
                 Spacer(modifier = Modifier.height(30.dp))
@@ -246,10 +251,41 @@ fun ProfileScreenTemplate(
                         )
                     },
                     label = "Change Password",
-                    onClick = {
-                        navController.navigate("change_pass")
-                    }
+                    onClick = { showChangePass = true }
                 )
+                if (showChangePass) {
+                    ChangePasswordDialog(
+                        show = showChangePass,
+                        isLoading = isLoadingChange,
+                        onDismiss = { showChangePass = false },
+                        onConfirm = { current, new ->
+                            val user = FirebaseAuth.getInstance().currentUser
+                            val email = user?.email
+                            if (user != null && email != null) {
+                                isLoadingChange = true
+                                val cred = EmailAuthProvider.getCredential(email, current)
+                                user.reauthenticate(cred).addOnCompleteListener { authTask ->
+                                    if (authTask.isSuccessful) {
+                                        user.updatePassword(new).addOnCompleteListener { upd ->
+                                            isLoadingChange = false
+                                            if (upd.isSuccessful) {
+                                                showChangePass = false
+                                                Toast.makeText(context, "Password updated", Toast.LENGTH_SHORT).show() // ✅ use captured context
+                                            } else {
+                                                Toast.makeText(context, upd.exception?.message ?: "Failed to update password", Toast.LENGTH_LONG).show()
+                                            }
+                                        }
+                                    } else {
+                                        isLoadingChange = false
+                                        Toast.makeText(context, authTask.exception?.message ?: "Re-authentication failed", Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            } else {
+                                Toast.makeText(context, "User not logged in", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    )
+                }
 
                 if (userRole == "user") {
                     AssessmentRow(
@@ -285,6 +321,7 @@ fun ProfileScreenTemplate(
             }
         }
     }
+
 
     if (showPhoto) {
         Box(
@@ -386,7 +423,7 @@ fun ProfileScreenTemplate(
         show = showDeleteDialog,
         title = "Deactivate Account?",
         description = "Please enter your password to confirm. This action is irreversible.",
-        primaryText = "Yes, Deactivate my Account",
+        primaryText = "Deactivate my Account",
         onPrimary = {
             if (passwordInput.isBlank()) {
                 showPasswordError = true
@@ -427,15 +464,19 @@ fun ProfileScreenTemplate(
         },
         extraContent = {
             Column {
-                OutlinedTextField(
+                InputField(
                     value = passwordInput,
-                    onValueChange = { passwordInput = it },
-                    label = { Text("Enter your password") },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier
-                        .fillMaxWidth(0.9f)
-                        .padding(top = 8.dp)
+                    onValueChange = {
+                        passwordInput = it
+                        if (showPasswordError) showPasswordError = false
+                    },
+                    placeholder = "Enter your password",
+                    iconRes = R.drawable.icon_pass,
+                    isPassword = true,
+                    errorMessage = if (showPasswordError) "Incorrect password. Please try again." else null,
+                    modifier = Modifier.fillMaxWidth(),                   // ⬅️ full width so placeholder doesn't truncate
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    placeholderStyle = MaterialTheme.typography.labelMedium
                 )
                 if (showPasswordError) {
                     Text(
@@ -517,19 +558,24 @@ fun ProfileScreenTemplate(
                 }
             },
             extraContent = {
-                Column {
-                    OutlinedTextField(
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    InputField(
                         value = editedFirstName,
                         onValueChange = { editedFirstName = it },
-                        label = { Text("First Name") }
+                        placeholder = "First Name",
+                        isPassword = false,
+                        modifier = Modifier.fillMaxWidth()
                     )
-                    OutlinedTextField(
+                    InputField(
                         value = editedLastName,
                         onValueChange = { editedLastName = it },
-                        label = { Text("Last Name") }
+                        placeholder = "Last Name",
+                        isPassword = false,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
+
         )
     }
 
@@ -735,6 +781,165 @@ fun EditName(icon: @Composable () -> Unit, label: String, onClick: () -> Unit) {
                 tint = Color(0xFF0FB2B2),
                 modifier = Modifier.size(15.dp)
             )
+        }
+    }
+}
+
+@Composable
+fun ChangePasswordDialog(
+    show: Boolean,
+    isLoading: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (current: String, newPass: String) -> Unit
+) {
+    val viewModel: AuthViewModel = viewModel(factory = AuthViewModelFactory(AuthUseCase(AuthRepositoryImpl())))
+
+    var current by remember { mutableStateOf("") }
+    var pass by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+
+    val passValid = viewModel.isPasswordStrong(pass)
+    val matches = pass == confirm
+    val canSubmit = current.isNotBlank() && passValid && matches && !isLoading
+
+    DialogTemplate(
+        show = show,
+        title = "Change Password",
+        description = "Set a new password for your account.",
+        primaryText = "Update",
+        onPrimary = { onConfirm(current, pass) },
+        secondaryText = "Cancel",
+        onSecondary = { onDismiss() },
+        primaryEnabled = canSubmit,
+        secondaryEnabled = !isLoading,
+        onDismiss = onDismiss,
+        extraContent = {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                InputField(
+                    value = current,
+                    onValueChange = { current = it },
+                    placeholder = "Enter Current Password",
+                    iconRes = R.drawable.icon_pass,
+                    isPassword = true,
+                    errorMessage = null,
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = MaterialTheme.typography.bodyMedium,        // 👈 apply size/style
+                    placeholderStyle = MaterialTheme.typography.labelMedium// width 90% of modal
+                )
+                Spacer(Modifier.height(12.dp))
+                InputField(
+                    value = pass,
+                    onValueChange = { pass = it },
+                    placeholder = "Enter New Password",
+                    iconRes = R.drawable.icon_pass,
+                    isPassword = true,
+                    errorMessage = when {
+                        pass.isNotBlank() && !passValid ->
+                            "Use at least 8 characters with uppercase, lowercase, number and special character (e.g. DermTect@2024)"
+                        else -> null
+
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = MaterialTheme.typography.bodyMedium,        // 👈 apply size/style
+                    placeholderStyle = MaterialTheme.typography.labelMedium
+                )
+                Spacer(Modifier.height(12.dp))
+                InputField(
+                    value = confirm,
+                    onValueChange = { confirm = it },
+                    placeholder = "Confirm New Password",
+                    iconRes = R.drawable.icon_pass,
+                    isPassword = true,
+                    errorMessage = if (confirm.isNotBlank() && !matches) "Passwords do not match" else null,
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    placeholderStyle = MaterialTheme.typography.labelMedium  // width 90% of modal
+                )
+                if (isLoading) {
+                    Spacer(Modifier.height(16.dp))
+                    CircularProgressIndicator()
+                }
+            }
+        }
+    )
+}
+
+
+@Composable
+private fun Label(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+        color = Color(0xFF1D1D1D),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 8.dp, bottom = 6.dp)
+    )
+}
+@Composable
+fun AccountIdentityRow(email: String, isGoogleAccount: Boolean) {
+
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(start = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        if (isGoogleAccount) {
+            Box(
+                modifier = Modifier
+                    .size(width = 62.dp, height = 57.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFFCDFFFF)),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.google_logo),
+                    contentDescription = "Google Icon",
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(width = 62.dp, height = 57.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFFCDFFFF)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Email,
+                    contentDescription = "Email",
+                    tint = Color(0xFF0FB2B2),
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        }
+
+        Column(horizontalAlignment = Alignment.Start) {
+            Text(
+                text = email,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF484848)
+            )
+
+            if (isGoogleAccount) {
+                Text(
+                    text = "Google Account",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal),
+                    color = Color.Gray,
+                )
+            } else {
+                Text(
+                    text = "Email",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal),
+                    color = Color.Gray,
+                )
+            }
+
         }
     }
 }

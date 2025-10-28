@@ -660,7 +660,8 @@ fun TakePhotoScreen(
                                 }
 
                             },
-                            onFindClinicClick = { onFindClinicClick() }
+                            onFindClinicClick = { onFindClinicClick() },
+                            compact = true
                         )
                         if (showPrivacyDialog) {
                             AlertDialog(
@@ -772,7 +773,8 @@ fun TakePhotoScreen(
                                             }
                                         }
                                     ) { Text("Cancel") }
-                                }
+                                },
+
                             )
                         }
 

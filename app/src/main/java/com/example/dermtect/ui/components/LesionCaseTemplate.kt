@@ -22,33 +22,42 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.dermtect.R
 import com.example.dermtect.ui.components.BackButton
 import com.example.dermtect.ui.components.BubblesBackground
-import java.util.Locale
-import kotlin.compareTo
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.ui.draw.rotate
+import kotlinx.coroutines.launch
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import com.example.dermtect.ui.components.DialogTemplate
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LesionCaseTemplate(
     imageResId: Int? = null,
@@ -71,9 +80,10 @@ fun LesionCaseTemplate(
     onImageClick: (page: Int) -> Unit = {},
     unsavedHeightFraction: Float = 0.55f,   // ~bigger before saving
     savedHeightFraction: Float = 0.35f,     // smaller after saving
-    isSaving: Boolean = false
+    isSaving: Boolean = false,
+    compact: Boolean = false,
 
-) {
+    ) {
 // Which condition to show info for (null = no dialog)
     var showInfoFor by remember { mutableStateOf<String?>(null) }
 
@@ -93,10 +103,23 @@ fun LesionCaseTemplate(
     var fullImagePage by remember { mutableStateOf<Int?>(null) } // 0 = photo, 1 = heatmap
 
     BubblesBackground {
+        val scrollState = rememberScrollState()
+        val scope = rememberCoroutineScope()
+        val atBottom = remember { derivedStateOf { scrollState.value >= (scrollState.maxValue - 8) } }.value
+        val canScroll = remember { derivedStateOf { scrollState.maxValue > 0 } }.value
+
+        // OPTIONAL: account for the navigation bar so the chip isn’t too low
+        val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+
+        val arrowRotation by animateFloatAsState(
+            targetValue = if (atBottom) 180f else 0f,
+            label = "arrowRotation"
+        )
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(top = 50.dp, bottom = 20.dp, start = 20.dp, end = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -113,7 +136,7 @@ fun LesionCaseTemplate(
             Spacer(Modifier.height(6.dp))
             Text(
                 text = timestamp,
-                style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray),
+                style = MaterialTheme.typography.bodyMedium.copy(color = Color.Black, fontWeight = FontWeight.Normal),
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -273,7 +296,7 @@ fun LesionCaseTemplate(
                 Spacer(Modifier.height(12.dp))
 
                 Text(
-                    text = "Possible Identifications",
+                    text = "Possible Skin Condition",
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                     color = Color.Black,
                     modifier = Modifier.fillMaxWidth()
@@ -395,6 +418,7 @@ fun LesionCaseTemplate(
                     imageResId = R.drawable.nearby_clinics,
                     onClick = onFindClinicClick
                 )
+                Spacer(Modifier.height(20.dp))
             }
             if (fullImagePage != null) {
                 Dialog(
@@ -430,6 +454,50 @@ fun LesionCaseTemplate(
                 }
             }
         }
+        // ▼▼ fixed bottom-center overlay (sibling of Column)
+        AnimatedVisibility(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)   // keep it pinned to bottom
+                .padding(bottom = 20.dp),        // lift above buttons a bit
+            visible = canScroll && !atBottom,    // hide when already at bottom
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(50.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.9f))
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.linearGradient(
+                            listOf(
+                                Color(0xFFBFFDFD),
+                                Color(0xFF88E7E7),
+                                Color(0xFF55BFBF)
+                            )
+                        ),
+                        shape = CircleShape
+                    )
+                    .clickable {
+                        scope.launch {
+                            // Always scroll down; no more "scroll up"
+                            val target = scrollState.maxValue
+                            scrollState.animateScrollTo(target)
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.ArrowDownward,
+                    contentDescription = "Scroll down",
+                    tint = Color(0xFF0FB2B2),
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        }
+
+
     }
 
     if (isSaving) {
@@ -466,47 +534,44 @@ fun LesionCaseTemplate(
     // Info dialog for a tapped condition
     showInfoFor?.let { name ->
         val info = conditionInfo[name]
-        AlertDialog(
-            onDismissRequest = { showInfoFor = null },
-            confirmButton = {
-                TextButton(onClick = { showInfoFor = null }) { Text("Close",                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
-                ) }
-            },
-            title = {
-                Text(
-                    text = name,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
-                )
-            },
-            text = {
+
+        DialogTemplate(
+            show = true,
+            title = name,
+            description = info?.what ?: "No description available.",
+            primaryText = "Close",
+            onPrimary = { showInfoFor = null },
+            onDismiss = { showInfoFor = null },
+            extraContent = {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        text = info?.what ?: "No description available.",
-                        color = Color.Black,
-                        textAlign = TextAlign.Center
-                    )
                     Spacer(Modifier.height(15.dp))
                     Text(
-                        text = "Common signs:",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        text = buildAnnotatedString {
+                            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                                append("Common signs:")
+                            }
+                        },
                         color = Color.Black,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodyMedium
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = info?.symptoms ?: "—",
+                        text = (info?.symptoms ?: "—").trim(),
                         color = Color.Black,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Normal  // 👈 symptoms in normal weight
+                        )
                     )
                 }
             }
         )
     }
+
 
 }
 

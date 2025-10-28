@@ -19,7 +19,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.example.dermtect.ui.components.EmbossedButton
+import com.example.dermtect.ui.components.SecondaryButton
 
 @Composable
 fun PrivacyConsentDialog(
@@ -127,12 +127,10 @@ fun PrivacyConsentContent(
             listOf(Color(0xFFBDBDBD), Color(0xFF9E9E9E), Color(0xFF757575))
         )
 
-        EmbossedButton(
+        SecondaryButton(
             text = "Consent",
             onClick = onConsent,
             enabled = isChecked,
-            backgroundBrush = if (isChecked) activeBrush else disabledBrush,
-            textColor = Color.White,
             cornerRadius = 12.dp,
             modifier = Modifier
                 .fillMaxWidth()
@@ -141,13 +139,10 @@ fun PrivacyConsentContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        EmbossedButton(
+        SecondaryButton(
             text = "Do Not Consent",
             onClick = onDecline,
-            backgroundBrush = Brush.linearGradient(
-                listOf(Color(0xFFF0F0F0), Color(0xFFF0F0F0))
-            ),
-            textColor = Color(0xFF0FB2B2),
+
             cornerRadius = 12.dp,
             modifier = Modifier
                 .fillMaxWidth()
