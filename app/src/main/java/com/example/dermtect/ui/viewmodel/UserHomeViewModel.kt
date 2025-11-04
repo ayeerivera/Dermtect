@@ -14,7 +14,8 @@ import androidx.lifecycle.AndroidViewModel
 import com.example.dermtect.model.Clinic
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
-
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.tasks.await
 
 class UserHomeViewModel(application: Application) : AndroidViewModel(application) {
     private val context = application.applicationContext
@@ -43,6 +44,8 @@ class UserHomeViewModel(application: Application) : AndroidViewModel(application
     private val _role = MutableStateFlow<String?>(null)
     val role: StateFlow<String?> = _role
 
+    private val _tutorialSeen = MutableStateFlow<Boolean?>(null) // null = loading
+    val tutorialSeen = _tutorialSeen.asStateFlow()
     fun fetchUserInfo() {
         if (uid.isEmpty()) return
         viewModelScope.launch {
@@ -246,4 +249,22 @@ class UserHomeViewModel(application: Application) : AndroidViewModel(application
                 _lastName.value = lastName
             }
     }
+    suspend fun loadTutorialSeenRemote() {
+        val uid = auth.currentUser?.uid ?: run { _tutorialSeen.value = true; return } // no user → don't show
+        try {
+            val snap = db.collection("users").document(uid).get().await()
+            _tutorialSeen.value = snap.getBoolean("tutorial_v1_seen") ?: false
+        } catch (_: Exception) {
+            _tutorialSeen.value = false // fail open: still show tutorial once
+        }
+    }
+
+    fun markTutorialSeenRemote() {
+        val uid = auth.currentUser?.uid ?: return
+        db.collection("users").document(uid)
+            .update("tutorial_v1_seen", true)
+            .addOnSuccessListener { _tutorialSeen.value = true }
+            .addOnFailureListener { /* optional: retry/backoff */ }
+    }
+
 }

@@ -47,19 +47,46 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-
+import com.example.dermtect.ui.viewmodel.SharedProfileViewModel
+import androidx.compose.material.icons.outlined.Assignment
+import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Logout
+import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.Security
+import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.Dp
+import com.example.dermtect.ui.components.DialogTemplate
+import androidx.compose.runtime.collectAsState
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.Icon
 
 @Composable
 fun ProfileDropdownMenu(
     name: String,
+    photoUri: Uri?,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
-    onNotificationsClick: () -> Unit,
-    onSettingsClick: () -> Unit,
-    onProfileClick: () -> Unit,
+    assessmentLabel: String,                 // "My Initial Assessment" or "Start Assessment"
+    onEditProfile: () -> Unit,
+    onAssessmentClick: () -> Unit,
+    onViewNotifications: () -> Unit,
+    onAboutClick: () -> Unit,
+    onDataPrivacyClick: () -> Unit,
     onLogoutClick: () -> Unit
 ) {
+    // Brand-ish colors
+    val edge = listOf(Color(0xFFBFFDFD), Color(0xFF88E7E7), Color(0xFF55BFBF))
+    val radius = 16.dp
+    val rowH = 48.dp
+    val divider = Color(0xFFECECEC)
+    val labelColor = Color(0xFF1D1D1D)
+    var showLogoutDialog by remember { mutableStateOf(false) }
+
     Box {
+        // Trigger (avatar + chevron)
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
@@ -67,69 +94,234 @@ fun ProfileDropdownMenu(
                 .clickable { onExpandedChange(true) }
                 .padding(horizontal = 6.dp, vertical = 6.dp)
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.profilepicture),
-                contentDescription = "Profile",
-                modifier = Modifier
-                    .size(35.dp)
-                    .clip(CircleShape)
-            )
-
-            Spacer(modifier = Modifier.width(6.dp))
-
+            if (photoUri != null) {
+                AsyncImage(
+                    model = photoUri,
+                    contentDescription = "Profile",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(35.dp).clip(CircleShape)
+                )
+            } else {
+                Image(
+                    painter = painterResource(id = R.drawable.profilepicture),
+                    contentDescription = "Profile",
+                    modifier = Modifier.size(35.dp).clip(CircleShape)
+                )
+            }
+            Spacer(Modifier.width(6.dp))
             Icon(
                 imageVector = Icons.Default.ArrowDropDown,
                 contentDescription = "Menu",
-                modifier = Modifier.size(35.dp),
+                modifier = Modifier.size(32.dp),
                 tint = Color(0xFF1D1D1D)
             )
         }
 
-        MaterialTheme(
-            shapes = MaterialTheme.shapes.copy(extraSmall = RoundedCornerShape(16.dp))
+        // Dropdown panel (custom card inside)
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { onExpandedChange(false) },
+            modifier = Modifier.padding(top = 4.dp), // tiny breathing space
+            offset = DpOffset(0.dp, 8.dp),
+            containerColor = Color.Transparent
         ) {
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { onExpandedChange(false) },
-                modifier = Modifier.width(200.dp)
+            // Gradient edge wrapper
+            Box(
+                modifier = Modifier
+                    .width(300.dp)
+                    .shadow(12.dp, RoundedCornerShape(radius))
+                    .background(Brush.verticalGradient(edge), RoundedCornerShape(radius))
+                    .padding(1.dp)
             ) {
-                val itemFontSize = 18.sp
-                val itemPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                Surface(
+                    shape = RoundedCornerShape(radius - 1.dp),
+                    color = Color.White
+                ) {
+                    Column(Modifier.padding(vertical = 6.dp)) {
+                        // Header — photo + name (tap → Edit Profile)
+                        ProfileDropdownHeader(
+                            photoUri = photoUri,
+                            name = name
+                        ) {
+                            onExpandedChange(false)
+                            onEditProfile()
+                        }
 
-                DropdownMenuItem(
-                    text = { Text("Notifications", fontSize = itemFontSize) },
-                    onClick = {
-                        onExpandedChange(false)
-                        onNotificationsClick()
-                    },
-                    contentPadding = itemPadding
-                )
-                DropdownMenuItem(
-                    text = { Text("Settings", fontSize = itemFontSize) },
-                    onClick = {
-                        onExpandedChange(false)
-                        onSettingsClick()
-                    },
-                    contentPadding = itemPadding
-                )
-                DropdownMenuItem(
-                    text = { Text("Profile", fontSize = itemFontSize) },
-                    onClick = {
-                        onExpandedChange(false)
-                        onProfileClick()
-                    },
-                    contentPadding = itemPadding
-                )
-                DropdownMenuItem(
-                    text = { Text("Logout", fontSize = itemFontSize) },
-                    onClick = {
-                        onExpandedChange(false)
-                        onLogoutClick()
-                    },
-                    contentPadding = itemPadding
-                )
+                        Divider(color = divider)
+
+                        MenuRow(
+                            label = "View Notifications",
+                            rowHeight = rowH,
+                            onClick = {
+                                onExpandedChange(false); onViewNotifications()
+                            }
+                        ) {
+                            IconBadge { Icon(Icons.Outlined.NotificationsNone, null, tint = Color(0xFF2B6E6E)) }
+                        }
+
+                        MenuRow(
+                            label = "Edit Profile",
+                            rowHeight = rowH,
+                            onClick = {
+                                onExpandedChange(false); onEditProfile()
+                            }
+                        ) {
+                            IconBadge { Icon(Icons.Outlined.Edit, null, tint = Color(0xFF2B6E6E)) }
+                        }
+
+
+                        Divider(color = divider)
+
+                        MenuRow(
+                            label = assessmentLabel,
+                            rowHeight = rowH,
+                            onClick = {
+                                onExpandedChange(false); onAssessmentClick()
+                            }
+                        ) {
+                            IconBadge { Icon(Icons.Outlined.Assignment, null, tint = Color(0xFF2B6E6E)) }
+                        }
+
+
+
+                        MenuRow(
+                            label = "About",
+                            rowHeight = rowH,
+                            onClick = {
+                                onExpandedChange(false); onAboutClick()
+                            }
+                        ) {
+                            IconBadge { Icon(Icons.Outlined.Info, null, tint = Color(0xFF2B6E6E)) }
+                        }
+
+                        MenuRow(
+                            label = "Data & Privacy",
+                            rowHeight = rowH,
+                            onClick = {
+                                onExpandedChange(false); onDataPrivacyClick()
+                            }
+                        ) {
+                            IconBadge { Icon(Icons.Outlined.Security, null, tint = Color(0xFF2B6E6E)) }
+                        }
+
+                        Divider(color = divider)
+
+                        MenuRow(
+                            label = "Logout",
+                            rowHeight = rowH,
+                            labelColor = Color(0xFFB00020),
+                            onClick = {
+                                    showLogoutDialog = true
+                            }
+                        ) {
+                            IconBadge(bg = Color(0xFFFFF1F1)) { Icon(Icons.Outlined.Logout, null, tint = Color(0xFFB00020)) }
+                        }
+                    }
+                }
             }
         }
+    }
+    DialogTemplate(
+        show = showLogoutDialog,
+        title = "Confirm logout?",
+        primaryText = "Yes, Logout",
+        onPrimary = {
+            showLogoutDialog = false
+            onExpandedChange(false)
+            onLogoutClick()  // <-- delegate to the screen
+        },
+        secondaryText = "Stay logged in",
+        onSecondary = { showLogoutDialog = false },
+        onDismiss = { showLogoutDialog = false }
+    )
+}
+
+@Composable
+private fun ProfileDropdownHeader(
+    photoUri: Uri?,
+    name: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (photoUri != null) {
+            AsyncImage(
+                model = photoUri,
+                contentDescription = "Profile photo",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(45.dp).clip(CircleShape)
+            )
+        } else {
+            Image(
+                painter = painterResource(id = R.drawable.profilepicture),
+                contentDescription = "Default photo",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(45.dp).clip(CircleShape)
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = name.ifBlank { "User" },
+            style = MaterialTheme.typography.headlineSmall.copy(color = Color(0xFF1D1D1D)),
+            maxLines = 1
+        )
+    }
+}
+
+/* ---------- Reusable bits ---------- */
+
+@Composable
+private fun IconBadge(
+    bg: Color = Color(0xFFEFF9F9),
+    content: @Composable BoxScope.() -> Unit
+) {
+    Box(
+        modifier = Modifier.size(36.dp).background(bg, CircleShape),
+        contentAlignment = Alignment.Center,
+        content = content
+    )
+}
+
+@Composable
+private fun MenuRow(
+    label: String,
+    rowHeight: Dp,
+    labelColor: Color = Color(0xFF1D1D1D),
+    onClick: () -> Unit,
+    leading: @Composable (() -> Unit)? = null,
+    content: @Composable () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(rowHeight)
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Leading icon badge
+        content()
+
+        Spacer(Modifier.width(12.dp))
+
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium.copy(color = labelColor),
+            modifier = Modifier.weight(1f),
+            maxLines = 1
+        )
+
+        Icon(
+            imageVector = Icons.Outlined.ChevronRight,
+            contentDescription = null,
+            tint = Color(0xFF9AA7A7)
+        )
     }
 }
 
@@ -140,7 +332,10 @@ fun UserHomeScreen(
     tutorialManager: TutorialManager
 ) {
     val viewModel: UserHomeViewModel = viewModel()
+    val sharedProfileViewModel: SharedProfileViewModel = viewModel()   // 👈 NEW
+
     var showConsentDialog by remember { mutableStateOf(false) }
+    var menuExpanded by remember { mutableStateOf(false) }              // 👈 keep only ONE
 
     val firstName by viewModel.firstName.collectAsState()
     val lastName by viewModel.lastName.collectAsState()
@@ -148,18 +343,29 @@ fun UserHomeScreen(
     val isGoogleAccount by viewModel.isGoogleAccount.collectAsState()
     val userRole = "user"
 
+// Load profile photo once
+    LaunchedEffect(Unit) { sharedProfileViewModel.loadPhoto("users") }  // 👈 NEW
+    val profileUri by sharedProfileViewModel.selectedImageUri.collectAsState()  // 👈 NEW
+
     val hasConsented by viewModel.hasConsented.collectAsState()
-    val coroutineScope = rememberCoroutineScope()
     val consentChecked by viewModel.consentChecked.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
     var pendingCameraAction by remember { mutableStateOf(false) }
     val newsItems by viewModel.newsItems.collectAsState()
     val isLoadingNews by viewModel.isLoadingNews.collectAsState()
     val highlightItem by viewModel.highlightItem.collectAsState()
     val gson = remember { Gson() }
-
     var showTutorial by remember { mutableStateOf(true) }
 
-    var menuExpanded by remember { mutableStateOf(false) }
+    var hasInitialAssessment by remember { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(Unit) {
+        try {
+            hasInitialAssessment = viewModel.hasAnsweredQuestionnaire()
+        } catch (_: Exception) {
+            hasInitialAssessment = false
+        }
+    }
+    val assessmentLabel = if (hasInitialAssessment == true) "My Initial Assessment" else "Start Assessment"
 
     LaunchedEffect(Unit) {
         viewModel.fetchUserInfo()
@@ -172,6 +378,10 @@ fun UserHomeScreen(
             showConsentDialog = true
         }
     }
+    val tutorialSeen by viewModel.tutorialSeen.collectAsState()
+
+    // Load once
+    LaunchedEffect(Unit) { viewModel.loadTutorialSeenRemote() }
 
     Box(
         modifier = Modifier
@@ -229,35 +439,41 @@ fun UserHomeScreen(
                         .align(Alignment.TopEnd)
                         .padding(top = 8.dp)
                         .onGloballyPositioned { coordinates ->
-                            if (tutorialManager.getStepKey() == "notification") {
+                            if (tutorialManager.getStepKey() == "profile_menu") {
                                 tutorialManager.currentTargetBounds = coordinates.boundsInRoot()
                             }
                         }
                 ) {
                     ProfileDropdownMenu(
-                        name = firstName,
+                        name = "$firstName $lastName",
+                        photoUri = profileUri,
                         expanded = menuExpanded,
                         onExpandedChange = { menuExpanded = it },
-                        onNotificationsClick = {
-                            if (!hasConsented) {
-                                showConsentDialog = true
-                                return@ProfileDropdownMenu
-                            }
-                            navController.navigate("notifications")
-                        },
-                        onSettingsClick = {
-                            navController.navigate("user_settings")
-                        },
-                        onProfileClick = {
+                        assessmentLabel = assessmentLabel,
+                        onEditProfile = {
                             val encodedFirstName = Uri.encode(firstName)
                             val encodedLastName = Uri.encode(lastName)
                             val encodedEmail = Uri.encode(email)
-                            navController.navigate("profile/$encodedFirstName/$encodedLastName/$encodedEmail/$isGoogleAccount/$userRole")
+                            navController.navigate(
+                                "profile/$encodedFirstName/$encodedLastName/$encodedEmail/$isGoogleAccount/$userRole"
+                            )
                         },
-                        onLogoutClick = {
-                            navController.navigate("login")
-                        }
+                        onAssessmentClick = {
+                            // If none yet, start; if exists, open the same screen (your app already routes accordingly)
+                            navController.navigate("questionnaire")
+                        },
+                        onViewNotifications = {
+                            if (!hasConsented) {
+                                showConsentDialog = true
+                            } else {
+                                navController.navigate("notifications")
+                            }
+                        },
+                        onAboutClick = { navController.navigate("about") },
+                        onDataPrivacyClick = { navController.navigate("terms_privacy") },
+                        onLogoutClick = { navController.navigate("login") }
                     )
+
                 }
             }
 
@@ -353,16 +569,6 @@ fun UserHomeScreen(
         )
     }
 
-    if (showTutorial) {
-        TutorialOverlay(
-            tutorialManager = tutorialManager,
-            onFinish = {
-                showTutorial = false
-                tutorialManager.currentTargetBounds = null
-            }
-        )
-    }
-
     if (showConsentDialog && !hasConsented) {
         PrivacyConsentDialog(
             show = showConsentDialog,
@@ -374,6 +580,15 @@ fun UserHomeScreen(
                 showConsentDialog = false
             },
             onViewTermsClick = { navController.navigate("terms_privacy") }
+        )
+    }
+    if (showTutorial) {
+        TutorialOverlay(
+            tutorialManager = tutorialManager,
+            onFinish = {
+                tutorialManager.currentTargetBounds = null
+                viewModel.markTutorialSeenRemote()
+            }
         )
     }
 }
@@ -781,203 +996,78 @@ fun BottomNavBar(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.home_icon),
-                    contentDescription = "Home",
+                // Left & right spacers so the bar keeps its height and looks balanced
+                Spacer(modifier = Modifier.size(30.dp))
+                Spacer(modifier = Modifier.size(30.dp))
+            }
+        }
+                Box(
                     modifier = Modifier
-                        .size(30.dp)
-                        .onGloballyPositioned { coords ->
-                            if (tutorialManager.getStepKey() == "home") {
-                                tutorialManager.currentTargetBounds = coords.boundsInRoot()
-                            }
-                        }
-                )
-                Image(
-                    painter = painterResource(id = R.drawable.user_vector),
-                    contentDescription = "Settings",
-                    modifier = Modifier
-                        .size(26.dp)
-                        .onGloballyPositioned { coords ->
-                            if (tutorialManager.getStepKey() == "settings") {
-                                tutorialManager.currentTargetBounds = coords.boundsInRoot()
+                        .align(Alignment.TopCenter)
+                        .offset(y = (-28).dp)
+                        .size(70.dp)
+                        .shadow(
+                            elevation = 6.dp,
+                            shape = CircleShape,
+                            clip = false
+                        )
+                        .background(
+                            color = Color(0xFFCDFFFF),
+                            shape = CircleShape
+                        )
+                        .border(
+                            width = 1.dp,
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    Color(0xFFBFFDFD),
+                                    Color(0xFF88E7E7),
+                                    Color(0xFF41A6A6)
+                                )
+                            ),
+                            shape = CircleShape
+                        )
+                        .border(
+                            width = 5.dp,
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    Color(0xFFBFFDFD),
+                                    Color(0xFF88E7E7),
+                                    Color(0xFF55BFBF)
+                                )
+                            ),
+                            shape = CircleShape
+                        )
+                        .padding(5.dp)
+                        .onGloballyPositioned { coordinates ->
+                            if (tutorialManager.getStepKey() == "camera") {
+                                tutorialManager.currentTargetBounds = coordinates.boundsInRoot()
                             }
                         }
                         .clickable {
                             if (!hasConsented) {
+                                setPendingCameraAction(true)
                                 onShowConsentDialog()
                                 return@clickable
                             }
-                            navController.navigate("user_settings")
-                        }
-                )
-            }
-        }
 
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(y = (-28).dp)
-                .size(70.dp)
-                .shadow(
-                    elevation = 6.dp,
-                    shape = CircleShape,
-                    clip = false
-                )
-                .background(
-                    color = Color(0xFFCDFFFF),
-                    shape = CircleShape
-                )
-                .border(
-                    width = 1.dp,
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Color(0xFFBFFDFD),
-                            Color(0xFF88E7E7),
-                            Color(0xFF41A6A6)
-                        )
-                    ),
-                    shape = CircleShape
-                )
-                .border(
-                    width = 5.dp,
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Color(0xFFBFFDFD),
-                            Color(0xFF88E7E7),
-                            Color(0xFF55BFBF)
-                        )
-                    ),
-                    shape = CircleShape
-                )
-                .padding(5.dp)
-                .onGloballyPositioned { coordinates ->
-                    if (tutorialManager.getStepKey() == "camera") {
-                        tutorialManager.currentTargetBounds = coordinates.boundsInRoot()
-                    }
-                }
-                .clickable {
-                    if (!hasConsented) {
-                        setPendingCameraAction(true)
-                        onShowConsentDialog()
-                        return@clickable
-                    }
-
-                    coroutineScope.launch {
-                        try {
-                            val answered = viewModel.hasAnsweredQuestionnaire()
-                            navController.navigate(if (answered) "tutorial_screen1" else "tutorial_screen0")
-                        } catch (_: Exception) {
-                            navController.navigate("tutorial_screen0")
-                        }
-                    }
-                },
-            contentAlignment = Alignment.Center
-        ) {
-
-            Image(
-                painter = painterResource(id = R.drawable.camera_fill),
-                contentDescription = "Camera",
-                modifier = Modifier.size(30.dp)
-            )
-        }
-    }
-}
-
-
-@Preview(showBackground = true)
-@Composable
-fun UserHomeScreenPreview() {
-    val tutorialManager = TutorialManager()
-    val navController = rememberNavController()
-
-    var menuExpanded by remember { mutableStateOf(false) }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.White)
-        ) {
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(176.dp)
-                    .background(Color(0x3DCDFFFF))
-                    .padding(start = 20.dp, end = 20.dp, top = 26.dp)
-            ) {
-                Column(modifier = Modifier.align(Alignment.CenterStart)) {
-                    Text(
-                        text = "Hello,",
-                        style = MaterialTheme.typography.displayMedium.copy(
-                            fontWeight = FontWeight.Normal,
-                            fontSize = 32.sp,
-                            color = Color(0xFF1D1D1D)
-                        )
-                    )
-                    Text(
-                        text = "User!",
-                        style = MaterialTheme.typography.displayLarge.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 42.sp,
-                            color = Color(0xFF1D1D1D)
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Early Detection Saves Lives.",
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontWeight = FontWeight.Normal,
-                            fontStyle = FontStyle.Italic,
-                            fontSize = 16.sp,
-                            color = Color(0xFF1D1D1D)
-                        )
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 8.dp)
+                            coroutineScope.launch {
+                                try {
+                                    val answered = viewModel.hasAnsweredQuestionnaire()
+                                    navController.navigate(if (answered) "tutorial_screen1" else "tutorial_screen0")
+                                } catch (_: Exception) {
+                                    navController.navigate("tutorial_screen0")
+                                }
+                            }
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
-                    ProfileDropdownMenu(
-                        name = "User",
-                        expanded = menuExpanded,
-                        onExpandedChange = { menuExpanded = it },
-                        onNotificationsClick = {},
-                        onSettingsClick = {},
-                        onProfileClick = {},
-                        onLogoutClick = {}
+
+                    Image(
+                        painter = painterResource(id = R.drawable.camera_fill),
+                        contentDescription = "Camera",
+                        modifier = Modifier.size(30.dp)
                     )
                 }
             }
-
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp)
-                    .padding(top = 20.dp),
-                horizontalAlignment = Alignment.Start
-            ) {
-                HomeFeatureButtonsRow(
-                    hasConsented = true,
-                    tutorialManager = tutorialManager,
-                    onShowConsentDialog = { },
-                    onSkinReportClick = { },
-                    onNearbyClinicsClick = { }
-                )
-            }
-        }
-
-        if (menuExpanded) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.5f))
-                    .clickable { menuExpanded = false }
-            )
-        }
     }
-}
+
