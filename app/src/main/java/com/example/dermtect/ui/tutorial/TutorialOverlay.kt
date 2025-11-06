@@ -81,7 +81,6 @@ fun TutorialOverlay(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .clickable(enabled = true, onClick = { /* Block taps underneath */ })
     ) {
         val parentWidth = this.maxWidth
         val parentHeight = this.maxHeight
@@ -90,6 +89,8 @@ fun TutorialOverlay(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .clickable(onClick = { /* eat taps behind overlay */ }, indication = null,
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() })
                 .graphicsLayer(alpha = 0.99f)
                 .drawWithContent {
                     drawRect(color = Color(0x99000000))
@@ -149,7 +150,12 @@ fun TutorialOverlay(
                 onBack = { tutorialManager.previousStep() },
                 arrowHorizontalPositionPx = arrowHorizontalPositionPx,
                 // ✅ RE-INTRODUCE onSkip
-                onSkip = onFinish
+                onSkip = {
+                    tutorialManager.currentStep = tutorialManager.steps.size
+                    tutorialManager.currentTargetBounds = null
+                    onFinish()
+                }
+
             )
         }
     }
