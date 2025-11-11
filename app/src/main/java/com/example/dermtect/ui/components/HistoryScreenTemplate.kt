@@ -1,6 +1,5 @@
 package com.example.dermtect.ui.components
 
-import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,11 +14,9 @@ import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.indicatorColor
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,8 +29,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
-import com.example.dermtect.R
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.indicatorColor
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -113,37 +108,80 @@ fun HistoryScreenTemplate(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            caseList.forEach { case ->
-                // compute colors/labels per item
-                val indicatorColor = when {
-                    case.status?.equals("pending", true) == true -> Color(0xFFFFC107)
-                    case.result?.equals("malignant", true) == true -> Color(0xFFF44336)
-                    case.result?.equals("benign", true) == true -> Color(0xFF4CAF50)
-                    else -> Color(0xFFBDBDBD)
-                }
 
-                val (statusLabel, statusColor) = when (case.status?.lowercase()) {
-                    "pending" -> "Pending" to Color(0xFFFFD46D).copy(alpha = 0.2f)
-                    "completed" -> "Completed" to Color(0xFF00B69B).copy(alpha = 0.2f)
-                    else -> null to null
-                }
-
-                CaseListItem(
-                    title = case.label,
-                    result = case.result,
-                    date = case.date,
-                    status = case.status,
-                    indicatorColor = indicatorColor,
-                    statusLabel = statusLabel,
-                    statusColor = statusColor,
-                    imageUrl = case.imageUrl,
+            if (caseList.isEmpty()) {
+                // ✅ Empty state
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 24.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    navController.navigate("case_detail/${case.caseId}")
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+
+                        Text(
+                            text = "There’s no scan history yet.",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color(0xFF1D1D1D),
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = "Your saved scans will appear here after you take your first photo.",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = Color.Gray,
+                            textAlign = TextAlign.Center
+                        )
+
+                        // Optional: quick action button to start scanning
+                        Spacer(Modifier.height(16.dp))
+                        TextButton(
+                            onClick = { navController.navigate("take_photo") }, // ← route to your capture screen
+                            modifier = Modifier
+                                .shadow(4.dp, RoundedCornerShape(10.dp))
+                                .background(Color(0xFFCDFFFF), RoundedCornerShape(10.dp))
+                        ) {
+                            Text(
+                                "Take your first scan",
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                                color = Color(0xFF0FB2B2),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
                 }
+            } else {
+                caseList.forEach { case ->
+                    // compute colors/labels per item
+                    val indicatorColor = when {
+                        case.status?.equals("pending", true) == true -> Color(0xFFFFC107)
+                        case.result?.equals("malignant", true) == true -> Color(0xFFF44336)
+                        case.result?.equals("benign", true) == true -> Color(0xFF4CAF50)
+                        else -> Color(0xFFBDBDBD)
+                    }
 
-                Divider(modifier = Modifier.padding(vertical = 12.dp))
+                    val (statusLabel, statusColor) = when (case.status?.lowercase()) {
+                        "pending" -> "Pending" to Color(0xFFFFD46D).copy(alpha = 0.2f)
+                        "completed" -> "Completed" to Color(0xFF00B69B).copy(alpha = 0.2f)
+                        else -> null to null
+                    }
+
+                    CaseListItem(
+                        title = case.label,
+                        result = case.result,
+                        date = case.date,
+                        status = case.status,
+                        indicatorColor = indicatorColor,
+                        statusLabel = statusLabel,
+                        statusColor = statusColor,
+                        imageUrl = case.imageUrl,
+                    ) {
+                        navController.navigate("case_detail/${case.caseId}")
+                    }
+
+                    Divider(modifier = Modifier.padding(vertical = 12.dp))
+                }
             }
-
         }
     }
 }

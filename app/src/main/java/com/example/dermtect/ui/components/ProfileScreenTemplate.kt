@@ -32,7 +32,7 @@ import com.example.dermtect.R
 import com.example.dermtect.ui.viewmodel.AuthViewModelFactory
 import com.example.dermtect.ui.viewmodel.SharedProfileViewModel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.runtime.collectAsState
 import com.example.dermtect.ui.viewmodel.DermaHomeViewModel
 import com.example.dermtect.ui.viewmodel.UserHomeViewModel
@@ -43,15 +43,22 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import androidx.compose.ui.platform.LocalContext
 import com.google.firebase.auth.EmailAuthProvider
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.border
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import com.google.firebase.auth.FirebaseAuth
 import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.Brush
 import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.GoogleAuthProvider
 import com.example.dermtect.ui.screens.BirthdayMaskedField
 import com.example.dermtect.ui.screens.FamilyHistoryDropdown
+import kotlinx.coroutines.launch
+
 @Composable
 fun ProfileScreenTemplate(
     navController: NavController,
@@ -134,8 +141,11 @@ fun ProfileScreenTemplate(
             showPasswordError = true
         }
     }
-    val birthday by userHomeViewModel.birthday.collectAsState()           // "MM/DD/YYYY" or ""
-    val familyHistory by userHomeViewModel.familyHistory.collectAsState() // "yes" | "no" | "unknown" | ""
+
+    val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    val atBottom = remember { derivedStateOf { scrollState.value >= (scrollState.maxValue - 8) } }.value
+    val canScroll = remember { derivedStateOf { scrollState.maxValue > 0 } }.value
 
 
     val context = LocalContext.current
@@ -230,85 +240,130 @@ fun ProfileScreenTemplate(
                         )
                     }
                 }
-                }
-            }
-
-            Card(
-                modifier = Modifier
-                    .offset(x = 25.dp, y = -10.dp) // matched to Settings
-                    .fillMaxWidth(0.9f)
-                    .padding (bottom = 10.dp)
-                    .wrapContentHeight()
-                    .shadow(8.dp, RoundedCornerShape(36.dp)), // matched to Settings
-                shape = RoundedCornerShape(36.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-            ) {
-                Column (
-                    modifier = Modifier
-                        .verticalScroll(rememberScrollState())
-                ){
-                    Box(
-                        modifier = Modifier
-                            .padding(horizontal = 19.dp, vertical = 18.dp)
-                            .fillMaxWidth()
-                            .height(85.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFFEDFFFF))
-                    ) {
-                        AccountIdentityRow(email = email, isGoogleAccount = isGoogleAccount)
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-// Inline editable name (no dialog)
-                    // replace the two sections with:
-                    CombinedProfileSection(
-                        initialFirstName = firstNameFromVm.ifBlank { "" },
-                        initialLastName  = lastNameFromVm.ifBlank { "" },
-                        initialBirthday  = (birthdayFromVm ?: ""),
-                        initialFamilyHistory = (famHistoryFromVm ?: ""),
-                        onSaveAll = { newFirst, newLast, newBirthday, newFamilyHistory ->
-                            userHomeViewModel.updateProfile(
-                                firstName = newFirst,
-                                lastName = newLast,
-                                birthday = newBirthday,
-                                familyHistory = newFamilyHistory,
-                                onSuccess = {
-                                    Toast.makeText(context, "Profile saved successfully!", Toast.LENGTH_SHORT).show()
-                                    navController.popBackStack()
-                                },
-                                onFailure = { errorMsg ->
-                                    Toast.makeText(context, "Save failed: $errorMsg", Toast.LENGTH_LONG).show()
-                                }
-                            )
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-// Inline change password (no dialog)
-                    ChangePasswordSection()
-
-                    Spacer(modifier = Modifier.height(15.dp))
-                    DeleteAccountRow(
-                        icon = {
-                            Icon(
-                                imageVector = Icons.Filled.Delete,
-                                contentDescription = "Deactivate Account",
-                                tint = Color(0xFF0FB2B2),
-                                modifier = Modifier.size(28.dp)
-                            )
-                        },
-                        label = "Deactivate Account",
-                        onClick = {
-                            showDeleteDialog = true
-                        }
-                    )
-                }
             }
         }
 
+        Card(
+            modifier = Modifier
+                .offset(x = 25.dp, y = -10.dp) // matched to Settings
+                .fillMaxWidth(0.9f)
+                .padding(bottom = 10.dp)
+                .wrapContentHeight()
+                .shadow(8.dp, RoundedCornerShape(36.dp)), // matched to Settings
+            shape = RoundedCornerShape(36.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 19.dp, vertical = 18.dp)
+                        .fillMaxWidth()
+                        .height(85.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFFEDFFFF))
+                ) {
+                    AccountIdentityRow(email = email, isGoogleAccount = isGoogleAccount)
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+// Inline editable name (no dialog)
+                // replace the two sections with:
+                CombinedProfileSection(
+                    initialFirstName = firstNameFromVm.ifBlank { "" },
+                    initialLastName = lastNameFromVm.ifBlank { "" },
+                    initialBirthday = (birthdayFromVm ?: ""),
+                    initialFamilyHistory = (famHistoryFromVm ?: ""),
+                    onSaveAll = { newFirst, newLast, newBirthday, newFamilyHistory ->
+                        userHomeViewModel.updateProfile(
+                            firstName = newFirst,
+                            lastName = newLast,
+                            birthday = newBirthday,
+                            familyHistory = newFamilyHistory,
+                            onSuccess = {
+                                Toast.makeText(
+                                    context,
+                                    "Profile saved successfully!",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            },
+                            onFailure = { errorMsg ->
+                                Toast.makeText(context, "Save failed: $errorMsg", Toast.LENGTH_LONG)
+                                    .show()
+                            }
+                        )
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+// Inline change password (no dialog)
+                ChangePasswordSection()
+
+                Spacer(modifier = Modifier.height(15.dp))
+                DeleteAccountRow(
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Filled.Delete,
+                            contentDescription = "Deactivate Account",
+                            tint = Color(0xFF0FB2B2),
+                            modifier = Modifier.size(28.dp)
+                        )
+                    },
+                    label = "Deactivate Account",
+                    onClick = {
+                        showDeleteDialog = true
+                    }
+                )
+
+            }
+
+
+    AnimatedVisibility(
+        modifier = Modifier
+            .align(Alignment.CenterHorizontally) // <-- 'align' is available because the parent is a Box
+            .padding(bottom = 20.dp),
+        visible = canScroll && !atBottom,
+        enter = fadeIn(),
+        exit = fadeOut()
+    ) {
+        Box(
+            modifier = Modifier
+                .size(50.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.9f))
+                .border(
+                    width = 1.dp,
+                    brush = Brush.linearGradient(
+                        listOf(
+                            Color(0xFFBFFDFD),
+                            Color(0xFF88E7E7),
+                            Color(0xFF55BFBF)
+                        )
+                    ),
+                    shape = CircleShape
+                )
+                .clickable {
+                    scope.launch {
+                        val target = scrollState.maxValue
+                        scrollState.animateScrollTo(target)
+                    }
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.ArrowDownward,
+                contentDescription = "Scroll down",
+                tint = Color(0xFF0FB2B2),
+                modifier = Modifier.size(28.dp)
+            )
+        }
+    } }
+    }
         if (showPhoto) {
             Box(
                 modifier = Modifier
@@ -529,34 +584,15 @@ fun ProfileScreenTemplate(
         }
 
         DialogTemplate(
-            show = showLogoutDialog,
-            title = "Confirm logout?",
-            primaryText = "Yes, Logout",
-            onPrimary = {
-                // 1) Sign out Google (harmless if email/password user)
-                googleSignInClient.signOut().addOnCompleteListener {
-                    // 2) Then sign out Firebase
-                    authViewModel.logout {
-                        navController.navigate("login") {
-                            popUpTo(0) { inclusive = true }
-                        }
-                    }
-                }
-            },
-            secondaryText = "Stay logged in",
-            onSecondary = { showLogoutDialog = false },
-            onDismiss = { showLogoutDialog = false }
-        )
-
-        DialogTemplate(
             show = showDeletedDialog,
             title = "Your account has been deactivated!",
             imageResId = R.drawable.success,
             autoDismiss = true,
             onDismiss = { showDeletedDialog = false }
         )
+}
 
-    }
+
 
 
 

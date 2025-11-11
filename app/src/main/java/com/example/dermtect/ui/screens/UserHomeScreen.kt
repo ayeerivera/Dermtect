@@ -751,17 +751,15 @@ fun HighlightCard(
         )
     )
 
-    Box(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp, horizontal = 16.dp)
             .heightIn(min = 150.dp)       // ✅ allow growth, keep a minimum
-            .clickable { onHighlightClick() }
-            .shadow(
-                elevation = 8.dp,
-                shape = RoundedCornerShape(cornerRadius),
-                clip = false
-            )
+            .clickable { onHighlightClick() },
+        shape = RoundedCornerShape(cornerRadius),
+        color = Color.Transparent,
+        shadowElevation = 8.dp
     ) {
         Box(
             modifier = Modifier

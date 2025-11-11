@@ -38,15 +38,11 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.dermtect.R
 import com.example.dermtect.ui.components.BackButton
 import com.example.dermtect.ui.components.BubblesBackground
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.ui.draw.rotate
 import kotlinx.coroutines.launch
-
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.runtime.derivedStateOf

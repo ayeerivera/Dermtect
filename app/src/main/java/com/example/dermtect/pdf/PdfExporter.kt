@@ -41,10 +41,31 @@ private suspend fun <T> taskAwait(task: Task<T>): T =
             .addOnFailureListener { e -> if (cont.isActive) cont.resumeWithException(e) }
     }
 
+private fun computeAgeFrom(birthday: String?): Int? {
+    if (birthday.isNullOrBlank()) return null
+    return try {
+        val sdf = java.text.SimpleDateFormat("MM/dd/yyyy", java.util.Locale.getDefault())
+        sdf.isLenient = false
+        val dob = sdf.parse(birthday) ?: return null
+
+        val calDob = java.util.Calendar.getInstance().apply { time = dob }
+        val calNow = java.util.Calendar.getInstance()
+
+        var age = calNow.get(java.util.Calendar.YEAR) - calDob.get(java.util.Calendar.YEAR)
+        val beforeBirthdayThisYear =
+            calNow.get(java.util.Calendar.DAY_OF_YEAR) < calDob.get(java.util.Calendar.DAY_OF_YEAR)
+        if (beforeBirthdayThisYear) age -= 1
+        age
+    } catch (_: Exception) {
+        null
+    }
+}
+
 object PdfExporter {
 
     data class CasePdfData(
         val userFullName: String = "",
+        val birthday: String? = null,
         val reportId: String,
         val title: String,
         val timestamp: String,
@@ -88,6 +109,20 @@ object PdfExporter {
 
         var y = margin.toFloat()
 
+        val computedAge = computeAgeFrom(data.birthday)
+        if (!data.birthday.isNullOrBlank() || computedAge != null) {
+            val parts = buildString {
+                if (!data.birthday.isNullOrBlank()) append("Birthday: ${data.birthday}")
+                if (computedAge != null) {
+                    if (isNotEmpty()) append("   ") // small spacer
+                    append("(Age: $computedAge)")
+                }
+            }
+            if (parts.isNotBlank()) {
+                canvas.drawText(parts, margin.toFloat(), y, textPaint)
+                y += textPaint.textSize + (lineGap * 2)
+            }
+        }
         // Header
         canvas.drawText(data.title, margin.toFloat(), y, titlePaint)
         y += titlePaint.textSize + lineGap
@@ -262,12 +297,15 @@ object PdfExporter {
             downloadUrl = taskAwait(pdfRef.downloadUrl).toString()  // <-- no .await()
             storagePath = "users/$userId/reports/$reportId.pdf"
         }
+        val ageVal = computeAgeFrom(baseData.birthday)
 
         // 3) Build Firestore payloads
         val fullPayload = mapOf(
             "reportId" to reportId,
             "userId" to userId,
             "userFullName" to baseData.userFullName,
+            "birthday" to (baseData.birthday ?: ""),
+            "age" to (ageVal ?: FieldValue.delete()),
             "title" to baseData.title,
             "summary" to baseData.shortMessage,
             "timestampText" to baseData.timestamp,

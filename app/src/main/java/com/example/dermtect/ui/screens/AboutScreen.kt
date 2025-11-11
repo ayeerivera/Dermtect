@@ -20,10 +20,11 @@ import com.example.dermtect.ui.components.BackButton
 
 @Composable
 fun AboutScreen(navController: NavController) {
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF5F5F5)) // fallback background
+            .background(Color.White)
     ) {
         // Cyan background rectangle
         Box(

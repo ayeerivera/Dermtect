@@ -45,15 +45,13 @@ class QuestionnaireViewModel : ViewModel() {
             "timestamp" to FieldValue.serverTimestamp()
         )
 
-        FirebaseFirestore.getInstance()
-            .collection("questionnaires")
-            .document(uid)                               // docId permanently = uid
-            .set(data)
-            .addOnSuccessListener { /* ... */ }
-            .addOnFailureListener { e -> onError(e.message) }
 
+        if (answers.any { it == null }) {
+            _loading.value = false
+            onError("Not all questions answered")
+            return
+        }
 
-        // 👇 Log where we write for sanity
         android.util.Log.d("QuestionnaireVM", "Writing to questionnaires/$uid")
 
         db.collection("questionnaires")
@@ -61,20 +59,19 @@ class QuestionnaireViewModel : ViewModel() {
             .set(data)
             .addOnSuccessListener {
                 _loading.value = false
-                loadQuestionnaireAnswers()
                 _saveSuccess.value = true
+                loadQuestionnaireAnswers()
                 logQuestionnaireAudit("questionnaire_updated")
                 onSuccess()
             }
             .addOnFailureListener { e ->
                 _loading.value = false
                 android.util.Log.e("QuestionnaireVM", "Save failed", e)
-                onError(e.message)   // <-- bubble the message up to the UI
+                onError(e.message)
             }
-
     }
 
-    fun setExistingAnswers(newAnswers: List<Boolean?>) {
+        fun setExistingAnswers(newAnswers: List<Boolean?>) {
         _existingAnswers.value = newAnswers
     }
 
@@ -95,7 +92,7 @@ class QuestionnaireViewModel : ViewModel() {
             .addOnSuccessListener { document ->
                 if (document.exists()) {
                     val data = document["answers"] as? Map<String, Boolean>
-                    val loaded = (1..8).map { data?.get("question_$it") }
+                    val loaded = (1..10).map { data?.get("question_$it") }
                     _existingAnswers.value = loaded
                 }
             }

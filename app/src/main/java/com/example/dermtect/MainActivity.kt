@@ -5,10 +5,7 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -16,7 +13,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -27,7 +23,6 @@ import com.example.dermtect.ui.screens.CameraPermissionGate
 import com.example.dermtect.ui.screens.TakePhotoScreen
 import com.example.dermtect.model.Clinic
 import com.example.dermtect.model.NewsItem
-import com.example.dermtect.ui.components.CaseData
 import com.example.dermtect.ui.components.DermaAssessmentReportScreen
 import com.example.dermtect.ui.components.NearbyClinicsScreen
 import com.example.dermtect.ui.screens.AboutScreen
@@ -61,7 +56,6 @@ import com.example.dermtect.ui.screens.PendingCasesScreen
 import com.example.dermtect.ui.components.ProfileScreenTemplate
 import com.example.dermtect.ui.screens.ClinicTemplateScreen
 import com.example.dermtect.ui.screens.LesionCaseScreen
-import com.example.dermtect.ui.screens.LesionCaseTemplate
 import com.example.dermtect.ui.screens.TermsPrivacyScreen
 import com.example.dermtect.ui.theme.DermtectTheme
 import com.example.dermtect.ui.viewmodel.DermaHomeViewModel
@@ -77,19 +71,14 @@ import com.example.dermtect.ui.viewmodel.AuthViewModelFactory
 import androidx.compose.ui.platform.LocalContext
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.example.dermtect.ui.screens.CameraPermissionGate
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.navigation.NavController
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.delay
 import com.example.dermtect.data.OnboardingPrefs
 import com.google.firebase.auth.FirebaseAuth
 import com.example.dermtect.ui.tutorial.TutorialManager
-import com.example.dermtect.ui.tutorial.TutorialOverlay
 
 
 class MainActivity : ComponentActivity() {
@@ -102,12 +91,13 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             DermtectTheme {
+                androidx.compose.material3.Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = androidx.compose.ui.graphics.Color.White // opaque root
+                ) {
                 val navController = rememberNavController()
                 val tutorialManager = remember { TutorialManager() } // ✅ create once here
-                UserHomeScreen(
-                    navController = navController,
-                    tutorialManager = tutorialManager // ✅ Passed to screen
-                )
+
 
                 val sharedProfileViewModel: SharedProfileViewModel = viewModel()
                 val userHomeViewModel: UserHomeViewModel = viewModel()
@@ -194,13 +184,14 @@ class MainActivity : ComponentActivity() {
                     composable("forgot_pass3") { ForgotPass3(navController) }
                     composable("forgot_pass4") { ForgotPass4(navController) }
                     composable("terms_privacy") { TermsPrivacyScreen(navController) }
-                    composable("user_home") {UserHomeScreen(
-                        navController = navController,
-                        tutorialManager = tutorialManager
+                    composable("user_home") {
+                        UserHomeScreen(
+                            navController = navController,
+                            tutorialManager = tutorialManager
                         )
                     }
-                    composable("notifications") {NotificationScreen(navController = navController) }
-                    composable("questionnaire") { QuestionnaireScreen(navController = navController)}
+                    composable("notifications") { NotificationScreen(navController = navController) }
+                    composable("questionnaire") { QuestionnaireScreen(navController = navController) }
                     composable("camera") {
                         CameraPermissionGate(
                             onGranted = {
@@ -224,18 +215,20 @@ class MainActivity : ComponentActivity() {
                     ) { backStackEntry ->
                         val json = backStackEntry.arguments?.getString("newsJson") ?: ""
                         val newsItem = Gson().fromJson(Uri.decode(json), NewsItem::class.java)
-                        HighlightArticle(newsItem = newsItem, onBackClick = { navController.popBackStack() })
+                        HighlightArticle(
+                            newsItem = newsItem,
+                            onBackClick = { navController.popBackStack() })
                     }
 
 
-                    composable("history") { HistoryScreen(navController = navController)}
+                    composable("history") { HistoryScreen(navController = navController) }
                     composable("case_detail/{caseId}") { backStackEntry ->
                         val caseId = backStackEntry.arguments?.getString("caseId")!!
                         LesionCaseScreen(
                             navController = navController,
                             caseId = caseId,
-                            onBackClick = { navController.popBackStack()},
-                            onFindClinicClick = { navController.navigate("nearby_clinics")},
+                            onBackClick = { navController.popBackStack() },
+                            onFindClinicClick = { navController.navigate("nearby_clinics") },
                             onNavigateToAssessment = { navController.navigate("questionnaire") }   // ✅
 
                         )
@@ -244,7 +237,8 @@ class MainActivity : ComponentActivity() {
                     composable("article_detail_screen/{newsJson}") { backStackEntry ->
                         val json = backStackEntry.arguments?.getString("newsJson") ?: ""
                         val newsItem = Gson().fromJson(json, NewsItem::class.java)
-                        ArticleDetailScreen(newsItem = newsItem,
+                        ArticleDetailScreen(
+                            newsItem = newsItem,
                             onBackClick = { navController.popBackStack() })
                     }
                     composable("user_settings") {
@@ -273,8 +267,8 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    composable("tutorial_screen0") {TutorialScreen0(navController = navController) }
-                    composable("tutorial_screen1") {TutorialScreen1(navController) }
+                    composable("tutorial_screen0") { TutorialScreen0(navController = navController) }
+                    composable("tutorial_screen1") { TutorialScreen1(navController) }
                     composable("tutorial_screen2") { TutorialScreen2(navController) }
                     composable("tutorial_screen3") { TutorialScreen3(navController) }
                     composable("tutorial_screen4") { TutorialScreen4(navController) }
@@ -285,7 +279,8 @@ class MainActivity : ComponentActivity() {
                         val firstName = backStackEntry.arguments?.getString("firstName") ?: ""
                         val lastName = backStackEntry.arguments?.getString("lastName") ?: ""
                         val email = backStackEntry.arguments?.getString("email") ?: ""
-                        val isGoogleAccount = backStackEntry.arguments?.getString("isGoogleAccount")?.toBooleanStrictOrNull() ?: false
+                        val isGoogleAccount = backStackEntry.arguments?.getString("isGoogleAccount")
+                            ?.toBooleanStrictOrNull() ?: false
                         val userRole = backStackEntry.arguments?.getString("userRole") ?: "user"
                         ProfileScreenTemplate(
                             navController = navController,
@@ -345,10 +340,14 @@ class MainActivity : ComponentActivity() {
                         arguments = listOf(navArgument("caseJson") { type = NavType.StringType })
                     ) { backStackEntry ->
                         val caseJson = backStackEntry.arguments?.getString("caseJson")
-                        val case = Gson().fromJson(caseJson, com.example.dermtect.ui.components.CaseData::class.java)
+                        val case = Gson().fromJson(
+                            caseJson,
+                            com.example.dermtect.ui.components.CaseData::class.java
+                        )
 
                         DermaAssessmentScreen(
-                            lesionImage = case.imageRes ?: R.drawable.sample_skin, // fallback to a non-null drawable
+                            lesionImage = case.imageRes
+                                ?: R.drawable.sample_skin, // fallback to a non-null drawable
                             scanTitle = case.label,                                 // use label instead of title
                             onBackClick = { navController.popBackStack() },
                             onCancel = { navController.popBackStack() },
@@ -360,12 +359,14 @@ class MainActivity : ComponentActivity() {
 
                     composable("pending_cases") { PendingCasesScreen(navController) }
                     composable("case_history") { DermaHistoryScreen(navController) }
-                    composable("assessment_report") { DermaAssessmentReportScreen(
-                        lesionImage = painterResource(id = R.drawable.sample_skin),
-                        onBackClick = { navController.popBackStack() },
-                        onSendReport = {},
-                        onCancel = {}
-                    ) }
+                    composable("assessment_report") {
+                        DermaAssessmentReportScreen(
+                            lesionImage = painterResource(id = R.drawable.sample_skin),
+                            onBackClick = { navController.popBackStack() },
+                            onSendReport = {},
+                            onCancel = {}
+                        )
+                    }
 
                     composable("derma_settings") {
                         val context = LocalContext.current
@@ -392,9 +393,7 @@ class MainActivity : ComponentActivity() {
                             }
                         )
                     }
-
-
-
+                }
 
                 }
 

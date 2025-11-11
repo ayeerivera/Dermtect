@@ -43,8 +43,6 @@ import com.example.dermtect.R
 import com.example.dermtect.tflt.DermtectResult
 import com.example.dermtect.tflt.TfLiteService
 import com.example.dermtect.ui.components.BackButton
-import com.example.dermtect.ui.screens.LesionCaseTemplate
-import com.example.dermtect.ui.screens.generateTherapeuticMessage
 import com.example.dermtect.data.repository.ScanRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
@@ -67,10 +65,7 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.border
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.runtime.*
 import androidx.compose.material3.*
-import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.ActivityCompat
 import com.example.dermtect.pdf.PdfExporter
 import com.example.dermtect.ui.viewmodel.QuestionnaireViewModel
@@ -82,9 +77,6 @@ import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashAuto
 import androidx.compose.ui.zIndex
 import com.example.dermtect.util.SkinGateResult
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.style.TextAlign
 import kotlin.math.max
@@ -161,14 +153,16 @@ fun TakePhotoScreen(
     val existingAnswers by qvm.existingAnswers.collectAsState()
     val questions = remember {
         listOf(
-            "Have you noticed this skin spot recently appearing or changing in size?",
-            "Does the lesion have uneven or irregular borders?",
-            "Is the color of the spot unusual (black, blue, red, or a mix of colors)?",
-            "Has the lesion been bleeding, itching, or scabbing recently?",
-            "Is there a family history of skin cancer or melanoma?",
-            "Has the lesion changed in color or texture over the last 3 months?",
-            "Is the lesion asymmetrical (one half unlike the other)?",
-            "Is the diameter larger than 6mm (about the size of a pencil eraser)?"
+            "Do you usually get sunburned easily after spending around 15–20 minutes under the sun without protection?",
+            "Is your natural skin color fair or very fair (light and easily burns in the sun)?",
+            "Have you ever had a severe sunburn that caused redness or blisters and lasted for more than a day?",
+            "Do you have many moles or freckles on your body (for example, more than 50 small spots or several large moles)?",
+            "Has any of your close family members (parent, sibling, or child) been diagnosed with skin cancer?",
+            "Have you ever been diagnosed or treated for any type of skin cancer or a precancerous skin lesion?",
+            "Do you often spend more than one hour outdoors during peak sunlight (between 10 a.m. and 4 p.m.) without shade or protection?",
+            "Do you rarely or never use sunscreen when you go outdoors for long periods?",
+            "Do you seldom check your skin or moles for any new or changing spots?",
+            "Have you recently noticed a new or changing mole or spot on your skin in the last six months?"
         )
     }
     LaunchedEffect(Unit) { qvm.loadQuestionnaireAnswers() }
@@ -641,16 +635,31 @@ fun TakePhotoScreen(
                                             }
 
 // You already checked userId above
+                                        val userSnap = FirebaseFirestore.getInstance()
+                                            .collection("users")
+                                            .document(userId)
+                                            .get()
+                                            .await()
+
+                                        val first = userSnap.getString("firstName").orEmpty()
+                                        val last  = userSnap.getString("lastName").orEmpty()
+                                        val birthdayStr = userSnap.getString("birthday")   // "MM/dd/yyyy" from your app (may be null/blank)
+
+                                        val fullName = listOf(first, last).filter { it.isNotBlank() }.joinToString(" ")
+
+                                        // 3) Generate a report id per user (you already use this util)
                                         val reportId = PdfExporter.nextUserReportSeq(userId)
 
+                                        // 4) Build CasePdfData WITH BIRTHDAY (PdfExporter will auto-compute age)
                                         val data = PdfExporter.CasePdfData(
-                                            reportId = reportId,                 // ✅ REQUIRED
+                                            reportId = reportId,
                                             title = "Result",
-                                            userFullName = "John Dela Cruz",
+                                            userFullName = fullName,                 // ← real name
+                                            birthday = birthdayStr,                  // ← pass birthday here
                                             timestamp = nowTimestamp(),
-                                            photo = image,                       // or `photo` if you used that var
-                                            heatmap = r.heatmap,
-                                            shortMessage = generateTherapeuticMessage(r.probability),
+                                            photo = photo,
+                                            heatmap = inferenceResult?.heatmap,
+                                            shortMessage = generateTherapeuticMessage(inferenceResult?.probability ?: 0f),
                                             answers = answerPairs
                                         )
 
@@ -868,13 +877,6 @@ fun rotateBitmapAccordingToExif(context: Context, file: File): Bitmap {
     val matrix = Matrix().apply { postRotate(rotationAngle) }
     return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
 }
-
-/**
- * Uploads the cropped photo to Storage and writes the scan metadata into Firestore:
- * - Storage path: users/{uid}/scans/{caseId}.jpg
- * - Firestore doc: lesion_case/{caseId}
- * Includes a friendly label "Scan N".
- */
 
 suspend fun uploadScanWithLabel(
     bitmap: Bitmap,            // original cropped photo

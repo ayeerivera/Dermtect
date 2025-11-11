@@ -60,7 +60,6 @@ fun NearbyClinicsScreen(
     val user by overpassVm.user.collectAsState()
     val osmClinics by overpassVm.clinics.collectAsState()
 
-    var showLocationDialog by remember { mutableStateOf(false) }
     var requestPermissionNow by remember { mutableStateOf(false) }
 
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -166,8 +165,12 @@ fun NearbyClinicsScreen(
                                     overpassVm.fetchNearbyDermatology(radiusMeters = 5000)
                                 }
                                 shouldShowRationale() -> {
-                                    showLocationDialog = true
-                                }
+                                    permissionLauncher.launch(
+                                        arrayOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION
+                                        )
+                                    )                                }
                                 else -> {
                                     permissionLauncher.launch(
                                         arrayOf(
@@ -433,34 +436,6 @@ fun NearbyClinicsScreen(
                         )
                     }
                 }
-
-                // =======================================
-                // 🔹 Dialog for rationale
-                // =======================================
-                if (showLocationDialog) {
-                    AlertDialog(
-                        onDismissRequest = { showLocationDialog = false },
-                        title = { Text("Location Needed") },
-                        text = { Text("We use your location to find dermatology clinics near you.") },
-                        confirmButton = {
-                            TextButton(onClick = {
-                                showLocationDialog = false
-                                permissionLauncher.launch(
-                                    arrayOf(
-                                        Manifest.permission.ACCESS_FINE_LOCATION,
-                                        Manifest.permission.ACCESS_COARSE_LOCATION
-                                    )
-                                )
-                            }) { Text("Allow") }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { showLocationDialog = false }) {
-                                Text("Not now")
-                            }
-                        }
-                    )
-                }
-
                 // =======================================
                 // 🔹 Dialog for "Don't ask again" (open Settings)
                 // =======================================

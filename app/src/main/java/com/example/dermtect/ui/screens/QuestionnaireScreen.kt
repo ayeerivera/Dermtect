@@ -45,14 +45,16 @@ fun QuestionnaireScreen(navController: NavController) {
     // 8 questions to match Firestore structure
     val questions = remember {
         listOf(
-            "Have you noticed this skin spot recently appearing or changing in size?",
-            "Does the lesion have uneven or irregular borders?",
-            "Is the color of the spot unusual (black, blue, red, or a mix of colors)?",
-            "Has the lesion been bleeding, itching, or scabbing recently?",
-            "Is there a family history of skin cancer or melanoma?",
-            "Has the lesion changed in color or texture over the last 3 months?",
-            "Is the lesion asymmetrical (one half unlike the other)?",
-            "Is the diameter larger than 6mm (about the size of a pencil eraser)?"
+            "Do you usually get sunburned easily after spending around 15–20 minutes under the sun without protection?",
+            "Is your natural skin color fair or very fair (light and easily burns in the sun)?",
+            "Have you ever had a severe sunburn that caused redness or blisters and lasted for more than a day?",
+            "Do you have many moles or freckles on your body (for example, more than 50 small spots or several large moles)?",
+            "Has any of your close family members (parent, sibling, or child) been diagnosed with skin cancer?",
+            "Have you ever been diagnosed or treated for any type of skin cancer or a precancerous skin lesion?",
+            "Do you often spend more than one hour outdoors during peak sunlight (between 10 a.m. and 4 p.m.) without shade or protection?",
+            "Do you rarely or never use sunscreen when you go outdoors for long periods?",
+            "Do you seldom check your skin or moles for any new or changing spots?",
+            "Have you recently noticed a new or changing mole or spot on your skin in the last six months?"
         )
     }
     // Modes & navigation
