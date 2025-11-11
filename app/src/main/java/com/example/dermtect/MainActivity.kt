@@ -1,5 +1,14 @@
 package com.example.dermtect
 
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import com.example.dermtect.ui.components.DialogTemplate
+
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -79,7 +88,21 @@ import kotlinx.coroutines.delay
 import com.example.dermtect.data.OnboardingPrefs
 import com.google.firebase.auth.FirebaseAuth
 import com.example.dermtect.ui.tutorial.TutorialManager
+import kotlinx.coroutines.launch
+import android.graphics.Color as AColor
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.ui.text.font.FontWeight
+import com.example.dermtect.pdf.PdfExporter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.*
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -90,6 +113,7 @@ class MainActivity : ComponentActivity() {
         Log.d("FirebaseCheck", "Firebase project: ${app.options.projectId}")
 
         setContent {
+
             DermtectTheme {
                 androidx.compose.material3.Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -109,6 +133,12 @@ class MainActivity : ComponentActivity() {
 
 
                 NavHost(navController = navController, startDestination = "splash") {
+                    composable("demo") { DemoPdfScreen() }
+
+                    composable("demo") {
+                        DemoPdfScreen()
+
+                    }
 
                     composable("splash") {
                         val context = LocalContext.current
@@ -202,7 +232,9 @@ class MainActivity : ComponentActivity() {
                                             launchSingleTop = true
                                         }
                                     },
-                                    onFindClinicClick = { navController.navigate("nearby_clinics") }
+                                    onFindClinicClick = { navController.navigate("nearby_clinics") },
+                                    onNavigateToAssessment = { navController.navigate("questionnaire") } // NEW
+
                                 )
                             }
                         )
@@ -423,4 +455,241 @@ fun DemoLesionCaseScreen(navController: androidx.navigation.NavController) {
         showPrimaryButtons = false,             // show the post-save actions
         showSecondaryActions = true
     )
+}
+
+@Composable
+fun SavePrivacyDialogDemo() {
+    var showPrivacyDialog by remember { mutableStateOf(false) }
+    var consentToSave by remember { mutableStateOf(false) }
+    val fakeProbability = 0.72f
+    val needsDermaReview = fakeProbability * 100f >= 60f
+    var isSaving by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(20.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Button(onClick = { showPrivacyDialog = true }) {
+            Text("Show Privacy Dialog")
+        }
+
+        DialogTemplate(
+            show = showPrivacyDialog,
+            title = "Save & Privacy",
+            description = "We’ll store this scan (photo and optional heatmap) securely in your account. " +
+                    "Some scans may require a dermatologist’s review based on the analysis. " +
+                    "If that happens, we’ll ask to securely send it for review.",
+            primaryText = if (isSaving) "Saving…" else "Save",
+            onPrimary = {
+                isSaving = true
+                // Simulate saving process
+                kotlinx.coroutines.GlobalScope.launch {
+                    kotlinx.coroutines.delay(2000)
+                    isSaving = false
+                    showPrivacyDialog = false
+                }
+            },
+            secondaryText = "Cancel",
+            onSecondary = {
+                showPrivacyDialog = false
+                consentToSave = false
+            },
+            onDismiss = {
+                showPrivacyDialog = false
+                consentToSave = false
+            },
+            primaryEnabled = consentToSave && !isSaving,
+            secondaryEnabled = !isSaving,
+            extraContent = {
+                Text(
+                    text = if (needsDermaReview)
+                        "This scan may be sent for dermatologist review."
+                    else
+                        "This scan will only be saved to your account (not sent).",
+                    color = if (needsDermaReview) Color(0xFFB00020) else Color.Gray,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = consentToSave, onCheckedChange = { consentToSave = it })
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "I agree to save this scan and, if needed, send it for review.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun DemoPdfScreen() {
+
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    var isWorking by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf<String?>(null) }
+
+    Surface(color = MaterialTheme.colorScheme.background) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    "DermTect PDF Demo",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                )
+                Spacer(Modifier.height(8.dp))
+                Text("Tap the button to generate a sample PDF and view it.")
+
+                Spacer(Modifier.height(24.dp))
+
+                Button(
+                    enabled = !isWorking,
+                    onClick = {
+                        scope.launch {
+                            try {
+                                isWorking = true
+                                status = "Generating…"
+
+                                // 1) Make demo bitmaps (photo + heatmap)
+                                val photo = makeDemoBitmap(640, 640, AColor.parseColor("#EEEFF7"))
+                                val heatmap = makeDemoHeatmap(640, 640)
+
+                                // 2) Demo “Possible Conditions” (1–6 shown in PDF)
+                                val possible = listOf(
+                                    "Common benign nevus",
+                                    "Atypical/Dysplastic nevus",
+                                    "Seborrheic keratosis",
+                                    "Solar lentigo",
+                                    "Lichen planus–like keratosis",
+                                    "Dermatofibroma"
+                                )
+
+                                // 3) Demo questionnaire answers
+                                val answers = listOf(
+                                    "Do you usually get sunburned easily after ~15–20 mins without protection?" to "No",
+                                    "Is your natural skin color fair or very fair?" to "No",
+                                    "Have you ever had a severe sunburn?" to "Yes",
+                                    "Do you have many moles or freckles?" to "No",
+                                    "Family member diagnosed with skin cancer?" to "No",
+                                    "Ever diagnosed/treated for skin cancer or precancer?" to "No",
+                                    "Often >1 hour outdoors at 10am–4pm unprotected?" to "Sometimes",
+                                    "Rarely or never use sunscreen?" to "No",
+                                    "Seldom check your skin/moles?" to "Sometimes",
+                                    "New or changing mole/spot in last 6 months?" to "No"
+                                )
+
+                                // 4) Build data → use a simple demo Report ID
+                                val reportId = "DTX-DEMO-" +
+                                        SimpleDateFormat("yyyyMMdd-HHmmss", Locale.getDefault()).format(Date())
+
+                                val data = PdfExporter.CasePdfData(
+                                    userFullName = "Jane Doe",
+                                    birthday = "01/15/1996", // MM/dd/yyyy
+                                    reportId = reportId,
+                                    title = "DERMTECT CLINICAL ANALYSIS REPORT",
+                                    timestamp = SimpleDateFormat(
+                                        "MMM dd, yyyy HH:mm",
+                                        Locale.getDefault()
+                                    ).format(Date()),
+                                    photo = photo,
+                                    heatmap = heatmap,
+                                    shortMessage = "This scan looks reassuring, with a very low likelihood of a serious issue. " +
+                                            "You can continue your normal skincare routine. Just keep being mindful of your skin and how it changes over time.",
+                                    possibleConditions = possible,   // << ensures the numbered list appears (1–6)
+                                    answers = answers
+                                )
+
+                                // 5) Create and open PDF
+                                val uri = withContext(Dispatchers.IO) {
+                                    PdfExporter.createCasePdf(ctx, data)
+                                }
+                                status = "Opening…"
+                                PdfExporter.openPdf(ctx, uri)
+                                status = "Done"
+                            } catch (t: Throwable) {
+                                status = "Failed: ${t.message}"
+                            } finally {
+                                isWorking = false
+                            }
+                        }
+                    }
+                ) {
+                    Text(if (isWorking) "Working…" else "Generate & View PDF")
+                }
+
+                Spacer(Modifier.height(12.dp))
+                status?.let { Text(it) }
+            }
+        }
+    }
+}
+
+/** Simple square demo bitmap with a gradient + label */
+private fun makeDemoBitmap(w: Int, h: Int, bgColor: Int): Bitmap {
+    val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val c = Canvas(bmp)
+    c.drawColor(bgColor)
+
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        color = AColor.parseColor("#5A6ACF")
+        strokeWidth = 10f
+    }
+    // frame
+    c.drawRect(20f, 20f, w - 20f, h - 20f, paint)
+
+    // diagonal accent
+    paint.color = AColor.parseColor("#99A0FF")
+    c.drawLine(20f, 20f, w - 20f, h - 20f, paint)
+    c.drawLine(20f, h - 20f, w - 20f, 20f, paint)
+
+    // label
+    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AColor.DKGRAY
+        textSize = 36f
+        style = Paint.Style.FILL
+    }
+    c.drawText("Original Image (demo)", 28f, h - 40f, textPaint)
+    return bmp
+}
+
+
+/** Fake “heatmap” overlay-ish look just for demo */
+private fun makeDemoHeatmap(w: Int, h: Int): Bitmap {
+    val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val c = Canvas(bmp)
+    c.drawColor(AColor.WHITE)
+
+    // base rectangle
+    val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AColor.parseColor("#FFCDD2") // soft red
+        style = Paint.Style.FILL
+    }
+    c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p)
+
+    // hotspot circles
+    p.color = AColor.parseColor("#E57373")
+    c.drawCircle(w * 0.35f, h * 0.35f, w * 0.18f, p)
+
+    p.color = AColor.parseColor("#EF5350")
+    c.drawCircle(w * 0.6f, h * 0.55f, w * 0.22f, p)
+
+    // label
+    val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AColor.DKGRAY
+        textSize = 36f
+        style = Paint.Style.FILL
+    }
+    c.drawText("Processed / Analyzed (demo)", 28f, h - 40f, text)
+    return bmp
 }

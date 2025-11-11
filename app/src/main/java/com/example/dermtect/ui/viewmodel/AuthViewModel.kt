@@ -21,7 +21,6 @@ data class UserProfile(
     val firstName: String = "",
     val lastName: String = "",
     val birthday: String = "",
-    val familyHistory: String = "",
     val email: String? = null
 )
 class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
@@ -141,7 +140,6 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
                         firstName = doc.getString("firstName") ?: "",
                         lastName = doc.getString("lastName") ?: "",
                         birthday = doc.getString("birthday") ?: "",
-                        familyHistory = doc.getString("familyHistory") ?: "",
                         email = doc.getString("email")
                     )
                 } else {
@@ -156,28 +154,7 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
         }
     }
 
-    // --- NEW: Profile Data Update (Save) ---
-    fun updateFamilyHistory(familyHistory: String, onSuccess: () -> Unit, onFailure: (String) -> Unit) {
-        val uid = auth.currentUser?.uid
-        if (uid == null) {
-            onFailure("User not authenticated.")
-            return
-        }
 
-        _isLoading.value = true
-        firestore.collection("users").document(uid)
-            .update("familyHistory", familyHistory)
-            .addOnSuccessListener {
-                logAudit(uid, auth.currentUser?.email, "profile_update_family_history")
-                // Update the local state immediately
-                _userProfile.value = _userProfile.value.copy(familyHistory = familyHistory)
-                onSuccess()
-            }
-            .addOnFailureListener {
-                onFailure(it.message ?: "Failed to save family history.")
-            }
-            .addOnCompleteListener { _isLoading.value = false }
-    }
     // --- Registration --- //
     fun register(
         email: String,
@@ -185,7 +162,6 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
         firstName: String,
         lastName: String,
         birthday: String,
-        familyHistory: String        // ✅ add this
     ) {
         _loading.value = true
         auth.createUserWithEmailAndPassword(email, password)
@@ -212,7 +188,6 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
                     "firstName" to formattedFirstName,
                     "lastName" to formattedLastName,
                     "birthday" to birthday,
-                    "familyHistory" to familyHistory.lowercase(),  // ✅ record the chosen value
                     "createdAt" to FieldValue.serverTimestamp(),
                     "emailVerified" to false,
                     "role" to "patient",
@@ -332,7 +307,6 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
                                 "email" to email,
                                 "firstName" to firstName,
                                 "lastName" to lastName,
-                                "familyHistory" to "",
                                 "role" to "patient",
                                 "provider" to "google",
                                 "createdAt" to FieldValue.serverTimestamp()

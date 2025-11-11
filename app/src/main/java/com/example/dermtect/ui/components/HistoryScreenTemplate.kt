@@ -41,9 +41,9 @@ import com.example.dermtect.ui.screens.StatusFilter
 data class CaseData(
     val caseId: String,
     val label: String,                 // "Scan 1"
-    val result: String?,               // "Benign"/"Malignant"/"Pending"
-    val date: String,                  // formatted timestamp
-    val status: String?,               // "completed"/"pending"
+    val result: String?,               // "Benign"/"Malignant"
+    val date: String,                  // formatted time stamp
+    val status: String?,               // "completed"
     val imageUrl: String? = null,      // Storage URL
     val imageRes: Int? = null,
     val createdAt: Long = 0,
@@ -121,47 +121,39 @@ fun HistoryScreenTemplate(
 
                         Text(
                             text = "There’s no scan history yet.",
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.headlineMedium,
                             color = Color(0xFF1D1D1D),
                             textAlign = TextAlign.Center
                         )
                         Spacer(Modifier.height(6.dp))
                         Text(
                             text = "Your saved scans will appear here after you take your first photo.",
-                            style = MaterialTheme.typography.headlineMedium,
+                            style = MaterialTheme.typography.headlineSmall,
                             color = Color.Gray,
                             textAlign = TextAlign.Center
                         )
 
                         // Optional: quick action button to start scanning
                         Spacer(Modifier.height(16.dp))
-                        TextButton(
-                            onClick = { navController.navigate("take_photo") }, // ← route to your capture screen
-                            modifier = Modifier
-                                .shadow(4.dp, RoundedCornerShape(10.dp))
-                                .background(Color(0xFFCDFFFF), RoundedCornerShape(10.dp))
-                        ) {
-                            Text(
-                                "Take your first scan",
-                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                                color = Color(0xFF0FB2B2),
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                            )
-                        }
+                        Spacer(Modifier.height(16.dp))
+                        PrimaryButton(
+                            text = "Take your first scan",
+                            onClick = { navController.navigate("camera") }, // ✅ redirects to your camera route
+                            modifier = Modifier.fillMaxWidth(0.9f)
+                        )
+
                     }
                 }
             } else {
                 caseList.forEach { case ->
                     // compute colors/labels per item
                     val indicatorColor = when {
-                        case.status?.equals("pending", true) == true -> Color(0xFFFFC107)
                         case.result?.equals("malignant", true) == true -> Color(0xFFF44336)
                         case.result?.equals("benign", true) == true -> Color(0xFF4CAF50)
                         else -> Color(0xFFBDBDBD)
                     }
 
                     val (statusLabel, statusColor) = when (case.status?.lowercase()) {
-                        "pending" -> "Pending" to Color(0xFFFFD46D).copy(alpha = 0.2f)
                         "completed" -> "Completed" to Color(0xFF00B69B).copy(alpha = 0.2f)
                         else -> null to null
                     }
@@ -256,7 +248,6 @@ fun CaseListItem(
                 text = it,
                 style = MaterialTheme.typography.labelSmall,
                 color = when {
-                    it.equals("Pending", true) -> Color(0xFFC48833)
                     it.equals("Completed", true) -> Color(0xFF00B69B)
                     else -> Color(0xFFFFC107)
                 },
@@ -316,20 +307,14 @@ fun HistoryFilterButton(
         }
 
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            // Status
-            DropdownMenuItem(text = { Text("All") },        onClick = { onStatusChange(StatusFilter.ALL); expanded = false })
-            DropdownMenuItem(text = { Text("Completed") },  onClick = { onStatusChange(StatusFilter.COMPLETED); expanded = false })
-            DropdownMenuItem(text = { Text("Pending") },    onClick = { onStatusChange(StatusFilter.PENDING); expanded = false })
 
             if (isDerma) {
-                Divider()
                 // Result (Derma-only)
                 DropdownMenuItem(text = { Text("All") },       onClick = { onResultChange(ResultFilter.ALL); expanded = false })
                 DropdownMenuItem(text = { Text("Malignant") }, onClick = { onResultChange(ResultFilter.MALIGNANT); expanded = false })
                 DropdownMenuItem(text = { Text("Benign") },    onClick = { onResultChange(ResultFilter.BENIGN); expanded = false })
             }
 
-            Divider()
             // Sort
             DropdownMenuItem(text = { Text("Newest to Oldest") }, onClick = { onSortChange(true);  expanded = false })
             DropdownMenuItem(text = { Text("Oldest to Newest") }, onClick = { onSortChange(false); expanded = false })

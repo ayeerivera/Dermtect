@@ -58,7 +58,6 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import androidx.compose.ui.geometry.Size as GeometrySize
 import android.app.Activity
 import android.Manifest
 import android.content.pm.PackageManager
@@ -89,6 +88,13 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import com.example.dermtect.ui.components.DialogTemplate
+import android.graphics.BitmapFactory
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.ui.draw.clip
 
 // ---------- Small utilities ----------
 fun nowTimestamp(): String {
@@ -105,7 +111,10 @@ private val StatusGap = 12.dp
 @Composable
 fun TakePhotoScreen(
     onBackClick: () -> Unit = {},
-    onFindClinicClick: () -> Unit = {}
+    onFindClinicClick: () -> Unit = {},
+    onNavigateToAssessment: () -> Unit= {},
+    onNavigateToTermsPrivacy: () -> Unit = {}
+
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -151,6 +160,8 @@ fun TakePhotoScreen(
     // === NEW: questionnaire state (gate PDF download) ===
     val qvm = remember { QuestionnaireViewModel() }
     val existingAnswers by qvm.existingAnswers.collectAsState()
+    var showQaRequiredDialog by remember { mutableStateOf(false) }  // ✅ ADD
+
     val questions = remember {
         listOf(
             "Do you usually get sunburned easily after spending around 15–20 minutes under the sun without protection?",
@@ -259,7 +270,6 @@ fun TakePhotoScreen(
                 modifier = Modifier
                     .fillMaxSize()
             ) {
-                drawRect(color = Color.Black.copy(alpha = 0.7f), size = size)
 
                 val rectWidth = FOCUS_BOX_WIDTH.toPx()
                 val rectHeight = FOCUS_BOX_HEIGHT.toPx()
@@ -271,12 +281,6 @@ fun TakePhotoScreen(
 
                 squareRect = Rect(left, top, right, bottom)
 
-                drawRect(
-                    color = Color.Transparent,
-                    topLeft = Offset(left, top),
-                    size = GeometrySize(rectWidth, rectHeight),
-                    blendMode = androidx.compose.ui.graphics.BlendMode.Clear
-                )
 
                 val lineLength = 40.dp.toPx()
                 val strokeWidth = 6f
@@ -338,7 +342,7 @@ fun TakePhotoScreen(
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 150.dp),
+                .padding(top = 80.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
@@ -387,7 +391,7 @@ fun TakePhotoScreen(
 
             // 📸 Camera button (center) — gated by SkinGate
             val canShoot = canCapture
-            val enabledColor = Color(0xFFCDFFFF)
+            val enabledColor = Color((0xFF0097A7))
             val disabledColor = Color(0xFFBDBDBD)
 
             Box(
@@ -472,7 +476,6 @@ fun TakePhotoScreen(
                     modifier = Modifier.size(24.dp)
                 )
             }
-
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
@@ -609,20 +612,26 @@ fun TakePhotoScreen(
                                     val notCompleted =
                                         (qa == null) || (qa.size != questions.size) || qa.any { it == null }
                                     if (notCompleted) {
-                                        Toast.makeText(
-                                            context,
-                                            "Please complete the questionnaire before downloading the PDF.",
-                                            Toast.LENGTH_LONG
-                                        ).show()
+                                        showQaRequiredDialog =
+                                            true    // ✅ show the clickable dialog instead of snackbar
                                         return@launch
                                     }
                                     val photo = capturedImage ?: run {
-                                        Toast.makeText(context, "No photo available for PDF.", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(
+                                            context,
+                                            "No photo available for PDF.",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
                                         return@launch
                                     }
-                                    val userId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+                                    val userId =
+                                        com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
                                     if (userId == null) {
-                                        Toast.makeText(context, "You must be signed in to export.", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(
+                                            context,
+                                            "You must be signed in to export.",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
                                         return@launch
                                     }
 
@@ -642,32 +651,70 @@ fun TakePhotoScreen(
                                             .await()
 
                                         val first = userSnap.getString("firstName").orEmpty()
-                                        val last  = userSnap.getString("lastName").orEmpty()
-                                        val birthdayStr = userSnap.getString("birthday")   // "MM/dd/yyyy" from your app (may be null/blank)
+                                        val last = userSnap.getString("lastName").orEmpty()
+                                        val birthdayStr =
+                                            userSnap.getString("birthday")   // "MM/dd/yyyy" from your app (may be null/blank)
 
-                                        val fullName = listOf(first, last).filter { it.isNotBlank() }.joinToString(" ")
+                                        val fullName =
+                                            listOf(first, last).filter { it.isNotBlank() }
+                                                .joinToString(" ")
 
                                         // 3) Generate a report id per user (you already use this util)
                                         val reportId = PdfExporter.nextUserReportSeq(userId)
 
                                         // 4) Build CasePdfData WITH BIRTHDAY (PdfExporter will auto-compute age)
+                                        // --- Build the same "possible conditions" list the UI shows, based on probability ---
+                                        val prob = inferenceResult?.probability ?: 0f
+                                        val pPct = prob * 100f
+                                        val alerted = prob >= 0.0112f
+                                        val idsToShow: List<String> = if (!alerted) {
+                                            LesionIds.benignIds
+                                        } else {
+                                            when {
+                                                pPct < 10f -> LesionIds.benignIds
+                                                pPct < 30f -> LesionIds.lt30Ids
+                                                pPct < 60f -> LesionIds.lt60Ids
+                                                pPct < 80f -> LesionIds.lt80Ids
+                                                else       -> LesionIds.gte80Ids
+                                            }
+                                        }
+
+// --- Make the PDF summary WITHOUT the bullet list so it doesn't leak into "Summary" ---
+                                        val pdfSummary = if (!alerted) {
+                                            "This scan looks reassuring, with a very low likelihood of a serious issue. " +
+                                                    "You can continue your normal skincare routine. Just keep being mindful of your skin and how it changes over time."
+                                        } else {
+                                            when {
+                                                pPct < 10f -> "Your result shows a very low chance of concern. Everything appears fine. Casual self-checks are enough."
+                                                pPct < 30f -> "Your result suggests a low chance of concern. Keep an eye on changes and consult if something evolves."
+                                                pPct < 60f -> "We noticed some minor concern. Consider discussing this with a doctor for guidance and peace of mind."
+                                                pPct < 80f -> "There’s moderate concern. We recommend scheduling a skin check with a dermatologist."
+                                                else        -> "There’s higher concern. Please visit a dermatologist soon for proper care and support."
+                                            }
+                                        }
+
+// --- Build the CasePdfData and INCLUDE the list ---
                                         val data = PdfExporter.CasePdfData(
                                             reportId = reportId,
                                             title = "Result",
-                                            userFullName = fullName,                 // ← real name
-                                            birthday = birthdayStr,                  // ← pass birthday here
+                                            userFullName = fullName,
+                                            birthday = birthdayStr,
                                             timestamp = nowTimestamp(),
                                             photo = photo,
                                             heatmap = inferenceResult?.heatmap,
-                                            shortMessage = generateTherapeuticMessage(inferenceResult?.probability ?: 0f),
+                                            shortMessage = pdfSummary,                 // <-- important: NO bullets here
+                                            possibleConditions = idsToShow,            // <-- pass the list to the PDF
                                             answers = answerPairs
                                         )
 
-                                        val uri = withContext(Dispatchers.IO) {
-                                            PdfExporter.createCasePdf(context, data)
-                                        }
+// Create + open the PDF
+                                        val uri = withContext(Dispatchers.IO) { PdfExporter.createCasePdf(context, data) }
                                         PdfExporter.openPdf(context, uri)
-                                        Toast.makeText(context, "PDF saved successfully", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(
+                                            context,
+                                            "PDF saved successfully",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
                                         Toast.makeText(
                                             context,
                                             "PDF saved successfully",
@@ -688,122 +735,229 @@ fun TakePhotoScreen(
                             onFindClinicClick = { onFindClinicClick() },
                             compact = true
                         )
-                        if (showPrivacyDialog) {
-                            AlertDialog(
-                                onDismissRequest = {
-                                    if (!isSaving) {
+
+                        DialogTemplate(
+                            show = showPrivacyDialog,
+                            title = "Important: Not a Medical Diagnosis",
+                            description = "DermTect isn’t a substitute for a dermatologist’s diagnosis.",
+                            primaryText = if (isSaving) "Saving…" else "Save",
+                            onPrimary = primaryClick@{
+                                // hard guard: do nothing unless consent is checked and not saving
+                                if (isSaving) return@primaryClick
+                                if (!consentToSave) {
+                                    Toast.makeText(context, "Please check the consent box first.", Toast.LENGTH_SHORT).show()
+                                    return@primaryClick
+                                }
+
+                                coroutineScope.launch {
+                                    try {
+                                        isSaving = true
+
+                                        val uid = FirebaseAuth.getInstance().currentUser?.uid
+                                        if (uid == null) {
+                                            Toast.makeText(context, "Please sign in first.", Toast.LENGTH_SHORT).show()
+                                            return@launch
+                                        }
+                                        if (capturedImage == null) {
+                                            Toast.makeText(context, "No image to save.", Toast.LENGTH_SHORT).show()
+                                            return@launch
+                                        }
+
+                                        val ok = uploadScanWithLabel(
+                                            bitmap = capturedImage!!,
+                                            heatmap = inferenceResult?.heatmap,
+                                            probability = inferenceResult?.probability ?: 0f,
+                                            prediction = modelFlag,
+                                            status = "completed"
+                                        )
+
+                                        if (ok) {
+                                            hasSaved = true
+                                            Toast.makeText(context, "Scan saved successfully.", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "Save failed (rules or network).", Toast.LENGTH_LONG).show()
+                                        }
+                                    } catch (t: Throwable) {
+                                        Log.e("TakePhotoScreen", "Save failed", t)
+                                        Toast.makeText(context, "Save failed: ${t.message}", Toast.LENGTH_LONG).show()
+                                    } finally {
+                                        isSaving = false
                                         showPrivacyDialog = false
                                         consentToSave = false
                                     }
-                                },
-                                title = { Text("Save & Privacy") },
-                                text = {
-                                    Column {
+                                }
+                            },
+                        secondaryText = "Cancel",
+                        onSecondary = {
+                            if (!isSaving) {
+                                showPrivacyDialog = false
+                                consentToSave = false
+                            }
+                        },
+                        onDismiss = {
+                            if (!isSaving) {
+                                showPrivacyDialog = false
+                                consentToSave = false
+                            }
+                        },
+                        primaryEnabled = consentToSave && !isSaving,
+                        secondaryEnabled = !isSaving,
+                            extraContent = {
+                                val scrollState = rememberScrollState()
+                                val atBottom by remember {
+                                    derivedStateOf { scrollState.value >= scrollState.maxValue - 8 }
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(max = 400.dp)
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .verticalScroll(scrollState)
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 8.dp),
+                                        horizontalAlignment = Alignment.Start
+                                    ) {
+
+
                                         Text(
-                                            "We’ll store this scan (photo and optional heatmap) securely in your account. " +
-                                                    "Some scans may require a dermatologist’s review based on the analysis. " +
-                                                    "If that happens, we’ll ask to securely send it for review."
+                                            "If your lesion shows any ABCDE warning signs, please consult a nearby dermatologist:",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = Color.Black,
+                                            textAlign = TextAlign.Start
                                         )
+
+                                        Spacer(Modifier.height(8.dp))
+
+                                        val bullets = listOf(
+                                            "Asymmetry",
+                                            "Border irregular or blurred",
+                                            "Color variation (black/brown/tan/red/white/blue)",
+                                            "Diameter ≥ 6 mm or noticeably growing",
+                                            "Evolving (changes in size/shape/color) or symptoms like itching, bleeding, or non-healing"
+                                        )
+                                        bullets.forEach { line ->
+                                            Text(
+                                                text = "• $line",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = Color.Black,
+                                                textAlign = TextAlign.Start,
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(start = 4.dp, top = 2.dp)
+                                            )
+                                        }
+
+                                        Spacer(Modifier.height(14.dp))
+
+                                        Text(
+                                            text = "This scan will be securely saved to your account. If you decide to visit a dermatologist, you can share your Report ID so they can view your scan during your check-up.",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = Color.Red,
+                                            textAlign = TextAlign.Start
+                                        )
+
                                         Spacer(Modifier.height(12.dp))
 
-                                        // Optional: show what will happen for THIS scan
-                                        val pPct = ((inferenceResult?.probability ?: 0f) * 100f)
-                                        val needsDermaReview = pPct >= 60f
-
-                                        Text(
-                                            if (needsDermaReview)
-                                                "This scan may be sent for dermatologist review."
-                                            else
-                                                "This scan will only be saved to your account (not sent).",
-                                            color = if (needsDermaReview) Color(0xFFB00020) else Color.Gray,
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
-
-                                        Spacer(Modifier.height(12.dp))
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
                                             Checkbox(
                                                 checked = consentToSave,
                                                 onCheckedChange = { consentToSave = it }
                                             )
                                             Spacer(Modifier.width(8.dp))
                                             Text(
-                                                "I agree to save this scan to my account and, if this scan needs dermatologist review, " +
-                                                        "to securely send it for review."
+                                                "I agree to save this scan to my account. If I choose to visit a dermatologist, I understand they can only view my scan by using my Report ID during my check-up.",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                textAlign = TextAlign.Start
+                                            )
+                                        }
+
+                                        Spacer(Modifier.height(30.dp)) // bottom padding so last line isn't cut off
+                                    }
+
+                                    // ▼ Small pulsing arrow hint (appears only if not scrolled to bottom)
+                                    AnimatedVisibility(
+                                        visible = !atBottom,
+                                        modifier = Modifier
+                                            .align(Alignment.BottomCenter)
+                                            .padding(bottom = 4.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(50.dp)
+                                                .clip(CircleShape)
+                                                .background(Color.White.copy(alpha = 0.9f))
+                                                .border(
+                                                    width = 1.dp,
+                                                    brush = Brush.linearGradient(
+                                                        listOf(
+                                                            Color(0xFFBFFDFD),
+                                                            Color(0xFF88E7E7),
+                                                            Color(0xFF55BFBF)
+                                                        )
+                                                    ),
+                                                    shape = CircleShape
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.ArrowDownward,
+                                                contentDescription = "Scroll down",
+                                                tint = Color(0xFF0FB2B2),
+                                                modifier = Modifier.size(24.dp)
                                             )
                                         }
                                     }
+                                }
+                            }
+                        )
+
+                        if (showQaRequiredDialog) {
+                            DialogTemplate(
+                                show = showQaRequiredDialog,
+                                title = "Complete Assessment Required",
+                                description = "You can tap the button above, or go manually to:\n Dropdown Menu → Start Assessment",
+                                primaryText = "Go to Assessment Page",
+                                onPrimary = {
+                                    showQaRequiredDialog = false
+                                    onNavigateToAssessment()
                                 },
-                                confirmButton = {
-                                    TextButton(
-                                        enabled = consentToSave && !isSaving,
-                                        onClick = {
-                                            coroutineScope.launch {
-                                                try {
-                                                    isSaving = true
-                                                    val uid = FirebaseAuth.getInstance().currentUser?.uid
-                                                    if (uid == null) {
-                                                        Toast.makeText(context, "Please sign in first.", Toast.LENGTH_SHORT).show()
-                                                        return@launch
-                                                    }
-                                                    if (capturedImage == null) {
-                                                        Toast.makeText(context, "No image to save.", Toast.LENGTH_SHORT).show()
-                                                        return@launch
-                                                    }
-
-                                                    val pPctNow = ((inferenceResult?.probability ?: 0f) * 100f)
-                                                    val shouldSendToDerma = pPctNow >= 60f && pPctNow < 80f
-
-                                                    val ok = uploadScanWithLabel(
-                                                        bitmap = capturedImage!!,
-                                                        heatmap = inferenceResult?.heatmap,
-                                                        probability = inferenceResult?.probability ?: 0f,
-                                                        prediction = modelFlag,
-                                                        status = if (shouldSendToDerma) "pending" else "completed"
-                                                    )
-
-                                                    if (ok) {
-                                                        hasSaved = true
-                                                        Toast.makeText(
-                                                            context,
-                                                            if (shouldSendToDerma) "Sent to dermatologist for review." else "Scan saved",
-                                                            Toast.LENGTH_SHORT
-                                                        ).show()
-                                                    } else {
-                                                        Toast.makeText(context, "Save failed (rules or network).", Toast.LENGTH_LONG).show()
-                                                    }
-                                                } catch (t: Throwable) {
-                                                    Log.e("TakePhotoScreen", "Save failed", t)
-                                                    Toast.makeText(context, "Save failed: ${t.message}", Toast.LENGTH_LONG).show()
-                                                } finally {
-                                                    isSaving = false
-                                                    showPrivacyDialog = false
-                                                    consentToSave = false
-                                                }
-                                            }
-                                        }
+                                secondaryText = "Cancel",
+                                onSecondary = { showQaRequiredDialog = false },
+                                onDismiss = { showQaRequiredDialog = false },
+                                extraContent = {
+                                    androidx.compose.foundation.layout.Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally
                                     ) {
-                                        if (isSaving) {
-                                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                                        } else {
-                                            Text("Save")
-                                        }
-                                    }
-                                },
-                                dismissButton = {
-                                    TextButton(
-                                        onClick = {
-                                            if (!isSaving) {
-                                                showPrivacyDialog = false
-                                                consentToSave = false
-                                            }
-                                        }
-                                    ) { Text("Cancel") }
-                                },
+                                        androidx.compose.foundation.layout.Spacer(
+                                            modifier = Modifier.height(
+                                                8.dp
+                                            )
+                                        )
 
+                                        // 👇 "Why this matters" link that navigates to Terms & Privacy screen
+                                        Text(
+                                            text = "🔗 Why this matters",
+                                            color = Color(0xFF0FB2B2),
+                                            style = MaterialTheme.typography.bodyLarge.copy(
+                                                fontWeight = FontWeight.SemiBold
+                                            ),
+                                            modifier = Modifier
+                                                .clickable {
+                                                    showQaRequiredDialog = false
+                                                    onNavigateToTermsPrivacy()
+                                                }
+                                                .padding(vertical = 4.dp)
+                                        )
+                                    }
+                                }
                             )
                         }
-
-
                         if (fullImagePage != null) {
                             androidx.compose.ui.window.Dialog(onDismissRequest = {
                                 fullImagePage = null
@@ -835,12 +989,12 @@ fun TakePhotoScreen(
                                 }
                             }
                         }
-
+                    }
                     }
                 }
             }
         }
-    }
+
 }
 
 
@@ -967,6 +1121,8 @@ fun CameraPermissionGate(
     var checked by remember { mutableStateOf(false) }
     var granted by remember { mutableStateOf(false) }
     var showDialog by remember { mutableStateOf(false) }
+    var requestedOnce by remember { mutableStateOf(false) }
+
 
     // Launcher for the system permission prompt
     val launcher = rememberLauncherForActivityResult(
@@ -985,11 +1141,9 @@ fun CameraPermissionGate(
 
         granted = hasPermission
         checked = true
-        showDialog = !hasPermission
-
-        // Optional: auto-trigger the system dialog on very first entry
-        if (!hasPermission) {
-            launcher.launch(Manifest.permission.CAMERA)
+        if (!hasPermission && !requestedOnce) {
+            requestedOnce = true
+            launcher.launch(Manifest.permission.CAMERA) // 👉 show system prompt first
         }
     }
 

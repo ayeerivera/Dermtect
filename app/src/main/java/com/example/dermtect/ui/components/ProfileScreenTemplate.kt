@@ -56,7 +56,6 @@ import androidx.compose.ui.graphics.Brush
 import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.GoogleAuthProvider
 import com.example.dermtect.ui.screens.BirthdayMaskedField
-import com.example.dermtect.ui.screens.FamilyHistoryDropdown
 import kotlinx.coroutines.launch
 
 @Composable
@@ -79,7 +78,6 @@ fun ProfileScreenTemplate(
     val firstNameFromVm by userHomeViewModel.firstName.collectAsState()
     val lastNameFromVm  by userHomeViewModel.lastName.collectAsState()
     val birthdayFromVm  by userHomeViewModel.birthday.collectAsState()         // String? in your VM
-    val famHistoryFromVm by userHomeViewModel.familyHistory.collectAsState()
 
     LaunchedEffect(Unit) {
         userHomeViewModel.fetchUserInfo()
@@ -277,14 +275,14 @@ fun ProfileScreenTemplate(
                     initialFirstName = firstNameFromVm.ifBlank { "" },
                     initialLastName = lastNameFromVm.ifBlank { "" },
                     initialBirthday = (birthdayFromVm ?: ""),
-                    initialFamilyHistory = (famHistoryFromVm ?: ""),
-                    onSaveAll = { newFirst, newLast, newBirthday, newFamilyHistory ->
+                    onSaveAll = { newFirst, newLast, newBirthday->
                         userHomeViewModel.updateProfile(
                             firstName = newFirst,
                             lastName = newLast,
                             birthday = newBirthday,
-                            familyHistory = newFamilyHistory,
                             onSuccess = {
+                                userHomeViewModel.fetchUserInfo()
+
                                 Toast.makeText(
                                     context,
                                     "Profile saved successfully!",
@@ -723,21 +721,17 @@ private fun CombinedProfileSection(
     initialFirstName: String,
     initialLastName: String,
     initialBirthday: String,
-    initialFamilyHistory: String, // "yes" | "no" | "unknown" | ""
-    onSaveAll: (String, String, String, String) -> Unit
+    onSaveAll: (String, String, String) -> Unit
 ) {
     var first by remember(initialFirstName) { mutableStateOf(initialFirstName) }
     var last by remember(initialLastName) { mutableStateOf(initialLastName) }
     var birthday by remember(initialBirthday) { mutableStateOf(initialBirthday) }
-    // famHistory is the correct local state variable
-    var famHistory by remember(initialFamilyHistory) { mutableStateOf(initialFamilyHistory) }
 
     val nameValid = first.isNotBlank() && last.isNotBlank()
     val birthdayValid = birthday.isNotBlank() // same rule you used on Register
     val changed = first != initialFirstName ||
             last != initialLastName ||
-            birthday != initialBirthday ||
-            famHistory != initialFamilyHistory
+            birthday != initialBirthday
     val canSave = nameValid && birthdayValid && changed
 
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp) ) {
@@ -787,29 +781,13 @@ private fun CombinedProfileSection(
                 .align(Alignment.CenterHorizontally)
         )
 
-        Spacer(Modifier.height(24.dp))
-
-        // --- Edit Health Info ---
-        Text("Family History of Skin Cancer", style = MaterialTheme.typography.titleLarge, color = Color(0xFF1D1D1D))
-        Spacer(Modifier.height(10.dp))
-
-        FamilyHistoryDropdown(
-            value = famHistory, // <-- USE famHistory here
-            onChange = {
-                famHistory = it // <-- USE famHistory here
-            },
-            modifier = Modifier
-                .wrapContentWidth()
-                .align(Alignment.CenterHorizontally)
-        )
-
         Spacer(Modifier.height(12.dp))
 
         // --- One Save/Reset row for all three ---
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             PrimaryButton(
                 text = "Save",
-                onClick = { onSaveAll(first.trim(), last.trim(), birthday.trim(), famHistory.trim()) },
+                onClick = { onSaveAll(first.trim(), last.trim(), birthday.trim())},
                 enabled = canSave,
                 modifier = Modifier.weight(1f).height(48.dp)
             )
@@ -819,7 +797,6 @@ private fun CombinedProfileSection(
                     first = initialFirstName
                     last = initialLastName
                     birthday = initialBirthday
-                    famHistory = initialFamilyHistory
                 },
                 enabled = changed,
                 modifier = Modifier.weight(1f).height(48.dp)

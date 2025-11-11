@@ -76,7 +76,6 @@ fun Register(navController: NavController) {
     var showSuccessDialog by remember { mutableStateOf(false) }
     var showBackDialog by remember { mutableStateOf(false) }
     var birthday by rememberSaveable { mutableStateOf("") }
-    var familyHistory by rememberSaveable { mutableStateOf("") }
 
     val isEmailValid = email.isNotBlank() &&
             Patterns.EMAIL_ADDRESS.matcher(email).matches() &&
@@ -131,7 +130,6 @@ fun Register(navController: NavController) {
                                 .set(
                                     mapOf(
                                         "birthday" to birthday,
-                                        "familyHistory" to familyHistory.lowercase()
                                     ),
                                     com.google.firebase.firestore.SetOptions.merge()   // ✅ merge instead of overwrite
                                 )
@@ -241,14 +239,6 @@ fun Register(navController: NavController) {
                 )
 
 
-                Spacer(Modifier.height(5.dp))
-
-                FamilyHistoryDropdown(
-                    value = familyHistory,
-                    onChange = { familyHistory = it },
-                    icon = Icons.Outlined.MedicalInformation // optional swap
-                )
-
 
                 Spacer(modifier = Modifier.height(5.dp))
 
@@ -335,8 +325,7 @@ fun Register(navController: NavController) {
                                 password = password,
                                 firstName = firstName,
                                 lastName = lastName,
-                                birthday = birthday,
-                                familyHistory = familyHistory      // ✅ now sent to VM
+                                birthday = birthday
                             )
                         },
                     contentAlignment = Alignment.Center
@@ -569,83 +558,3 @@ fun BirthdayMaskedField(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun FamilyHistoryDropdown(
-    value: String,                         // "yes" | "no" | "unknown" | ""
-    onChange: (String) -> Unit,
-    placeholder: String = "Family history of skin cancer (Yes/No/Unknown)",
-    modifier: Modifier = Modifier,
-    icon: ImageVector = Icons.Outlined.HealthAndSafety // ← suggest: calendar/health icons
-) {
-    val options = listOf("Yes", "No", "Unknown")
-    var expanded by remember { mutableStateOf(false) }
-
-    // keep it centered like your InputField (0.9f width)
-    Box(
-        modifier = Modifier.fillMaxWidth(),
-        contentAlignment = Alignment.Center
-    ) {
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { expanded = it },
-            modifier = Modifier.fillMaxWidth(0.9f) // match InputField width
-        ) {
-            TextField(
-                value = value.ifBlank { "" }.replaceFirstChar { it.titlecase() },
-                onValueChange = {},
-                readOnly = true,
-                singleLine = true,
-                leadingIcon = {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = Color.Gray,
-                        modifier = Modifier.size(18.dp)
-                    )
-                },
-                placeholder = {
-                    Text(
-                        text = placeholder,
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.Normal,
-                            color = Color.DarkGray
-                        )
-                    )
-                },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                shape = RoundedCornerShape(10.dp),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color(0xFFF7F7F7),
-                    unfocusedContainerColor = Color(0xFFF7F7F7),
-                    disabledContainerColor = Color(0xFFF0F0F0),
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    focusedTextColor = Color.Black,
-                    unfocusedTextColor = Color.Black,
-                    cursorColor = Color.Black
-                ),
-                modifier = modifier
-                    .menuAnchor()                  // required for proper dropdown anchoring
-                    .height(56.dp)
-                    .fillMaxWidth()
-            )
-
-            ExposedDropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
-            ) {
-                options.forEach { opt ->
-                    DropdownMenuItem(
-                        text = { Text(opt) },
-                        onClick = {
-                            onChange(opt.lowercase())
-                            expanded = false
-                        }
-                    )
-                }
-            }
-        }
-    }
-}

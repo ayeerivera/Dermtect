@@ -1,6 +1,7 @@
 package com.example.dermtect.ui.screens
 
 import android.graphics.Bitmap
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -48,13 +49,11 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
 import com.example.dermtect.ui.components.DialogTemplate
 import com.example.dermtect.ui.components.PrimaryButton
 import com.example.dermtect.ui.components.SecondaryButton
-
+import kotlin.math.min
+import androidx.compose.ui.platform.LocalConfiguration
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LesionCaseTemplate(
@@ -99,6 +98,22 @@ fun LesionCaseTemplate(
     )
 // add near the top of LesionCaseTemplate, after other vals
     var fullImagePage by remember { mutableStateOf<Int?>(null) } // 0 = photo, 1 = heatmap
+    val cfg = LocalConfiguration.current
+    val screenW = cfg.screenWidthDp.dp
+    val screenH = cfg.screenHeightDp.dp
+    val imageHPad = 40.dp
+
+    val desiredSide =
+        if (showPrimaryButtons) screenH * unsavedHeightFraction
+        else screenH * savedHeightFraction
+
+    val targetSide by animateDpAsState(
+        // keep it square but never wider than the available width
+        targetValue = desiredSide.coerceAtMost(screenW - imageHPad),
+        label = "imageSideAnim"
+    )
+    var showCondImageResId by remember { mutableStateOf<Int?>(null) }
+
 
     BubblesBackground {
         val scrollState = rememberScrollState()
@@ -139,7 +154,7 @@ fun LesionCaseTemplate(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(5.dp))
 
             Column(
                 modifier = Modifier
@@ -147,7 +162,7 @@ fun LesionCaseTemplate(
                     .padding(top = 10.dp, bottom = 20.dp, start = 20.dp, end = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(Modifier.height(18.dp))
+                Spacer(Modifier.height(5.dp))
 
                 // --- HORIZONTAL PAGER (page 1 centered; page 2 on swipe) ---
                 if (imageBitmap != null || imageResId != null) {
@@ -164,15 +179,14 @@ fun LesionCaseTemplate(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(targetHeight)                 // << animated height
+                                .size(targetSide)
                                 .clickable {
                                     fullImagePage = pagerState.currentPage
 
                                 }) {
                             HorizontalPager(
                                 state = pagerState,
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.matchParentSize()
                             ) { page ->
                                 val bmpToShow: Bitmap? = when (page) {
                                     0 -> imageBitmap
@@ -185,7 +199,7 @@ fun LesionCaseTemplate(
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .aspectRatio(1f)           // square frame
+                                            .matchParentSize()       // square frame
                                             .clip(frameShape)
                                             .border(4.dp, borderColor, frameShape)
                                     ) {
@@ -527,6 +541,7 @@ fun LesionCaseTemplate(
             }
         }
     }
+
     // Info dialog for a tapped condition
     showInfoFor?.let { name ->
         val info = conditionInfo[name]
@@ -535,42 +550,60 @@ fun LesionCaseTemplate(
             show = true,
             title = name,
             description = info?.what ?: "No description available.",
-            primaryText = "Close",
-            onPrimary = { showInfoFor = null },
-            onDismiss = { showInfoFor = null },
-            extraContent = {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Spacer(Modifier.height(15.dp))
-                    Text(
-                        text = buildAnnotatedString {
-                            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                                append("Common signs:")
-                            }
-                        },
-                        color = Color.Black,
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.bodyMedium
+            // 👇 provide a clickable image if we have one
+            imageContent = {
+                val resId = info?.imageResId
+                if (resId != null) {
+                    Image(
+                        painter = painterResource(id = resId),
+                        contentDescription = "$name example",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { showCondImageResId = resId }, // << open full screen
+                        contentScale = ContentScale.Crop
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = (info?.symptoms ?: "—").trim(),
-                        color = Color.Black,
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.Normal  // 👈 symptoms in normal weight
-                        )
+                        "Tap image to view full screen",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color.Gray
                     )
                 }
-            }
+            },
+            primaryText = "Close",
+            onPrimary = { showInfoFor = null },
+            onDismiss = { showInfoFor = null }
         )
     }
 
+    if (showCondImageResId != null) {
+        Dialog(
+            onDismissRequest = { showCondImageResId = null },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,   // <- no default margins
+                decorFitsSystemWindows = false     // <- draw under system bars
+            )
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)       // full bleed
+                    .clickable { showCondImageResId = null },  // tap anywhere to close
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(id = showCondImageResId!!),
+                    contentDescription = "Condition example",
+                    modifier = Modifier
+                        .fillMaxSize(),            // <- take all space (no padding!)
+                    contentScale = ContentScale.Fit // scale up/down without cropping
+                )
+            }
+        }
+    }
 
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -633,9 +666,9 @@ object LesionIds {
     val lt30Ids = listOf(
         "Solar/actinic keratosis",
         "Squamous cell carcinoma in situ",
-        "Melanoma in situ",
-        "Superficial BCC",
-        "Nodular Basal Cell Carcinoma  (nodular BCC)",
+        "Melanoma in situ (general)",
+        "Superficial basal cell carcinoma",
+        "Nodular Basal Cell Carcinoma",
         "Indeterminate melanocytic neoplasm"
     )
 
@@ -643,22 +676,21 @@ object LesionIds {
         "Melanoma in situ, lentigo maligna",
         "Melanoma in situ, with nevus",
         "Melanoma invasive, superficial spreading",
-        "Basal cell carcinoma",
+        "Basal cell carcinoma (general malignant group)",
         "Melanoma invasive (general)",
         "Atypical intraepithelial melanocytic proliferation"
     )
 
     val lt80Ids = listOf(
         "Squamous cell carcinoma, invasive",
-        "Melanoma, NOS",
-        "Basal cell carcinoma, general malignant group"
+        "Melanoma, NOS (not otherwise specified)",
+        "Basal cell carcinoma (general malignant group)"
     )
 
     val gte80Ids = listOf(
-        "Basal cell carcinoma, nodular",
+        "Nodular basal cell carcinoma",
         "Superficial basal cell carcinoma",
-        "Melanoma in situ (general)",
-        "Atypical/Dysplastic nevus"
+        "Melanoma in situ (general)"
     )
 }
 fun generateTherapeuticMessage(
@@ -701,92 +733,89 @@ fun generateTherapeuticMessage(
 
 data class ConditionInfo(
     val what: String,
-    val symptoms: String
+    @DrawableRes val imageResId: Int? = null
 )
 
 val conditionInfo: Map<String, ConditionInfo> = mapOf(
-    "Solar/actinic keratosis (AK)" to ConditionInfo(
+    "Solar/actinic keratosis" to ConditionInfo(
         what = "Rough, scaly erythematous or hyperkeratotic patches on chronically sun-exposed areas; common in older fair-skinned people.",
-        symptoms = "Rough or scaly spot; pink/tan; may feel sandpapery; often on sun-exposed areas."
+        imageResId = R.drawable.solar_or_actinic_keratosis
     ),
-    "Squamous cell carcinoma in situ (Bowen disease)" to ConditionInfo(
+    "Squamous cell carcinoma in situ" to ConditionInfo(
         what = "Red scaly or crusted patch that may be mistaken for eczema or psoriasis; occurs on sun-exposed sites or mucosa.",
-        symptoms = "Persistent red/scaly patch; may crust; slow growth; usually painless."
+        imageResId = R.drawable.squamous_cell_carcinoma_in_situ
+
     ),
-    "Melanoma in situ (general / stage 0)" to ConditionInfo(
+    "Melanoma in situ (general)" to ConditionInfo(
         what = "Pigmented patch or macule exhibiting ABCDE changes (asymmetry, border irregularity, colour variegation, diameter, evolving). Confined to epidermis.",
-        symptoms = "Irregular borders, color variation; change in size/shape; may be flat."
+        imageResId = R.drawable.melanoma_in_situ
+
     ),
-    "Superficial basal cell carcinoma (superficial BCC)" to ConditionInfo(
+    "Superficial basal cell carcinoma" to ConditionInfo(
         what = "Thin, pink or scaly patch that may resemble eczema or AK; most often on trunk and limbs.",
-        symptoms = "Pink/red thin patch; may be shiny; slow-growing; may bleed easily."
+        imageResId = R.drawable.superficial_bcc
     ),
-    "Nodular basal cell carcinoma (nodular BCC)" to ConditionInfo(
+    "Nodular basal cell carcinoma" to ConditionInfo(
         what = "Pearly, translucent papule or nodule with telangiectasia; may ulcerate (rodent ulcer). Common on head/neck.",
-        symptoms = "Pearly bump; visible small blood vessels; may ulcerate or bleed."
+        imageResId = R.drawable.nodular_bcc
     ),
     "Indeterminate melanocytic neoplasm" to ConditionInfo(
         what = "Lesion that cannot be confidently classified clinically or histologically as benign or malignant.",
-        symptoms = "Atypical mole-like appearance; evolving features; often needs evaluation."
+        imageResId = R.drawable.indeterminate_melanocytic_neoplasm
     ),
-    "Melanoma in situ, lentigo maligna subtype" to ConditionInfo(
+    "Melanoma in situ, lentigo maligna" to ConditionInfo(
         what = "Slowly enlarging irregular pigmented patch on chronically sun-damaged skin (face/neck) of older adults.",
-        symptoms = "Slowly enlarging flat brown patch with varied shades; irregular edges."
+        imageResId = R.drawable.melanoma_in_situ_lentigo_maligna
     ),
     "Melanoma in situ, with nevus" to ConditionInfo(
         what = "Melanoma arising adjacent to or within a pre-existing nevus but still confined to epidermis.",
-        symptoms = "Change in a pre-existing mole: color/border/asymmetry."
+        imageResId = R.drawable.melanoma_in_situ_with_nevus
     ),
     "Melanoma invasive, superficial spreading" to ConditionInfo(
         what = "Most common invasive subtype — irregular, often multicolored plaque that initially grows radially then invades vertically; common on trunk (men) and legs (women).",
-        symptoms = "Asymmetric, irregular borders, multiple colors; enlarging lesion."
+        imageResId = R.drawable.melanoma_invasive_superficial_spreading
     ),
     "Basal cell carcinoma (general malignant group)" to ConditionInfo(
         what = "Group term for BCC subtypes (nodular, superficial, pigmented, morpheaform, etc.). Usually slow-growing, locally invasive lesions on sun-exposed skin.",
-        symptoms = "Shiny/pearly bump or scaly patch; may bleed; non-healing sore."
+        imageResId = R.drawable.bcc_general_malignant_group
     ),
     "Melanoma invasive (general)" to ConditionInfo(
         what = "Melanoma that has invaded beyond the epidermis into dermis; variable appearance depending on subtype.",
-        symptoms = "ABCDE changes (Asymmetry, Border, Color, Diameter, Evolving)."
+        imageResId = R.drawable.melanoma_invasive_general
     ),
     "Atypical intraepithelial melanocytic proliferation" to ConditionInfo(
         what = "A descriptive term for an epidermal melanocytic proliferation with atypia insufficient for a definitive melanoma diagnosis. May appear clinically suspicious.",
-        symptoms = "Atypical, changing pigmented patch; biopsy is often recommended."
+        imageResId = R.drawable.atypical_intraepithelial_melanocytic_proliferation
     ),
     "Squamous cell carcinoma, invasive" to ConditionInfo(
         what = "Scaly, crusted, or ulcerated nodule or plaque that may bleed or grow rapidly; arises on sun-exposed sites, scars, or immunosuppressed skin.",
-        symptoms = "Firm/red nodule or scaly patch that may crust or bleed; sun-exposed sites."
+        imageResId = R.drawable.squamous_cell_carcinoma_invasive
     ),
     "Melanoma, NOS (not otherwise specified)" to ConditionInfo(
-        what = "Melanoma that cannot be classified into a specific histologic subtype from available clinical/pathology data.",
-        symptoms = "Irregular pigmented lesion with change over time."
-    ),
-    "Superficial basal cell carcinoma  (superficial BCC)" to ConditionInfo(
-        what = "Thin, pink or scaly patch that may resemble eczema or AK; most often on trunk and limbs.",
-        symptoms = "Thin red patch; slightly scaly; may look like eczema but doesn’t resolve."
+        what = "Melanoma that cannot be classified into a specific histologic subtype from available clinical/pathology data."
     ),
     "Atypical/Dysplastic nevus" to ConditionInfo(
         what = "Moles that appear larger and more irregular than common nevi — irregular border, variable colour, often >5 mm. May clinically resemble melanoma.",
-        symptoms = "Larger than common nevi; irregular edges/color; change over time."
+        imageResId = R.drawable.atypical_or_dysplastic_nevus
     ),
     "Common benign nevus" to ConditionInfo(
         what = "Small, round to oval pigmented macules or papules (typically <6 mm) with uniform colour and smooth borders; common in childhood and young adulthood.",
-        symptoms = "Symmetric, uniform color, smooth borders; stable over time."
+        imageResId = R.drawable.common_benign_nevus
     ),
     "Seborrheic keratosis" to ConditionInfo(
         what = "Very common benign “stuck-on” waxy papules/plaques in older adults; colour ranges from light tan to black. Often on trunk, face.",
-        symptoms = "Waxy or wart-like; brown/tan/black; crumbly surface; not dangerous."
+        imageResId = R.drawable.seborrheic_keratosis
     ),
-    "Solar lentigo (age / sun spot)" to ConditionInfo(
+    "Solar lentigo" to ConditionInfo(
         what = "Flat, well-circumscribed brown macules on chronically sun-exposed skin (face, hands, forearms).",
-        symptoms = "Flat, well-defined brown spot; stable; sun-exposed areas."
+        imageResId = R.drawable.solar_lentigo
     ),
     "Lichen planus–like keratosis" to ConditionInfo(
-        what = "Usually a solitary pink to brown inflamed patch or plaque that may appear on sun-exposed skin and can mimic atypical pigmented lesions." ,
-        symptoms = "Pink-to-brown patch; may be itchy; often fades with time."
+        what = "Usually a solitary pink to brown inflamed patch or plaque that may appear on sun-exposed skin and can mimic atypical pigmented lesions.",
+        imageResId = R.drawable.lichen_planus_like_keratosis
     ),
     "Dermatofibroma" to ConditionInfo(
         what = "Small, firm papule or nodule (commonly on lower legs) that often dimples with lateral pressure (“dimple sign”). Usually under 1 cm.",
-        symptoms = "Firm dimple when pinched; brown/pink; usually harmless."
+        imageResId = R.drawable.dermatofibroma
     )
 )

@@ -37,6 +37,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -47,6 +48,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
+import com.example.dermtect.tflt.DermtectResult
 
 
 @Composable
@@ -69,6 +71,7 @@ fun LesionCaseScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var fullImagePage by remember { mutableStateOf<Int?>(null) } // 0 = photo, 1 = heatmap
     var showQaRequiredDialog by remember { mutableStateOf(false) }  // ✅ ADD
+    var inferenceResult by remember { mutableStateOf<DermtectResult?>(null) }
 
     val questions = remember {
         listOf(
@@ -218,7 +221,39 @@ fun LesionCaseScreen(
                                 }
 
 // sequential per-user ID (suspend)
+                                // sequential per-user ID (suspend)
                                 val reportId = PdfExporter.nextUserReportSeq(userId)
+
+// ❗ Use the Firestore-loaded probability for this screen
+                                val prob = probability
+                                val pPct = prob * 100f
+                                val alerted = prob >= 0.0112f
+
+// ✅ Build the exact same 6-item (or bucketed) list you show in UI
+                                val idsToShow: List<String> = if (!alerted) {
+                                    LesionIds.benignIds
+                                } else {
+                                    when {
+                                        pPct < 10f -> LesionIds.benignIds
+                                        pPct < 30f -> LesionIds.lt30Ids
+                                        pPct < 60f -> LesionIds.lt60Ids
+                                        pPct < 80f -> LesionIds.lt80Ids
+                                        else       -> LesionIds.gte80Ids
+                                    }
+                                }
+
+// ✅ Compact summary for the PDF (no bullets here)
+                                val pdfSummary = if (!alerted) {
+                                    "This scan looks reassuring, with a very low likelihood of a serious issue."
+                                } else {
+                                    when {
+                                        pPct < 10f -> "Very low chance of concern. Casual self-checks are enough."
+                                        pPct < 30f -> "Low chance of concern. Keep an eye on changes."
+                                        pPct < 60f -> "Minor concern. Consider discussing with a doctor."
+                                        pPct < 80f -> "Moderate concern. We recommend a dermatologist visit."
+                                        else        -> "Higher concern. Please visit a dermatologist soon."
+                                    }
+                                }
 
                                 val data = PdfExporter.CasePdfData(
                                     reportId = reportId,
@@ -227,18 +262,17 @@ fun LesionCaseScreen(
                                     timestamp = timestampText,
                                     photo = photo,
                                     heatmap = heatmapBitmap,
-                                    shortMessage = generateTherapeuticMessage(probability),
-                                    answers = answerPairs       // 👈 add the formatted answers here
+                                    shortMessage = pdfSummary,          // 👈 concise text (no bullets)
+                                    possibleConditions = idsToShow,     // 👈 THIS passes the 6 items to the PDF
+                                    answers = answerPairs
                                 )
 
+
                                 val uri = withContext(Dispatchers.IO) {
-                                    PdfExporter.saveReportAndPdf(
-                                        context = ctx,
-                                        userId = userId,
-                                        baseData = data,
-                                        uploadPdfToStorage = true
-                                    )
+                                    PdfExporter.createCasePdf(ctx, data)
                                 }
+                                PdfExporter.openPdf(ctx, uri)
+
 
                                 PdfExporter.openPdf(ctx, uri)
                                 snackbarHostState.showSnackbar("PDF saved successfully")
