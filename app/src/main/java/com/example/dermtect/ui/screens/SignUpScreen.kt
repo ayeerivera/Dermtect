@@ -18,10 +18,8 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import com.example.dermtect.R
 import com.example.dermtect.ui.components.BubblesBackground
 import com.example.dermtect.ui.components.InputField
@@ -38,7 +36,6 @@ import com.google.firebase.firestore.FirebaseFirestore
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import com.example.dermtect.ui.components.BackButton
-import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -46,7 +43,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.sp
 import com.example.dermtect.data.repository.AuthRepositoryImpl
 import com.example.dermtect.domain.usecase.AuthUseCase
-
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.HealthAndSafety
+import androidx.compose.material.icons.outlined.MedicalInformation
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 
 @Composable
 fun Register(navController: NavController) {
@@ -71,7 +75,8 @@ fun Register(navController: NavController) {
     var confirmPassword by remember { mutableStateOf("") }
     var showSuccessDialog by remember { mutableStateOf(false) }
     var showBackDialog by remember { mutableStateOf(false) }
-
+    var birthday by rememberSaveable { mutableStateOf("") }
+    var familyHistory by rememberSaveable { mutableStateOf("") }
 
     val isEmailValid = email.isNotBlank() &&
             Patterns.EMAIL_ADDRESS.matcher(email).matches() &&
@@ -81,12 +86,17 @@ fun Register(navController: NavController) {
         password == confirmPassword && viewModel.isPasswordStrong(password)
     }
 
-    val isFormValid = firstName.isNotBlank() && lastName.isNotBlank() && isEmailValid && isPasswordValid
-
     val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
         .requestIdToken("50445058822-fn9cea4e0bduos6t0g7ofb2g9ujri5s2.apps.googleusercontent.com")
         .requestEmail()
         .build()
+
+    val isFormValid = firstName.isNotBlank() &&
+            lastName.isNotBlank() &&
+            isEmailValid &&
+            isPasswordValid &&
+            birthday.isNotBlank()
+
 
     val googleSignInClient = GoogleSignIn.getClient(context, gso)
 
@@ -120,13 +130,12 @@ fun Register(navController: NavController) {
                                 .document(uid)
                                 .set(
                                     mapOf(
-                                        "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
-                                        "email" to user.email,
-                                        "firstName" to (account?.givenName ?: ""),
-                                        "lastName" to (account?.familyName ?: ""),
-                                        "role" to "patient"
-                                    )
+                                        "birthday" to birthday,
+                                        "familyHistory" to familyHistory.lowercase()
+                                    ),
+                                    com.google.firebase.firestore.SetOptions.merge()   // ✅ merge instead of overwrite
                                 )
+
                                 .addOnSuccessListener {
                                     Toast.makeText(context, "Google sign-in successful!", Toast.LENGTH_SHORT).show()
                                     navController.navigate("user_home")
@@ -220,6 +229,27 @@ fun Register(navController: NavController) {
                     isPassword = false,
                     errorMessage = if (lnameTouched && lastName.isBlank()) "Last name is required" else null
                 )
+
+                Spacer(modifier = Modifier.height(5.dp))
+
+                BirthdayMaskedField(
+                    birthday = birthday,
+                    onValueChange = { birthday = it },
+                    onValidDate = { birthday = it }, // keeps the validated value,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+
+                )
+
+
+                Spacer(Modifier.height(5.dp))
+
+                FamilyHistoryDropdown(
+                    value = familyHistory,
+                    onChange = { familyHistory = it },
+                    icon = Icons.Outlined.MedicalInformation // optional swap
+                )
+
+
                 Spacer(modifier = Modifier.height(5.dp))
 
                 InputField(
@@ -250,7 +280,7 @@ fun Register(navController: NavController) {
                     isPassword = true,
                     errorMessage = when {
                         password.isNotBlank() && !viewModel.isPasswordStrong(password) ->
-                            "Use at least 6 characters with uppercase, lowercase, number and special character (e.g. DermTect@2024)"
+                            "Use at least 8 characters with uppercase, lowercase, number and special character (e.g. DermTect@2024)"
                         else -> null
                     }
                 )
@@ -300,7 +330,14 @@ fun Register(navController: NavController) {
                             shape = RoundedCornerShape(12.dp)
                         )
                         .clickable(enabled = isFormValid && !loading) {
-                            viewModel.register(email, password, firstName, lastName)
+                            viewModel.register(
+                                email = email,
+                                password = password,
+                                firstName = firstName,
+                                lastName = lastName,
+                                birthday = birthday,
+                                familyHistory = familyHistory      // ✅ now sent to VM
+                            )
                         },
                     contentAlignment = Alignment.Center
                 ) {
@@ -415,8 +452,200 @@ fun Register(navController: NavController) {
     }
 }
 
-@Preview(showBackground = true)
 @Composable
-fun RegisterPreview() {
-    Register(navController = rememberNavController())
+fun BirthdayMaskedField(
+    birthday: String,
+    onValueChange: (String) -> Unit,
+    onValidDate: (String) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    var tfv by remember {
+        mutableStateOf(
+            TextFieldValue(
+                text = birthday,
+                selection = TextRange(birthday.length)
+            )
+        )
+    }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    // keep external state in sync if it changes (e.g., restored or cleared)
+    LaunchedEffect(birthday) {
+        if (birthday != tfv.text) {
+            tfv = tfv.copy(text = birthday, selection = TextRange(birthday.length))
+        }
+    }
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center
+    ) {
+
+        TextField(
+            value = tfv,
+            onValueChange = { new ->
+                // mask: keep only digits, insert slashes as MM/DD/YYYY
+                val digits = new.text.filter(Char::isDigit).take(8)
+                val masked = when {
+                    digits.length <= 2 -> digits
+                    digits.length <= 4 -> digits.substring(0, 2) + "/" + digits.substring(2)
+                    else -> digits.substring(0, 2) + "/" + digits.substring(
+                        2,
+                        4
+                    ) + "/" + digits.substring(4)
+                }
+
+                // move cursor to end of masked text
+                tfv = TextFieldValue(masked, selection = TextRange(masked.length))
+                onValueChange(masked)
+
+                error = null
+                if (masked.length == 10) {
+                    val ok = runCatching {
+                        val sdf =
+                            java.text.SimpleDateFormat("MM/dd/yyyy", java.util.Locale.getDefault())
+                        sdf.isLenient = false
+                        val d = sdf.parse(masked)!!
+                        val now = java.util.Calendar.getInstance()
+                        val min = (now.clone() as java.util.Calendar).apply {
+                            add(
+                                java.util.Calendar.YEAR,
+                                -110
+                            )
+                        }
+                        d.time in min.timeInMillis..now.timeInMillis
+                    }.getOrDefault(false)
+                    if (ok) onValidDate(masked) else error = "Invalid date"
+                }
+            },
+            singleLine = true,
+            readOnly = false,
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Outlined.CalendarToday,
+                    contentDescription = null,
+                    tint = Color.Gray,
+                    modifier = Modifier.size(18.dp)
+                )
+            },
+            placeholder = {
+                Text(
+                    text = "Birthday (MM/DD/YYYY)",
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = FontWeight.Normal,
+                        color = Color.DarkGray
+                    )
+                )
+            },
+            textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+            shape = RoundedCornerShape(10.dp),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Color(0xFFF7F7F7),
+                unfocusedContainerColor = Color(0xFFF7F7F7),
+                disabledContainerColor = Color(0xFFF0F0F0),
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                focusedTextColor = Color.Black,
+                unfocusedTextColor = Color.Black,
+                cursorColor = Color.Black
+            ),
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions.Default.copy(
+                keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+            ),
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .height(56.dp)
+        )
+
+        if (!error.isNullOrBlank()) {
+            Text(
+                text = error!!,
+                color = Color.Red,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier
+                    .padding(start = 16.dp, top = 4.dp)
+                    .fillMaxWidth(0.9f)
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FamilyHistoryDropdown(
+    value: String,                         // "yes" | "no" | "unknown" | ""
+    onChange: (String) -> Unit,
+    placeholder: String = "Family history of skin cancer (Yes/No/Unknown)",
+    modifier: Modifier = Modifier,
+    icon: ImageVector = Icons.Outlined.HealthAndSafety // ← suggest: calendar/health icons
+) {
+    val options = listOf("Yes", "No", "Unknown")
+    var expanded by remember { mutableStateOf(false) }
+
+    // keep it centered like your InputField (0.9f width)
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center
+    ) {
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = it },
+            modifier = Modifier.fillMaxWidth(0.9f) // match InputField width
+        ) {
+            TextField(
+                value = value.ifBlank { "" }.replaceFirstChar { it.titlecase() },
+                onValueChange = {},
+                readOnly = true,
+                singleLine = true,
+                leadingIcon = {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = Color.Gray,
+                        modifier = Modifier.size(18.dp)
+                    )
+                },
+                placeholder = {
+                    Text(
+                        text = placeholder,
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Normal,
+                            color = Color.DarkGray
+                        )
+                    )
+                },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                shape = RoundedCornerShape(10.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color(0xFFF7F7F7),
+                    unfocusedContainerColor = Color(0xFFF7F7F7),
+                    disabledContainerColor = Color(0xFFF0F0F0),
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedTextColor = Color.Black,
+                    unfocusedTextColor = Color.Black,
+                    cursorColor = Color.Black
+                ),
+                modifier = modifier
+                    .menuAnchor()                  // required for proper dropdown anchoring
+                    .height(56.dp)
+                    .fillMaxWidth()
+            )
+
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                options.forEach { opt ->
+                    DropdownMenuItem(
+                        text = { Text(opt) },
+                        onClick = {
+                            onChange(opt.lowercase())
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
 }

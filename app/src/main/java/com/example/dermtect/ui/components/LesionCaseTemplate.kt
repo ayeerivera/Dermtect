@@ -56,6 +56,8 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import com.example.dermtect.ui.components.DialogTemplate
+import com.example.dermtect.ui.components.PrimaryButton
+import com.example.dermtect.ui.components.SecondaryButton
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -372,26 +374,24 @@ fun LesionCaseTemplate(
                         .padding(horizontal = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Button(
-                        onClick = { if (!isSaving) onSaveClick?.invoke() },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp),
-                        enabled = !isSaving
-                    ) {
-                        Text("Save")
-                    }
+                     PrimaryButton(
+                    text = "Save",
+                    onClick = { onSaveClick?.invoke() },
+                    modifier = Modifier.weight(1f),
+                    enabled = !isSaving,
+                    height = 56.dp,
+                    cornerRadius = 10.dp
+                )
 
-                    OutlinedButton(
-                        onClick = { if (!isSaving) onRetakeClick?.invoke() },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp),
-                        enabled = !isSaving
-                    ) {
-                        Text("Retake")
-                    }
-
-                    Spacer(Modifier.height(16.dp))
-                }
+                SecondaryButton(
+                    text = "Retake",
+                    onClick = { onRetakeClick?.invoke() },
+                    modifier = Modifier.weight(1f),
+                    enabled = !isSaving,
+                    height = 56.dp,
+                    cornerRadius = 10.dp
+                )
+            }
             }
 
             // Post-save actions (small photo)
@@ -639,7 +639,7 @@ object LesionIds {
         "Squamous cell carcinoma in situ",
         "Melanoma in situ",
         "Superficial BCC",
-        "Nodular BCC",
+        "Nodular Basal Cell Carcinoma  (nodular BCC)",
         "Indeterminate melanocytic neoplasm"
     )
 
@@ -709,100 +709,88 @@ data class ConditionInfo(
 )
 
 val conditionInfo: Map<String, ConditionInfo> = mapOf(
-    "Solar/actinic keratosis" to ConditionInfo(
-        what = "A common sun-related precancerous patch caused by long-term UV exposure.",
+    "Solar/actinic keratosis (AK)" to ConditionInfo(
+        what = "Rough, scaly erythematous or hyperkeratotic patches on chronically sun-exposed areas; common in older fair-skinned people.",
         symptoms = "Rough or scaly spot; pink/tan; may feel sandpapery; often on sun-exposed areas."
     ),
-    "Squamous cell carcinoma in situ" to ConditionInfo(
-        what = "Early (in-situ) form of squamous cell skin cancer limited to the top skin layer.",
+    "Squamous cell carcinoma in situ (Bowen disease)" to ConditionInfo(
+        what = "Red scaly or crusted patch that may be mistaken for eczema or psoriasis; occurs on sun-exposed sites or mucosa.",
         symptoms = "Persistent red/scaly patch; may crust; slow growth; usually painless."
     ),
-    "Melanoma in situ" to ConditionInfo(
-        what = "Very early melanoma limited to the epidermis (top layer of skin).",
+    "Melanoma in situ (general / stage 0)" to ConditionInfo(
+        what = "Pigmented patch or macule exhibiting ABCDE changes (asymmetry, border irregularity, colour variegation, diameter, evolving). Confined to epidermis.",
         symptoms = "Irregular borders, color variation; change in size/shape; may be flat."
     ),
-    "Superficial BCC" to ConditionInfo(
-        what = "A shallow type of basal cell carcinoma, the most common skin cancer.",
+    "Superficial basal cell carcinoma (superficial BCC)" to ConditionInfo(
+        what = "Thin, pink or scaly patch that may resemble eczema or AK; most often on trunk and limbs.",
         symptoms = "Pink/red thin patch; may be shiny; slow-growing; may bleed easily."
     ),
-    "Nodular BCC" to ConditionInfo(
-        what = "A dome-shaped basal cell carcinoma that often looks pearly or translucent.",
+    "Nodular basal cell carcinoma (nodular BCC)" to ConditionInfo(
+        what = "Pearly, translucent papule or nodule with telangiectasia; may ulcerate (rodent ulcer). Common on head/neck.",
         symptoms = "Pearly bump; visible small blood vessels; may ulcerate or bleed."
     ),
     "Indeterminate melanocytic neoplasm" to ConditionInfo(
-        what = "A melanocytic lesion with uncertain behavior; biopsy may be required.",
+        what = "Lesion that cannot be confidently classified clinically or histologically as benign or malignant.",
         symptoms = "Atypical mole-like appearance; evolving features; often needs evaluation."
     ),
-    "Melanoma in situ, lentigo maligna" to ConditionInfo(
-        what = "A sun-damaged skin variant of melanoma in situ, often on the face.",
+    "Melanoma in situ, lentigo maligna subtype" to ConditionInfo(
+        what = "Slowly enlarging irregular pigmented patch on chronically sun-damaged skin (face/neck) of older adults.",
         symptoms = "Slowly enlarging flat brown patch with varied shades; irregular edges."
     ),
     "Melanoma in situ, with nevus" to ConditionInfo(
-        what = "Melanoma in situ arising in or adjacent to a mole (nevus).",
+        what = "Melanoma arising adjacent to or within a pre-existing nevus but still confined to epidermis.",
         symptoms = "Change in a pre-existing mole: color/border/asymmetry."
     ),
     "Melanoma invasive, superficial spreading" to ConditionInfo(
-        what = "The most common invasive melanoma subtype.",
+        what = "Most common invasive subtype — irregular, often multicolored plaque that initially grows radially then invades vertically; common on trunk (men) and legs (women).",
         symptoms = "Asymmetric, irregular borders, multiple colors; enlarging lesion."
     ),
-    "Basal cell carcinoma" to ConditionInfo(
-        what = "Most common skin cancer; usually slow-growing and highly treatable.",
+    "Basal cell carcinoma (general malignant group)" to ConditionInfo(
+        what = "Group term for BCC subtypes (nodular, superficial, pigmented, morpheaform, etc.). Usually slow-growing, locally invasive lesions on sun-exposed skin.",
         symptoms = "Shiny/pearly bump or scaly patch; may bleed; non-healing sore."
     ),
     "Melanoma invasive (general)" to ConditionInfo(
-        what = "Melanoma that has grown beyond the top layer of skin.",
+        what = "Melanoma that has invaded beyond the epidermis into dermis; variable appearance depending on subtype.",
         symptoms = "ABCDE changes (Asymmetry, Border, Color, Diameter, Evolving)."
     ),
     "Atypical intraepithelial melanocytic proliferation" to ConditionInfo(
-        what = "Atypical melanocytic growth within the epidermis; needs clinicopathologic correlation.",
+        what = "A descriptive term for an epidermal melanocytic proliferation with atypia insufficient for a definitive melanoma diagnosis. May appear clinically suspicious.",
         symptoms = "Atypical, changing pigmented patch; biopsy is often recommended."
     ),
     "Squamous cell carcinoma, invasive" to ConditionInfo(
-        what = "A common skin cancer that can grow deeper and rarely spread.",
+        what = "Scaly, crusted, or ulcerated nodule or plaque that may bleed or grow rapidly; arises on sun-exposed sites, scars, or immunosuppressed skin.",
         symptoms = "Firm/red nodule or scaly patch that may crust or bleed; sun-exposed sites."
     ),
-    "Melanoma, NOS" to ConditionInfo(
-        what = "Melanoma (not otherwise specified) when a more specific subtype is not assigned.",
+    "Melanoma, NOS (not otherwise specified)" to ConditionInfo(
+        what = "Melanoma that cannot be classified into a specific histologic subtype from available clinical/pathology data.",
         symptoms = "Irregular pigmented lesion with change over time."
     ),
-    "Basal cell carcinoma, general malignant group" to ConditionInfo(
-        what = "Basal cell carcinoma grouped without specifying subtype.",
-        symptoms = "Pearly bump or scaly patch; easily bleeds; slow growth."
-    ),
-    "Basal cell carcinoma, nodular" to ConditionInfo(
-        what = "See Nodular BCC.",
-        symptoms = "Pearly dome-shaped bump; visible blood vessels; may ulcerate."
-    ),
-    "Superficial basal cell carcinoma" to ConditionInfo(
-        what = "See Superficial BCC.",
+    "Superficial basal cell carcinoma  (superficial BCC)" to ConditionInfo(
+        what = "Thin, pink or scaly patch that may resemble eczema or AK; most often on trunk and limbs.",
         symptoms = "Thin red patch; slightly scaly; may look like eczema but doesn’t resolve."
     ),
-    "Melanoma in situ (general)" to ConditionInfo(
-        what = "Very early melanoma before invasion.",
-        symptoms = "Flat irregular patch; color variegation; border changes."
-    ),
     "Atypical/Dysplastic nevus" to ConditionInfo(
-        what = "A mole with atypical features; usually benign but needs observation.",
+        what = "Moles that appear larger and more irregular than common nevi — irregular border, variable colour, often >5 mm. May clinically resemble melanoma.",
         symptoms = "Larger than common nevi; irregular edges/color; change over time."
     ),
     "Common benign nevus" to ConditionInfo(
-        what = "A common, harmless mole.",
+        what = "Small, round to oval pigmented macules or papules (typically <6 mm) with uniform colour and smooth borders; common in childhood and young adulthood.",
         symptoms = "Symmetric, uniform color, smooth borders; stable over time."
     ),
     "Seborrheic keratosis" to ConditionInfo(
-        what = "Very common, benign “stuck-on” wart-like growth.",
+        what = "Very common benign “stuck-on” waxy papules/plaques in older adults; colour ranges from light tan to black. Often on trunk, face.",
         symptoms = "Waxy or wart-like; brown/tan/black; crumbly surface; not dangerous."
     ),
-    "Solar lentigo" to ConditionInfo(
-        what = "Sun-spot or age-spot from UV exposure.",
+    "Solar lentigo (age / sun spot)" to ConditionInfo(
+        what = "Flat, well-circumscribed brown macules on chronically sun-exposed skin (face, hands, forearms).",
         symptoms = "Flat, well-defined brown spot; stable; sun-exposed areas."
     ),
     "Lichen planus–like keratosis" to ConditionInfo(
-        what = "Inflamed regressing sun spot / seborrheic keratosis variant.",
+        what = "Usually a solitary pink to brown inflamed patch or plaque that may appear on sun-exposed skin and can mimic atypical pigmented lesions." ,
         symptoms = "Pink-to-brown patch; may be itchy; often fades with time."
     ),
     "Dermatofibroma" to ConditionInfo(
-        what = "Benign firm bump in the skin (often post-insect-bite/trauma).",
+        what = "Small, firm papule or nodule (commonly on lower legs) that often dimples with lateral pressure (“dimple sign”). Usually under 1 cm.",
         symptoms = "Firm dimple when pinched; brown/pink; usually harmless."
     )
 )

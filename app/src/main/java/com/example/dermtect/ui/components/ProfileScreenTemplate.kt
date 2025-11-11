@@ -24,9 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
@@ -50,7 +48,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import com.google.firebase.auth.FirebaseAuth
 import androidx.compose.material3.Icon
-
+import com.google.android.gms.common.api.ApiException
+import com.google.firebase.auth.GoogleAuthProvider
+import com.example.dermtect.ui.screens.BirthdayMaskedField
+import com.example.dermtect.ui.screens.FamilyHistoryDropdown
 @Composable
 fun ProfileScreenTemplate(
     navController: NavController,
@@ -61,27 +62,29 @@ fun ProfileScreenTemplate(
     userRole: String = "user",
     sharedProfileViewModel: SharedProfileViewModel,
 ) {
+    val authViewModel: AuthViewModel = viewModel(
+        factory = AuthViewModelFactory(AuthUseCase(AuthRepositoryImpl()))
+    )
+
     val userHomeViewModel: UserHomeViewModel = viewModel()
     val dermaHomeViewModel: DermaHomeViewModel = viewModel()
 
-    val firstNameState by userHomeViewModel.firstName.collectAsState()
-    val lastNameState by userHomeViewModel.lastName.collectAsState()
+    val firstNameFromVm by userHomeViewModel.firstName.collectAsState()
+    val lastNameFromVm  by userHomeViewModel.lastName.collectAsState()
+    val birthdayFromVm  by userHomeViewModel.birthday.collectAsState()         // String? in your VM
+    val famHistoryFromVm by userHomeViewModel.familyHistory.collectAsState()
+
     LaunchedEffect(Unit) {
         userHomeViewModel.fetchUserInfo()
     }
-    val fullName = "${firstNameState.ifBlank { firstName }} ${lastNameState.ifBlank { lastName }}".trim()
+
     var showPhoto by remember { mutableStateOf(false) }
     var showRemoveConfirmDialog by remember { mutableStateOf(false) }
-    var showEditNameDialog by remember { mutableStateOf(false) }
-    var editedFirstName by remember { mutableStateOf(firstName) }
-    var editedLastName by remember { mutableStateOf(lastName) }
     val selectedImageUri = sharedProfileViewModel.selectedImageUri.collectAsState().value
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showDeletedDialog by remember { mutableStateOf(false) }
-    val authViewModel: AuthViewModel = viewModel(
-        factory = AuthViewModelFactory(AuthUseCase(AuthRepositoryImpl()))
-    )
+
     val coroutineScope = rememberCoroutineScope()
     var passwordInput by remember { mutableStateOf("") }
     var showPasswordError by remember { mutableStateOf(false) }
@@ -102,12 +105,46 @@ fun ProfileScreenTemplate(
             showSavePhotoDialog = true    // ask to confirm
         }
     }
+    // Put this near your other launchers (e.g., right after imagePickerLauncher)
+    val googleReauthLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            val account = task.getResult(ApiException::class.java)
+            val credential = GoogleAuthProvider.getCredential(account.idToken, null)
+            val user = FirebaseAuth.getInstance().currentUser
+
+            user?.reauthenticate(credential)?.addOnCompleteListener { reauth ->
+                if (reauth.isSuccessful) {
+                    user.delete().addOnCompleteListener { del ->
+                        if (del.isSuccessful) {
+                            showDeleteDialog = false
+                            showDeletedDialog = true
+                            triggerNavigation = true
+                        } else {
+                            showPasswordError = true
+                        }
+                    }
+                } else {
+                    showPasswordError = true
+                }
+            }
+        } catch (e: Exception) {
+            showPasswordError = true
+        }
+    }
+    val birthday by userHomeViewModel.birthday.collectAsState()           // "MM/DD/YYYY" or ""
+    val familyHistory by userHomeViewModel.familyHistory.collectAsState() // "yes" | "no" | "unknown" | ""
+
 
     val context = LocalContext.current
+    @Suppress("DEPRECATION")
     val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-        .requestIdToken("50445058822-fn9cea4e0bduos6t0g7ofb2g9ujri5s2.apps.googleusercontent.com")
+        .requestIdToken("YOUR_WEB_CLIENT_ID")
         .requestEmail()
         .build()
+
     val googleSignInClient = GoogleSignIn.getClient(context, gso)
 
     Column(
@@ -225,16 +262,28 @@ fun ProfileScreenTemplate(
                     Spacer(modifier = Modifier.height(10.dp))
 
 // Inline editable name (no dialog)
-                    EditableNameSection(
-                        firstNameInitial = firstNameState.ifBlank { firstName },
-                        lastNameInitial = lastNameState.ifBlank { lastName }
-                    ) { newFirst, newLast ->
-                        if (userRole == "user") {
-                            userHomeViewModel.updateName(newFirst, newLast)
-                        } else {
-                            dermaHomeViewModel.updateName(newFirst, newLast)
+                    // replace the two sections with:
+                    CombinedProfileSection(
+                        initialFirstName = firstNameFromVm.ifBlank { "" },
+                        initialLastName  = lastNameFromVm.ifBlank { "" },
+                        initialBirthday  = (birthdayFromVm ?: ""),
+                        initialFamilyHistory = (famHistoryFromVm ?: ""),
+                        onSaveAll = { newFirst, newLast, newBirthday, newFamilyHistory ->
+                            userHomeViewModel.updateProfile(
+                                firstName = newFirst,
+                                lastName = newLast,
+                                birthday = newBirthday,
+                                familyHistory = newFamilyHistory,
+                                onSuccess = {
+                                    Toast.makeText(context, "Profile saved successfully!", Toast.LENGTH_SHORT).show()
+                                    navController.popBackStack()
+                                },
+                                onFailure = { errorMsg ->
+                                    Toast.makeText(context, "Save failed: $errorMsg", Toast.LENGTH_LONG).show()
+                                }
+                            )
                         }
-                    }
+                    )
 
                     Spacer(modifier = Modifier.height(24.dp))
 
@@ -313,6 +362,7 @@ fun ProfileScreenTemplate(
         }
 
         DialogTemplate(
+
             show = showSavePhotoDialog,
             title = "Save this photo?",
             description = "Use this as your new profile picture?",
@@ -347,50 +397,97 @@ fun ProfileScreenTemplate(
             onDismiss = { showRemoveConfirmDialog = false }
         )
 
-        DialogTemplate(
-            show = showDeleteDialog,
-            title = "Deactivate Account?",
-            description = "Please enter your password to confirm. This action is irreversible.",
-            primaryText = "Deactivate my Account",
-            onPrimary = {
-                if (passwordInput.isBlank()) {
-                    showPasswordError = true
-                    showDeleteDialog = true
-                } else {
-                    showPasswordError = false
-                    coroutineScope.launch {
-                        try {
-                            authViewModel.reauthenticateAndDelete(
-                                password = passwordInput,
-                                onSuccess = {
-                                    showDeleteDialog = false
-                                    showDeletedDialog = true
-                                    triggerNavigation = true
-                                },
-                                onFailure = {
-                                    showPasswordError = true
-                                    showDeleteDialog = true
-                                }
-                            )
-                        } catch (_: Exception) {
+    var isWorking by remember { mutableStateOf(false) }
+
+// derive whether this account needs a password
+    val requiresPassword = !isGoogleAccount
+
+    // 🔒 Disable primary when:
+// - working, or
+// - (email/password user AND password is blank)
+    val canSubmitPrimary =
+        if (requiresPassword) passwordInput.isNotBlank() && !isWorking
+        else !isWorking
+
+    DialogTemplate(
+        show = showDeleteDialog,
+        title = "Deactivate Account?",
+        description = if (requiresPassword)
+            "Please enter your password to confirm. This action is irreversible."
+        else
+            "Confirm to deactivate your account. This action is irreversible.",
+        primaryText = if (isWorking) "Working..." else "Deactivate my Account",
+        onPrimary = {
+            if (isWorking) return@DialogTemplate
+
+            val user = FirebaseAuth.getInstance().currentUser ?: run {
+                showPasswordError = true
+                return@DialogTemplate
+            }
+
+            // GOOGLE USERS → reauth via Google (no password needed)
+            if (isGoogleAccount) {
+                isWorking = true
+                googleSignInClient.signOut().addOnCompleteListener {
+                    val intent = googleSignInClient.signInIntent
+                    googleReauthLauncher.launch(intent)
+                    isWorking = false // launcher callback will finish the flow
+                }
+                return@DialogTemplate
+            }
+
+            // EMAIL/PASSWORD USERS → must have a non-blank password
+            if (passwordInput.isBlank()) {
+                showPasswordError = true
+                return@DialogTemplate
+            }
+
+            val email = user.email ?: run {
+                showPasswordError = true
+                return@DialogTemplate
+            }
+
+            val cred = EmailAuthProvider.getCredential(email, passwordInput)
+
+            isWorking = true
+            showPasswordError = false
+
+            user.reauthenticate(cred).addOnCompleteListener { reauth ->
+                if (reauth.isSuccessful) {
+                    user.delete().addOnCompleteListener { del ->
+                        isWorking = false
+                        if (del.isSuccessful) {
+                            showDeleteDialog = false
+                            showDeletedDialog = true
+                            triggerNavigation = true
+                        } else {
                             showPasswordError = true
-                            showDeleteDialog = true
                         }
                     }
+                } else {
+                    isWorking = false
+                    showPasswordError = true
                 }
-            },
-            secondaryText = "Cancel",
-            onSecondary = {
-                showDeleteDialog = false
-                passwordInput = ""
-                showPasswordError = false
-            },
-            onDismiss = {
-                showDeleteDialog = false
-                passwordInput = ""
-                showPasswordError = false
-            },
-            extraContent = {
+            }
+        },
+        // ✅ Disable primary button until valid so clicking it can't close the dialog
+        primaryEnabled = canSubmitPrimary,
+        secondaryText = if (isWorking) "Please wait…" else "Cancel",
+        onSecondary = {
+            if (isWorking) return@DialogTemplate
+            showDeleteDialog = false
+            passwordInput = ""
+            showPasswordError = false
+        },
+        onDismiss = {
+            if (isWorking) return@DialogTemplate
+            showDeleteDialog = false
+            passwordInput = ""
+            showPasswordError = false
+        },
+        extraContent = {
+            // Show password field ONLY for email/password users
+            if (requiresPassword) {
                 Column {
                     InputField(
                         value = passwordInput,
@@ -401,24 +498,27 @@ fun ProfileScreenTemplate(
                         placeholder = "Enter your password",
                         iconRes = R.drawable.icon_pass,
                         isPassword = true,
-                        errorMessage = if (showPasswordError) "Incorrect password. Please try again." else null,
-                        modifier = Modifier.fillMaxWidth(),                   // ⬅️ full width so placeholder doesn't truncate
+                        errorMessage = if (showPasswordError) "Incorrect or missing password." else null,
+                        modifier = Modifier.fillMaxWidth(),
                         textStyle = MaterialTheme.typography.bodyMedium,
                         placeholderStyle = MaterialTheme.typography.labelMedium
                     )
-                    if (showPasswordError) {
-                        Text(
-                            text = "Incorrect password. Please try again.",
-                            color = Color.Red,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
+                    if (isWorking) {
+                        Spacer(Modifier.height(12.dp))
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     }
                 }
+            } else {
+                // Optional helper text for Google users
+                if (isWorking) {
+                    Spacer(Modifier.height(12.dp))
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
             }
-        )
+        }
+    )
 
-        if (triggerNavigation) {
+    if (triggerNavigation) {
             LaunchedEffect(Unit) {
                 delay(2000)
                 navController.navigate("login") {
@@ -462,53 +562,6 @@ fun ProfileScreenTemplate(
 
 // Reusing existing composables below with no changes needed
 
-    @Composable
-    fun ChangePasswordRow(
-        icon: @Composable () -> Unit,
-        label: String,
-        onClick: () -> Unit
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onClick() }
-                .padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(width = 43.92.dp, height = 40.26.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFEDFFFF)),
-                contentAlignment = Alignment.Center
-            ) {
-                icon()
-            }
-
-            Spacer(modifier = Modifier.width(15.dp))
-
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal),
-                color = Color(0xFF484848),
-                modifier = Modifier.weight(1f)
-            )
-
-            Box(
-                modifier = Modifier
-                    .size(width = 26.dp, height = 24.dp)
-                    .background(Color.White, shape = RoundedCornerShape(4.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.arrow_right),
-                    contentDescription = "Navigate",
-                    tint = Color(0xFF0FB2B2),
-                    modifier = Modifier.size(15.dp)
-                )
-            }
-        }
-    }
 
 
 
@@ -560,64 +613,6 @@ fun ProfileScreenTemplate(
                     }
                 }
 
-@Composable
-                fun EditName(icon: @Composable () -> Unit, label: String, onClick: () -> Unit) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onClick() }
-                            .padding(horizontal = 20.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(width = 43.92.dp, height = 40.26.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFEDFFFF)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            icon()
-                        }
-
-                        Spacer(modifier = Modifier.width(16.dp))
-
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal),
-                            color = Color(0xFF484848),
-                            modifier = Modifier.weight(1f)
-                        )
-
-                        Box(
-                            modifier = Modifier
-                                .size(width = 26.dp, height = 24.dp)
-                                .background(Color.White, shape = RoundedCornerShape(4.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.arrow_right),
-                                contentDescription = "Navigate",
-                                tint = Color(0xFF0FB2B2),
-                                modifier = Modifier.size(15.dp)
-                            )
-                        }
-                    }
-                }
-
-
-
-
-                @Composable
-                private fun Label(text: String) {
-                    Text(
-                        text = text,
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = Color(0xFF1D1D1D),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 8.dp, bottom = 6.dp)
-                    )
-                }
 
                 @Composable
                 fun AccountIdentityRow(email: String, isGoogleAccount: Boolean) {
@@ -687,73 +682,117 @@ fun ProfileScreenTemplate(
                     }
                 }
 
-                @Composable
-                private fun EditableNameSection(
-                    firstNameInitial: String,
-                    lastNameInitial: String,
-                    onSave: (String, String) -> Unit
-                ) {
-                    var first by remember(firstNameInitial) { mutableStateOf(firstNameInitial) }
-                    var last by remember(lastNameInitial) { mutableStateOf(lastNameInitial) }
+@Composable
+private fun CombinedProfileSection(
+    initialFirstName: String,
+    initialLastName: String,
+    initialBirthday: String,
+    initialFamilyHistory: String, // "yes" | "no" | "unknown" | ""
+    onSaveAll: (String, String, String, String) -> Unit
+) {
+    var first by remember(initialFirstName) { mutableStateOf(initialFirstName) }
+    var last by remember(initialLastName) { mutableStateOf(initialLastName) }
+    var birthday by remember(initialBirthday) { mutableStateOf(initialBirthday) }
+    // famHistory is the correct local state variable
+    var famHistory by remember(initialFamilyHistory) { mutableStateOf(initialFamilyHistory) }
 
-                    val changed = first != firstNameInitial || last != lastNameInitial
-                    val valid = first.isNotBlank() && last.isNotBlank()
+    val nameValid = first.isNotBlank() && last.isNotBlank()
+    val birthdayValid = birthday.isNotBlank() // same rule you used on Register
+    val changed = first != initialFirstName ||
+            last != initialLastName ||
+            birthday != initialBirthday ||
+            famHistory != initialFamilyHistory
+    val canSave = nameValid && birthdayValid && changed
 
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
-                        Text(
-                            "Edit Name",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = Color(0xFF1D1D1D)
-                        )
-                        Spacer(Modifier.height(10.dp))
+    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp) ) {
 
-                        InputField(
-                            value = first,
-                            onValueChange = { first = it },
-                            placeholder = "First name",
-                            iconRes = null,                 // or a person icon if you have one
-                            isPassword = false,
-                            errorMessage = if (first.isBlank()) "First name is required" else null,
-                            modifier = Modifier.fillMaxWidth() // your InputField will cap at 90% width internally
-                        )
+        // --- Edit Name ---
+        Text("Edit Name", style = MaterialTheme.typography.titleLarge, color = Color(0xFF1D1D1D))
+        Spacer(Modifier.height(10.dp))
 
-                        Spacer(Modifier.height(10.dp))
+        InputField(
+            value = first,
+            onValueChange = { first = it },
+            placeholder = "First name",
+            iconRes = R.drawable.user_vector,
+            isPassword = false,
+            errorMessage = if (first.isBlank()) "First name is required" else null,
+            modifier = Modifier
+                .wrapContentWidth()
+                .align(Alignment.CenterHorizontally)
+        )
 
-                        InputField(
-                            value = last,
-                            onValueChange = { last = it },
-                            placeholder = "Last name",
-                            iconRes = null,
-                            isPassword = false,
-                            errorMessage = if (last.isBlank()) "Last name is required" else null,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+        Spacer(Modifier.height(10.dp))
 
+        InputField(
+            value = last,
+            onValueChange = { last = it },
+            placeholder = "Last name",
+            iconRes = R.drawable.user_vector,
+            isPassword = false,
+            errorMessage = if (last.isBlank()) "Last name is required" else null,
+            modifier = Modifier
+                .wrapContentWidth()
+                .align(Alignment.CenterHorizontally)
+        )
 
-                        Spacer(Modifier.height(12.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            PrimaryButton(
-                                text = "Save",
-                                onClick = { onSave(first.trim(), last.trim()) },
-                                enabled = changed && valid,
-                                modifier = Modifier.weight(1f).height(48.dp)
-                            )
+        Spacer(Modifier.height(24.dp))
 
-                            SecondaryButton(
-                                text = "Reset",
-                                onClick = {
-                                    first = firstNameInitial
-                                    last = lastNameInitial
-                                },
-                                enabled = changed,
-                                modifier = Modifier.weight(1f).height(48.dp)
-                            )
-                        }
+        // --- Edit Birthday ---
+        Text("Edit Birthday", style = MaterialTheme.typography.titleLarge, color = Color(0xFF1D1D1D))
+        Spacer(Modifier.height(10.dp))
 
-                    }
-                }
+        BirthdayMaskedField(
+            birthday = birthday,
+            onValueChange = { birthday = it },
+            onValidDate = { birthday = it },
+            modifier = Modifier
+                .wrapContentWidth()
+                .align(Alignment.CenterHorizontally)
+        )
 
-                @Composable
+        Spacer(Modifier.height(24.dp))
+
+        // --- Edit Health Info ---
+        Text("Family History of Skin Cancer", style = MaterialTheme.typography.titleLarge, color = Color(0xFF1D1D1D))
+        Spacer(Modifier.height(10.dp))
+
+        FamilyHistoryDropdown(
+            value = famHistory, // <-- USE famHistory here
+            onChange = {
+                famHistory = it // <-- USE famHistory here
+            },
+            modifier = Modifier
+                .wrapContentWidth()
+                .align(Alignment.CenterHorizontally)
+        )
+
+        Spacer(Modifier.height(12.dp))
+
+        // --- One Save/Reset row for all three ---
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            PrimaryButton(
+                text = "Save",
+                onClick = { onSaveAll(first.trim(), last.trim(), birthday.trim(), famHistory.trim()) },
+                enabled = canSave,
+                modifier = Modifier.weight(1f).height(48.dp)
+            )
+            SecondaryButton(
+                text = "Reset",
+                onClick = {
+                    first = initialFirstName
+                    last = initialLastName
+                    birthday = initialBirthday
+                    famHistory = initialFamilyHistory
+                },
+                enabled = changed,
+                modifier = Modifier.weight(1f).height(48.dp)
+            )
+        }
+    }
+}
+
+@Composable
                 private fun ChangePasswordSection() {
                     val context = LocalContext.current
                     val authViewModel: AuthViewModel = viewModel(
@@ -784,7 +823,9 @@ fun ProfileScreenTemplate(
                             iconRes = R.drawable.icon_pass,
                             isPassword = true,
                             errorMessage = null,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .wrapContentWidth()
+                                .align(Alignment.CenterHorizontally)
                         )
 
                         Spacer(Modifier.height(10.dp))
@@ -798,7 +839,9 @@ fun ProfileScreenTemplate(
                             errorMessage = if (pass.isNotBlank() && !passValid)
                                 "Use at least 8 characters including upper, lower, number, special"
                             else null,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .wrapContentWidth()
+                                .align(Alignment.CenterHorizontally)
                         )
 
                         Spacer(Modifier.height(10.dp))
@@ -810,7 +853,9 @@ fun ProfileScreenTemplate(
                             iconRes = R.drawable.icon_pass,
                             isPassword = true,
                             errorMessage = if (confirm.isNotBlank() && confirm != pass) "Passwords do not match" else null,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .wrapContentWidth()
+                                .align(Alignment.CenterHorizontally)
                         )
 
                         Spacer(Modifier.height(12.dp))
@@ -857,4 +902,3 @@ fun ProfileScreenTemplate(
 
                     }
                 }
-

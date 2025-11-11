@@ -1,7 +1,9 @@
 package com.example.dermtect.ui.viewmodel
 
+import android.R
 import android.util.Log
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.dermtect.domain.usecase.AuthUseCase
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
@@ -12,7 +14,16 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+data class UserProfile(
+    val firstName: String = "",
+    val lastName: String = "",
+    val birthday: String = "",
+    val familyHistory: String = "",
+    val email: String? = null
+)
 class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
 
     // --- Firebase --- //
@@ -35,6 +46,9 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
     private val _navigateToHome = MutableStateFlow(false)
     val navigateToHome: StateFlow<Boolean> = _navigateToHome
 
+    private val _userProfile = MutableStateFlow(UserProfile())
+    val userProfile: StateFlow<UserProfile> = _userProfile.asStateFlow()
+    // ----------------------------------------------------
     // --- Persistent Auth State for app routing --- //
     sealed interface AuthUiState {
         data object Loading : AuthUiState
@@ -111,8 +125,68 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
             }
     }
 
+    fun loadUserProfile() {
+        val uid = auth.currentUser?.uid
+        if (uid == null) {
+            Log.w("AuthViewModel", "Cannot load profile: User not signed in.")
+            return
+        }
+
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val doc = firestore.collection("users").document(uid).get().await()
+                if (doc.exists()) {
+                    _userProfile.value = UserProfile(
+                        firstName = doc.getString("firstName") ?: "",
+                        lastName = doc.getString("lastName") ?: "",
+                        birthday = doc.getString("birthday") ?: "",
+                        familyHistory = doc.getString("familyHistory") ?: "",
+                        email = doc.getString("email")
+                    )
+                } else {
+                    Log.w("AuthViewModel", "User document not found for $uid")
+                }
+            } catch (e: Exception) {
+                _errorMessage.value = "Failed to load profile: ${e.message}"
+                Log.e("AuthViewModel", "Error fetching user profile", e)
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    // --- NEW: Profile Data Update (Save) ---
+    fun updateFamilyHistory(familyHistory: String, onSuccess: () -> Unit, onFailure: (String) -> Unit) {
+        val uid = auth.currentUser?.uid
+        if (uid == null) {
+            onFailure("User not authenticated.")
+            return
+        }
+
+        _isLoading.value = true
+        firestore.collection("users").document(uid)
+            .update("familyHistory", familyHistory)
+            .addOnSuccessListener {
+                logAudit(uid, auth.currentUser?.email, "profile_update_family_history")
+                // Update the local state immediately
+                _userProfile.value = _userProfile.value.copy(familyHistory = familyHistory)
+                onSuccess()
+            }
+            .addOnFailureListener {
+                onFailure(it.message ?: "Failed to save family history.")
+            }
+            .addOnCompleteListener { _isLoading.value = false }
+    }
     // --- Registration --- //
-    fun register(email: String, password: String, firstName: String, lastName: String) {
+    fun register(
+        email: String,
+        password: String,
+        firstName: String,
+        lastName: String,
+        birthday: String,
+        familyHistory: String        // ✅ add this
+    ) {
         _loading.value = true
         auth.createUserWithEmailAndPassword(email, password)
             .addOnCompleteListener { task ->
@@ -137,6 +211,8 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
                     "email" to user.email,
                     "firstName" to formattedFirstName,
                     "lastName" to formattedLastName,
+                    "birthday" to birthday,
+                    "familyHistory" to familyHistory.lowercase(),  // ✅ record the chosen value
                     "createdAt" to FieldValue.serverTimestamp(),
                     "emailVerified" to false,
                     "role" to "patient",
@@ -256,6 +332,7 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
                                 "email" to email,
                                 "firstName" to firstName,
                                 "lastName" to lastName,
+                                "familyHistory" to "",
                                 "role" to "patient",
                                 "provider" to "google",
                                 "createdAt" to FieldValue.serverTimestamp()

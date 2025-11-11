@@ -115,9 +115,9 @@ dependencies {
     implementation("com.google.android.gms:play-services-auth:21.0.0")
 
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
-
     // Gson
     implementation("com.google.code.gson:gson:2.10.1")
 
@@ -145,5 +145,6 @@ dependencies {
     implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
     implementation ("androidx.datastore:datastore-preferences:1.1.1")
+
 
 }

@@ -209,9 +209,19 @@ fun LesionCaseScreen(
                                     snackbarHostState.showSnackbar("No photo available for PDF.")
                                     return@launch
                                 }
+                                val userId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+                                if (userId == null) {
+                                    snackbarHostState.showSnackbar("You must be signed in to export.")
+                                    return@launch
+                                }
+
+// sequential per-user ID (suspend)
+                                val reportId = PdfExporter.nextUserReportSeq(userId)
 
                                 val data = PdfExporter.CasePdfData(
+                                    reportId = reportId,
                                     title = title,
+                                    userFullName = "John Dela Cruz",
                                     timestamp = timestampText,
                                     photo = photo,
                                     heatmap = heatmapBitmap,
@@ -220,7 +230,12 @@ fun LesionCaseScreen(
                                 )
 
                                 val uri = withContext(Dispatchers.IO) {
-                                    PdfExporter.createCasePdf(ctx, data)
+                                    PdfExporter.saveReportAndPdf(
+                                        context = ctx,
+                                        userId = userId,
+                                        baseData = data,
+                                        uploadPdfToStorage = true
+                                    )
                                 }
 
                                 PdfExporter.openPdf(ctx, uri)

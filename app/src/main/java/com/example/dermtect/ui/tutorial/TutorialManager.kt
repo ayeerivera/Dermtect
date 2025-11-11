@@ -59,6 +59,7 @@ class TutorialManager {
 
     fun isFinished(): Boolean = currentStep >= steps.size
     // --- Persistence lives here ---
+
     suspend fun initialize(context: Context) {
         // Read first-run flag (default true)
         isFirstRun = context.dataStore.data.map { it[KEY_FIRST_RUN] ?: true }.first()

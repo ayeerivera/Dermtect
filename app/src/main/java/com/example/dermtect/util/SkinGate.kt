@@ -4,7 +4,6 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import kotlin.math.*
 
-/** Tunables — tweak to your dataset / camera */
 data class SkinGateConfig(
     val maxSide: Int = 220,                // downscale for speed
     val sampleStep: Int = 2,               // stride when sampling pixels

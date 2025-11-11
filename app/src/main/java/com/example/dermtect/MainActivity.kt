@@ -23,8 +23,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.cameradermtect.CameraPermissionGate
-import com.example.cameradermtect.TakePhotoScreen
+import com.example.dermtect.ui.screens.CameraPermissionGate
+import com.example.dermtect.ui.screens.TakePhotoScreen
 import com.example.dermtect.model.Clinic
 import com.example.dermtect.model.NewsItem
 import com.example.dermtect.ui.components.CaseData
@@ -77,7 +77,7 @@ import com.example.dermtect.ui.viewmodel.AuthViewModelFactory
 import androidx.compose.ui.platform.LocalContext
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.example.cameradermtect.CameraPermissionGate
+import com.example.dermtect.ui.screens.CameraPermissionGate
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -212,16 +212,7 @@ class MainActivity : ComponentActivity() {
                                         }
                                     },
                                     onFindClinicClick = { navController.navigate("nearby_clinics") }
-
                                 )
-                            },
-                            deniedContent = {
-                                // Optional: nice UI if permission is denied
-                                Column(Modifier.padding(24.dp)) {
-                                    Text("We need the camera to scan lesions.")
-                                    Spacer(Modifier.    height(12.dp))
-                                    Text("Please allow the Camera permission to continue.")
-                                }
                             }
                         )
                     }

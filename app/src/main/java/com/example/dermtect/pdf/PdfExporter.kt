@@ -25,10 +25,27 @@ import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.firestore.SetOptions
+import com.google.android.gms.tasks.Task
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+
+
+private suspend fun <T> taskAwait(task: Task<T>): T =
+    suspendCancellableCoroutine { cont ->
+        task.addOnSuccessListener { res -> if (cont.isActive) cont.resume(res) }
+            .addOnFailureListener { e -> if (cont.isActive) cont.resumeWithException(e) }
+    }
 
 object PdfExporter {
 
     data class CasePdfData(
+        val userFullName: String = "",
+        val reportId: String,
         val title: String,
         val timestamp: String,
         val photo: Bitmap,
@@ -75,6 +92,13 @@ object PdfExporter {
         canvas.drawText(data.title, margin.toFloat(), y, titlePaint)
         y += titlePaint.textSize + lineGap
         canvas.drawText(data.timestamp, margin.toFloat(), y, textPaint)
+        y += textPaint.textSize + (lineGap * 2)
+        if (data.userFullName.isNotBlank()) {
+            canvas.drawText("Name: ${data.userFullName}", margin.toFloat(), y, textPaint)
+            y += textPaint.textSize + (lineGap * 2)
+        }
+
+        canvas.drawText("Report ID: ${data.reportId}", margin.toFloat(), y, textPaint)
         y += textPaint.textSize + (lineGap * 2)
 
         // Photo and heatmap
@@ -213,11 +237,95 @@ object PdfExporter {
             context.startActivity(Intent.createChooser(share, "Open or share PDF"))
         }
     }
+
+    suspend fun saveReportAndPdf(
+        context: Context,
+        userId: String,
+        baseData: PdfExporter.CasePdfData, // reportId already set
+        uploadPdfToStorage: Boolean = true
+    ): Uri {
+        val db = FirebaseFirestore.getInstance()
+        val storageRoot = FirebaseStorage.getInstance().reference
+        val reportId = baseData.reportId
+
+        // 1) Create PDF locally
+        val localUri = PdfExporter.createCasePdf(context, baseData)
+
+        // 2) (Optional) Upload to Firebase Storage
+        var downloadUrl: String? = null
+        var storagePath: String? = null
+        if (uploadPdfToStorage) {
+            val pdfRef = storageRoot.child("users/$userId/reports/$reportId.pdf")
+            context.contentResolver.openInputStream(localUri)?.use { input ->
+                taskAwait(pdfRef.putStream(input))   // <-- no .await()
+            }
+            downloadUrl = taskAwait(pdfRef.downloadUrl).toString()  // <-- no .await()
+            storagePath = "users/$userId/reports/$reportId.pdf"
+        }
+
+        // 3) Build Firestore payloads
+        val fullPayload = mapOf(
+            "reportId" to reportId,
+            "userId" to userId,
+            "userFullName" to baseData.userFullName,
+            "title" to baseData.title,
+            "summary" to baseData.shortMessage,
+            "timestampText" to baseData.timestamp,
+            "createdAt" to FieldValue.serverTimestamp(),
+            "answers" to baseData.answers.map { mapOf("q" to it.first, "a" to it.second) },
+            "hasHeatmap" to (baseData.heatmap != null),
+            "fileUrl" to (downloadUrl ?: ""),
+            "filePath" to (storagePath ?: "")
+        )
+
+        val userDoc = db.collection("users").document(userId)
+            .collection("reports").document(reportId)
+
+        val indexDoc = db.collection("reports_index")
+            .document("${userId}__${reportId}")
+
+        // 4) Write both in a batch (keeps them in sync)
+        taskAwait(
+            db.runBatch { b ->
+                b.set(userDoc, fullPayload)
+                b.set(
+                    indexDoc, mapOf(
+                        "reportId" to reportId,
+                        "userId" to userId,
+                        "summary" to baseData.shortMessage,
+                        "fileUrl" to (downloadUrl ?: ""),
+                        "createdAt" to FieldValue.serverTimestamp()
+                    )
+                )
+            }
+        )
+
+        return localUri
+    }
+
+
+    suspend fun nextUserReportSeq(userId: String): String {
+        val db = FirebaseFirestore.getInstance()
+        val userRef = db.collection("users").document(userId)
+
+        val seq = taskAwait(
+            db.runTransaction { tx ->
+                val snap = tx.get(userRef)
+                val current = (snap.getLong("reportSeq") ?: 0L).toInt()
+                val next = current + 1
+                tx.set(userRef, mapOf("reportSeq" to next), SetOptions.merge())
+                next
+            }
+        )
+        return "RPT-" + seq.toString().padStart(4, '0')
+    }
+
 }
 
 @Composable
 fun CreateCasePdfWithDialog(
     context: Context,
+    userId: String,
     data: PdfExporter.CasePdfData,
     onPdfReady: (Uri) -> Unit,
     onNavigateToAssessment: () -> Unit
@@ -228,8 +336,22 @@ fun CreateCasePdfWithDialog(
         if (data.answers.isEmpty()) {
             showDialog = true
         } else {
-            val uri = PdfExporter.createCasePdf(context, data)
-            onPdfReady(uri)
+            // 1) Generate a per-user reportId
+            // val reportId = generateReportIdPerUser()           // Option A
+            val reportId = PdfExporter.nextUserReportSeq(userId)
+
+            // 2) Build a new data with reportId
+            val withId = data.copy(reportId = reportId)
+
+            // 3) Create PDF + save Firestore (+ upload PDF)
+            val localUri = PdfExporter.saveReportAndPdf(
+                context = context,
+                userId = userId,
+                baseData = withId,
+                uploadPdfToStorage = true
+            )
+
+            onPdfReady(localUri)
         }
     }
 
@@ -238,13 +360,11 @@ fun CreateCasePdfWithDialog(
             show = showDialog,
             title = "Questionnaire Required",
             description = "You must complete your questionnaire before exporting your report.",
-            // Primary = take them to Assessment
             primaryText = "Go to Assessment Report",
             onPrimary = {
                 showDialog = false
                 onNavigateToAssessment()
             },
-            // Secondary = cancel/close
             secondaryText = "Cancel",
             onSecondary = { showDialog = false },
             onDismiss = { showDialog = false },

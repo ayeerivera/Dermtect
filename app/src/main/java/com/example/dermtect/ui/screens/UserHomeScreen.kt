@@ -22,11 +22,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import com.example.dermtect.R
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
@@ -62,6 +60,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.Icon
+import androidx.compose.runtime.saveable.rememberSaveable
 
 @Composable
 fun ProfileDropdownMenu(
@@ -336,6 +335,7 @@ fun UserHomeScreen(
 
     var showConsentDialog by remember { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }              // 👈 keep only ONE
+    var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     val firstName by viewModel.firstName.collectAsState()
     val lastName by viewModel.lastName.collectAsState()
@@ -355,7 +355,6 @@ fun UserHomeScreen(
     val isLoadingNews by viewModel.isLoadingNews.collectAsState()
     val highlightItem by viewModel.highlightItem.collectAsState()
     val gson = remember { Gson() }
-    var showTutorial by remember { mutableStateOf(true) }
 
     var hasInitialAssessment by remember { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(Unit) {
@@ -373,12 +372,12 @@ fun UserHomeScreen(
         viewModel.fetchNews()
     }
 
-    LaunchedEffect(consentChecked, hasConsented) {
-        if (consentChecked && !hasConsented) {
-            showConsentDialog = true
-        }
-    }
     val tutorialSeen by viewModel.tutorialSeen.collectAsState()
+// Local guard so it won’t reappear again in the same session after Skip/Finish
+    var tutorialDismissedThisSession by rememberSaveable { mutableStateOf(false) }
+
+// Only show when Firestore says not seen yet AND user hasn’t dismissed it in this session
+    val shouldShowTutorial = (tutorialSeen == false) && !tutorialDismissedThisSession
 
     // Load once
     LaunchedEffect(Unit) { viewModel.loadTutorialSeenRemote() }
@@ -459,9 +458,13 @@ fun UserHomeScreen(
                             )
                         },
                         onAssessmentClick = {
-                            // If none yet, start; if exists, open the same screen (your app already routes accordingly)
-                            navController.navigate("questionnaire")
-                        },
+                            if (!hasConsented) {
+                                showConsentDialog = true
+                            } else {
+                                navController.navigate("questionnaire")
+
+                            }
+                                   },
                         onViewNotifications = {
                             if (!hasConsented) {
                                 showConsentDialog = true
@@ -582,15 +585,17 @@ fun UserHomeScreen(
             onViewTermsClick = { navController.navigate("terms_privacy") }
         )
     }
-    if (showTutorial) {
+    if (shouldShowTutorial) {
         TutorialOverlay(
             tutorialManager = tutorialManager,
             onFinish = {
                 tutorialManager.currentTargetBounds = null
-                viewModel.markTutorialSeenRemote()
+                tutorialDismissedThisSession = true          // 👈 hide immediately for this session
+                viewModel.markTutorialSeenRemote()           // 👈 persist so it won’t show next login
             }
         )
     }
+
 }
 
 
@@ -750,7 +755,7 @@ fun HighlightCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp, horizontal = 16.dp)
-            .height(150.dp)
+            .heightIn(min = 150.dp)       // ✅ allow growth, keep a minimum
             .clickable { onHighlightClick() }
             .shadow(
                 elevation = 8.dp,
@@ -807,7 +812,7 @@ fun HighlightCard(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = item.description,
-                        style = MaterialTheme.typography.bodyMedium.copy(color = Color.Black)
+                        style = MaterialTheme.typography.labelMedium.copy(color = Color.Black)
                     )
                 }
                 Image(

@@ -56,12 +56,16 @@ class UserHomeViewModel(application: Application) : AndroidViewModel(application
             val providers = FirebaseAuth.getInstance().currentUser?.providerData?.map { it.providerId }
             val isGoogle = providers?.contains("google.com") == true
             _role.value = userDoc.getString("role")
-
+            val userBirthday = userDoc.getString("birthday")
+            val userFamilyHistory = userDoc.getString("familyHistory")
 
             _firstName.value = first
             _lastName.value = last
             _email.value = email
             _isGoogleAccount.value = isGoogle
+            _birthday.value = userDoc.getString("birthday") ?: ""
+            _familyHistory.value = userDoc.getString("familyHistory") ?: ""
+
         }
     }
 
@@ -148,7 +152,13 @@ class UserHomeViewModel(application: Application) : AndroidViewModel(application
                 _isLoadingNews.value = false
             }
         }
-    }
+    }// --- state ---
+    private val _birthday = MutableStateFlow("")
+    val birthday: StateFlow<String> = _birthday
+
+    private val _familyHistory = MutableStateFlow("")
+    val familyHistory: StateFlow<String> = _familyHistory
+
     private val _clinics = MutableStateFlow<List<Clinic>>(emptyList())
     val clinics: StateFlow<List<Clinic>> = _clinics
 
@@ -197,7 +207,6 @@ class UserHomeViewModel(application: Application) : AndroidViewModel(application
             }
         }
     }
-
     fun fetchSavedClinics() {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
 
@@ -265,6 +274,37 @@ class UserHomeViewModel(application: Application) : AndroidViewModel(application
             .update("tutorial_v1_seen", true)
             .addOnSuccessListener { _tutorialSeen.value = true }
             .addOnFailureListener { /* optional: retry/backoff */ }
+    }
+
+    // Inside UserHomeViewModel.kt
+
+    fun updateProfile(firstName: String, lastName: String, birthday: String?, familyHistory: String?, onSuccess: () -> Unit, onFailure: (String) -> Unit) {
+        val uid = auth.currentUser?.uid
+        if (uid.isNullOrEmpty()) {
+            onFailure("User not authenticated.")
+            return
+        }
+
+        // Build the map of fields to update, skipping nulls or just sending the new values
+        val updates = mutableMapOf<String, Any>()
+        updates["firstName"] = firstName
+        updates["lastName"] = lastName
+        updates["birthday"] = birthday ?: "" // Handle nullable state
+        updates["familyHistory"] = familyHistory ?: "" // Handle nullable state
+
+        db.collection("users").document(uid).update(updates)
+            .addOnSuccessListener {
+                // Update local state flows immediately
+                _firstName.value = firstName
+                _lastName.value = lastName
+                _birthday.value = birthday ?: ""
+                _familyHistory.value = familyHistory ?: ""
+                onSuccess()
+            }
+            .addOnFailureListener { e ->
+                Log.e("UserHomeVM", "Failed to update profile", e)
+                onFailure(e.message ?: "Failed to save profile.")
+            }
     }
 
 }

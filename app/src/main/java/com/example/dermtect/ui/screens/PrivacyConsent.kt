@@ -19,6 +19,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.dermtect.ui.components.PrimaryButton
 import com.example.dermtect.ui.components.SecondaryButton
 
 @Composable
@@ -33,10 +34,11 @@ fun PrivacyConsentDialog(
     Dialog(onDismissRequest = {}) {
         Box(
             modifier = Modifier
-                .fillMaxWidth(0.9f)
+                .fillMaxWidth()
                 .background(Color.White, shape = RoundedCornerShape(25.dp))
+                .widthIn(max = 500.dp)
                 .border(0.5.dp, Color(0xFF0FB2B2), shape = RoundedCornerShape(25.dp))
-                .padding(24.dp)
+                .padding(20.dp) // adds even margin from edges
         ) {
             PrivacyConsentContent(
                 onConsent = onConsent,
@@ -127,7 +129,7 @@ fun PrivacyConsentContent(
             listOf(Color(0xFFBDBDBD), Color(0xFF9E9E9E), Color(0xFF757575))
         )
 
-        SecondaryButton(
+        PrimaryButton(
             text = "Consent",
             onClick = onConsent,
             enabled = isChecked,

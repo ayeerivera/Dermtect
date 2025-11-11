@@ -1,4 +1,4 @@
-package com.example.cameradermtect
+package com.example.dermtect.ui.screens
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -622,18 +622,33 @@ fun TakePhotoScreen(
                                         ).show()
                                         return@launch
                                     }
+                                    val photo = capturedImage ?: run {
+                                        Toast.makeText(context, "No photo available for PDF.", Toast.LENGTH_SHORT).show()
+                                        return@launch
+                                    }
+                                    val userId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+                                    if (userId == null) {
+                                        Toast.makeText(context, "You must be signed in to export.", Toast.LENGTH_SHORT).show()
+                                        return@launch
+                                    }
 
                                     try {
+
                                         val answerPairs: List<Pair<String, String>> =
                                             questions.indices.map { i ->
                                                 val a = qa!![i] ?: false
                                                 questions[i] to if (a) "Yes" else "No"
                                             }
 
+// You already checked userId above
+                                        val reportId = PdfExporter.nextUserReportSeq(userId)
+
                                         val data = PdfExporter.CasePdfData(
+                                            reportId = reportId,                 // ✅ REQUIRED
                                             title = "Result",
+                                            userFullName = "John Dela Cruz",
                                             timestamp = nowTimestamp(),
-                                            photo = image,
+                                            photo = image,                       // or `photo` if you used that var
                                             heatmap = r.heatmap,
                                             shortMessage = generateTherapeuticMessage(r.probability),
                                             answers = answerPairs
@@ -643,6 +658,7 @@ fun TakePhotoScreen(
                                             PdfExporter.createCasePdf(context, data)
                                         }
                                         PdfExporter.openPdf(context, uri)
+                                        Toast.makeText(context, "PDF saved successfully", Toast.LENGTH_SHORT).show()
                                         Toast.makeText(
                                             context,
                                             "PDF saved successfully",
@@ -940,72 +956,89 @@ suspend fun uploadScanWithLabel(
 @Composable
 fun CameraPermissionGate(
     onGranted: @Composable () -> Unit,
-    // optional UI if denied; keep it simple by default
-    deniedContent: @Composable () -> Unit = {
-        Text("Camera permission is required to continue.")
-    }
+    title: String = "Camera access is required",
+    message: String = "We need the camera to scan lesions so we can analyze your photo safely and accurately."
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
+
     var checked by remember { mutableStateOf(false) }
     var granted by remember { mutableStateOf(false) }
+    var showDialog by remember { mutableStateOf(false) }
 
+    // Launcher for the system permission prompt
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         granted = isGranted
         checked = true
-        if (!isGranted) {
-            Toast.makeText(context, "Camera permission denied", Toast.LENGTH_SHORT).show()
-        }
+        showDialog = !isGranted // if still not granted, keep dialog visible
     }
 
+    // First-time check (runs once)
     LaunchedEffect(Unit) {
         val hasPermission = ContextCompat.checkSelfPermission(
             context, Manifest.permission.CAMERA
         ) == PackageManager.PERMISSION_GRANTED
 
-        if (hasPermission) {
-            granted = true
-            checked = true
-        } else {
+        granted = hasPermission
+        checked = true
+        showDialog = !hasPermission
+
+        // Optional: auto-trigger the system dialog on very first entry
+        if (!hasPermission) {
             launcher.launch(Manifest.permission.CAMERA)
         }
     }
 
-    // If user denied and checked is true, optionally show rationale + re-request button
-    if (checked && !granted) {
-        val shouldShowRationale =
-            activity?.let {
-                ActivityCompat.shouldShowRequestPermissionRationale(
-                    it,
-                    Manifest.permission.CAMERA
-                )
-            } == true
-
-        Column {
-            deniedContent()
-            if (shouldShowRationale) {
-                Text("We use the camera to take/scan images. Please allow it to continue.")
-                Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) {
-                    Text("Allow Camera")
-                }
-            } else {
-                // "Don’t ask again" or first hard denial → guide to Settings
-                Button(onClick = {
-                    Toast.makeText(
-                        context,
-                        "Go to App Settings → Permissions → Camera",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }) {
-                    Text("Open Settings")
-                }
-            }
-        }
-    } else if (granted) {
+    // If permission is granted, render the gated content
+    if (checked && granted) {
         onGranted()
+        return
     }
+
+    // Otherwise show our modal dialog UX
+    val shouldShowRationale = remember(checked, granted) {
+        activity?.let {
+            ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.CAMERA)
+        } == true
+    }
+
+    if (showDialog) {
+        com.example.dermtect.ui.components.DialogTemplate(
+            show = true,
+            title = title,
+            description = message,
+            imageResId = com.example.dermtect.R.drawable.pdf_download, // replace with a camera icon if you have one
+            primaryText = if (shouldShowRationale) "Allow Camera" else "Open Settings",
+            onPrimary = {
+                if (shouldShowRationale) {
+                    // User denied once → show system prompt again
+                    launcher.launch(Manifest.permission.CAMERA)
+                } else {
+                    // "Don’t ask again" state → take them to app settings
+                    openAppSettings(context)
+                }
+            },
+            secondaryText = if (shouldShowRationale) "Cancel" else "Cancel",
+            onSecondary = {
+                // Just close the dialog; user stays blocked from camera
+                showDialog = false
+            },
+            onDismiss = {
+                showDialog = false
+            }
+        )
+    }
+}
+
+private fun openAppSettings(context: Context) {
+    val uri = android.net.Uri.fromParts("package", context.packageName, null)
+    val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+        data = uri
+        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    context.startActivity(intent)
 }
 
 
