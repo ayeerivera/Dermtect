@@ -66,6 +66,7 @@ fun LesionCaseTemplate(
     riskDescription: String,
     prediction: String,
     probability: Float,
+    isDerma: Boolean = false,
     onBackClick: () -> Unit,
     onDownloadClick: () -> Unit,
     onFindClinicClick: () -> Unit,
@@ -155,6 +156,7 @@ fun LesionCaseTemplate(
             )
 
             Spacer(Modifier.height(5.dp))
+
 
             Column(
                 modifier = Modifier
@@ -291,6 +293,17 @@ fun LesionCaseTemplate(
 
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
+                        // 🧠 Derma-only prediction badge
+                        if (isDerma && prediction.isNotBlank()) {
+                            Spacer(Modifier.height(8.dp))
+                            PillBadge(
+                                text = "Prediction: $prediction",
+                                fg = if (prediction.equals("Benign", true)) Color(0xFF126E3A) else Color(0xFF8A1C1C),
+                                bg = if (prediction.equals("Benign", true)) Color(0xFFDFFCEB) else Color(0xFFFFE4E4)
+                            )
+                            Spacer(Modifier.height(8.dp))
+                        }
+
                         Text(
                             text = "Risk Assessment",
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),

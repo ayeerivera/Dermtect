@@ -46,7 +46,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import com.example.dermtect.tflt.DermtectResult
 
@@ -72,6 +71,9 @@ fun LesionCaseScreen(
     var fullImagePage by remember { mutableStateOf<Int?>(null) } // 0 = photo, 1 = heatmap
     var showQaRequiredDialog by remember { mutableStateOf(false) }  // ✅ ADD
     var inferenceResult by remember { mutableStateOf<DermtectResult?>(null) }
+    var scanUrl by remember { mutableStateOf<String?>(null) }
+    var heatmapUrl by remember { mutableStateOf<String?>(null) }
+    var timestampMs by remember { mutableStateOf<Long?>(null) }
 
     val questions = remember {
         listOf(
@@ -191,45 +193,55 @@ fun LesionCaseScreen(
 
                     onDownloadClick = {
                         scope.launch {
-                            // ✅ Gate on questionnaire completion (user-level doc)
+                            // 1) Gate on questionnaire completion
                             val qa = existingAnswers
                             val notCompleted = (qa == null) || qa.any { it == null }
                             if (notCompleted) {
-                                showQaRequiredDialog =
-                                    true    // ✅ show the clickable dialog instead of snackbar
+                                showQaRequiredDialog = true
                                 return@launch
                             }
 
+                            // 2) Ensure we have the photo
+                            val photo = imageBitmap
+                            if (photo == null) {
+                                snackbarHostState.showSnackbar("No photo available for PDF.")
+                                return@launch
+                            }
 
-                            // Build (Q → Yes/No) pairs for the PDF, using the same order
-                            val answerPairs: List<Pair<String, String>> =
-                                questions.indices.map { i ->
-                                    val a = qa!![i] ?: false
-                                    questions[i] to if (a) "Yes" else "No"
-                                }
+                            // 3) Ensure signed in
+                            val userId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+                            if (userId == null) {
+                                snackbarHostState.showSnackbar("You must be signed in to export.")
+                                return@launch
+                            }
 
                             try {
-                                val photo = imageBitmap
-                                if (photo == null) {
-                                    snackbarHostState.showSnackbar("No photo available for PDF.")
-                                    return@launch
-                                }
-                                val userId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
-                                if (userId == null) {
-                                    snackbarHostState.showSnackbar("You must be signed in to export.")
-                                    return@launch
-                                }
+                                // 4) Build (Q → Yes/No) pairs in the same order
+                                val answerPairs: List<Pair<String, String>> =
+                                    questions.indices.map { i ->
+                                        val a = qa!![i] ?: false
+                                        questions[i] to if (a) "Yes" else "No"
+                                    }
 
-// sequential per-user ID (suspend)
-                                // sequential per-user ID (suspend)
-                                val reportId = PdfExporter.nextUserReportSeq(userId)
+                                // 5) Pull user profile (optional but nice to have on PDF)
+                                val userSnap = FirebaseFirestore.getInstance()
+                                    .collection("users")
+                                    .document(userId)
+                                    .get()
+                                    .await()
 
-// ❗ Use the Firestore-loaded probability for this screen
+                                val first = userSnap.getString("firstName").orEmpty()
+                                val last  = userSnap.getString("lastName").orEmpty()
+                                val birthdayStr = userSnap.getString("birthday") // may be null
+                                val fullName = listOf(first, last).filter { it.isNotBlank() }.joinToString(" ").ifBlank { "—" }
+
+                                // 6) Compute the short code ONLY for the PDF (no UI badge)
+                                val shortCode = PdfExporter.shortReportFrom(caseId = caseId, fallback = "TEMP0")
+
+                                // 7) Recreate the same “possible conditions” list used in UI
                                 val prob = probability
                                 val pPct = prob * 100f
                                 val alerted = prob >= 0.0112f
-
-// ✅ Build the exact same 6-item (or bucketed) list you show in UI
                                 val idsToShow: List<String> = if (!alerted) {
                                     LesionIds.benignIds
                                 } else {
@@ -242,7 +254,7 @@ fun LesionCaseScreen(
                                     }
                                 }
 
-// ✅ Compact summary for the PDF (no bullets here)
+                                // 8) Compact summary text (no bullets; bullets come from possibleConditions)
                                 val pdfSummary = if (!alerted) {
                                     "This scan looks reassuring, with a very low likelihood of a serious issue."
                                 } else {
@@ -251,32 +263,30 @@ fun LesionCaseScreen(
                                         pPct < 30f -> "Low chance of concern. Keep an eye on changes."
                                         pPct < 60f -> "Minor concern. Consider discussing with a doctor."
                                         pPct < 80f -> "Moderate concern. We recommend a dermatologist visit."
-                                        else        -> "Higher concern. Please visit a dermatologist soon."
+                                        else       -> "Higher concern. Please visit a dermatologist soon."
                                     }
                                 }
 
+                                // 9) Build PDF payload (short code goes into reportId)
                                 val data = PdfExporter.CasePdfData(
-                                    reportId = reportId,
+                                    reportId = shortCode,            // ✅ short 4-char ID, PDF-only
                                     title = title,
-                                    userFullName = "John Dela Cruz",
+                                    userFullName = fullName,
+                                    birthday = birthdayStr,
                                     timestamp = timestampText,
                                     photo = photo,
-                                    heatmap = heatmapBitmap,
-                                    shortMessage = pdfSummary,          // 👈 concise text (no bullets)
-                                    possibleConditions = idsToShow,     // 👈 THIS passes the 6 items to the PDF
+                                    heatmap = heatmapBitmap,         // can be null
+                                    shortMessage = pdfSummary,
+                                    possibleConditions = idsToShow,
                                     answers = answerPairs
                                 )
 
-
+                                // 10) Create & open the PDF locally (no cloud upload here)
                                 val uri = withContext(Dispatchers.IO) {
                                     PdfExporter.createCasePdf(ctx, data)
                                 }
                                 PdfExporter.openPdf(ctx, uri)
-
-
-                                PdfExporter.openPdf(ctx, uri)
                                 snackbarHostState.showSnackbar("PDF saved successfully")
-
                             } catch (t: Throwable) {
                                 Log.e("LesionCaseScreen", "PDF export failed", t)
                                 snackbarHostState.showSnackbar("Failed to create PDF: ${t.message ?: "Unknown error"}")

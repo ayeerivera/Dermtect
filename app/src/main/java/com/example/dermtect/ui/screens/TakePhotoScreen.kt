@@ -89,7 +89,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import com.example.dermtect.ui.components.DialogTemplate
-import android.graphics.BitmapFactory
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -161,6 +160,11 @@ fun TakePhotoScreen(
     val qvm = remember { QuestionnaireViewModel() }
     val existingAnswers by qvm.existingAnswers.collectAsState()
     var showQaRequiredDialog by remember { mutableStateOf(false) }  // ✅ ADD
+    // --- Report code & reserved ids ---
+    var reservedCaseId by remember { mutableStateOf<String?>(null) }
+    var reservedLabel by remember { mutableStateOf<String?>(null) }
+    var reportCode by remember { mutableStateOf<String?>(null) }
+
 
     val questions = remember {
         listOf(
@@ -389,85 +393,87 @@ fun TakePhotoScreen(
             val flashSupported = cameraInfo?.hasFlashUnit() == true
 
 
-            // 📸 Camera button (center) — gated by SkinGate
             val canShoot = canCapture
-            val enabledColor = Color((0xFF0097A7))
+            val enabledColor = Color(0xFF0097A7)
             val disabledColor = Color(0xFFBDBDBD)
 
+// Capture Button
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .size(65.dp)
-                    .shadow(
-                        elevation = 6.dp,
-                        shape = CircleShape,
-                        clip = false
-                    )
-                    // Outer border for a thicker, more visible stroke effect
+                    .shadow(6.dp, CircleShape, clip = false)
                     .border(
-                        width = 1.dp, // Thicker outer border for more visibility
+                        width = 1.dp,
                         brush = Brush.linearGradient(
-                            colors = listOf(
-                                Color(0xFFBFFDFD), // Lighter outer shade
-                                Color(0xFF88E7E7), // Medium teal
-                                Color(0xFF41A6A6)  // Darker teal
+                            listOf(
+                                Color(0xFFBFFDFD),
+                                Color(0xFF88E7E7),
+                                Color(0xFF41A6A6)
                             )
                         ),
                         shape = CircleShape
                     )
-                    .background(if (canShoot) enabledColor else disabledColor, shape = CircleShape)
-                    .then(
-                        if (canShoot) {
-                            Modifier.clickable {
-                                // extra safety gate
-                                if (!canCapture) return@clickable
-
-                                val file = File(context.cacheDir, "${System.currentTimeMillis()}.jpg")
-                                val outputOptions = ImageCapture.OutputFileOptions.Builder(file).build()
-
-                                imageCapture?.takePicture(
-                                    outputOptions,
-                                    ContextCompat.getMainExecutor(context),
-                                    object : ImageCapture.OnImageSavedCallback {
-                                        override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                                            val fullBitmap = rotateBitmapAccordingToExif(context, file)
-                                            squareRect?.let { rect ->
-                                                val crop = mapViewRectToImageSquare(
-                                                    viewLeft = rect.left,
-                                                    viewTop = rect.top,
-                                                    viewWidth = rect.width,
-                                                    viewHeight = rect.height,
-                                                    imageWidth = fullBitmap.width,
-                                                    imageHeight = fullBitmap.height,
-                                                    previewViewWidth = previewView.width,
-                                                    previewViewHeight = previewView.height
-                                                )
-                                                val side = min(crop.width(), crop.height()).coerceAtLeast(1)
-                                                capturedImage = Bitmap.createBitmap(
-                                                    fullBitmap, crop.left, crop.top, side, side
-                                                )
-                                            } ?: run {
-                                                val side = min(fullBitmap.width, fullBitmap.height)
-                                                val left = (fullBitmap.width - side) / 2
-                                                val top = (fullBitmap.height - side) / 2
-                                                capturedImage = Bitmap.createBitmap(fullBitmap, left, top, side, side)
-                                            }
-                                        }
-                                        override fun onError(exception: ImageCaptureException) {
-                                            Toast.makeText(context, "Capture failed", Toast.LENGTH_SHORT).show()
-                                            Log.e("CameraX", "Photo capture failed: ${exception.message}", exception)
-                                        }
-                                    }
-                                )
-                            }
-                        } else {
-                            // When not allowed, still catch taps to explain why
-                            Modifier.clickable {
-                                val msg = liveGateResult?.reason ?: "Not ready. Adjust framing/lighting and hold steady."
-                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                            }
+                    .background(if (canShoot) enabledColor else disabledColor, CircleShape)
+                    .clickable {
+                        if (!canShoot) {
+                            val msg = liveGateResult?.reason
+                                ?: "Not ready. Adjust framing/lighting and hold steady."
+                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                            return@clickable
                         }
-                    ),
+
+                        val file = File(context.cacheDir, "${System.currentTimeMillis()}.jpg")
+                        val output = ImageCapture.OutputFileOptions.Builder(file).build()
+
+                        imageCapture?.takePicture(
+                            output,
+                            ContextCompat.getMainExecutor(context),
+                            object : ImageCapture.OnImageSavedCallback {
+                                override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                                    val fullBmp = rotateBitmapAccordingToExif(context, file)
+
+                                    squareRect?.let { rect ->
+                                        val crop = mapViewRectToImageSquare(
+                                            viewLeft = rect.left,
+                                            viewTop = rect.top,
+                                            viewWidth = rect.width,
+                                            viewHeight = rect.height,
+                                            imageWidth = fullBmp.width,
+                                            imageHeight = fullBmp.height,
+                                            previewViewWidth = previewView.width,
+                                            previewViewHeight = previewView.height
+                                        )
+
+                                        val side = min(crop.width(), crop.height()).coerceAtLeast(1)
+                                        capturedImage = Bitmap.createBitmap(
+                                            fullBmp,
+                                            crop.left,
+                                            crop.top,
+                                            side,
+                                            side
+                                        )
+                                    } ?: run {
+                                        val side = min(fullBmp.width, fullBmp.height)
+                                        val left = (fullBmp.width - side) / 2
+                                        val top = (fullBmp.height - side) / 2
+                                        capturedImage = Bitmap.createBitmap(
+                                            fullBmp,
+                                            left,
+                                            top,
+                                            side,
+                                            side
+                                        )
+                                    }
+                                }
+
+                                override fun onError(exception: ImageCaptureException) {
+                                    Toast.makeText(context, "Capture failed", Toast.LENGTH_SHORT).show()
+                                    Log.e("CameraX", "Photo capture failed: ${exception.message}", exception)
+                                }
+                            }
+                        )
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 Image(
@@ -476,6 +482,8 @@ fun TakePhotoScreen(
                     modifier = Modifier.size(24.dp)
                 )
             }
+
+
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
@@ -596,6 +604,9 @@ fun TakePhotoScreen(
                                 hasSaved = false
                                 hasUploaded = false
                                 fullImagePage = null
+                                reservedCaseId = null
+                                reservedLabel = null
+                                reportCode = null
                             },
                             onBackClick = {
                                 inferenceResult = null
@@ -604,46 +615,40 @@ fun TakePhotoScreen(
                                 hasUploaded = false
                                 fullImagePage = null
                                 onBackClick()
+                                reservedCaseId = null
+                                reservedLabel = null
+                                reportCode = null
                             },
                             onDownloadClick = {
                                 coroutineScope.launch {
-                                    // Gate: questionnaire must be complete (8 answers, none null)
+                                    // Gate: questionnaire complete?
                                     val qa = existingAnswers
-                                    val notCompleted =
-                                        (qa == null) || (qa.size != questions.size) || qa.any { it == null }
+                                    val notCompleted = (qa == null) || (qa.size != questions.size) || qa.any { it == null }
                                     if (notCompleted) {
-                                        showQaRequiredDialog =
-                                            true    // ✅ show the clickable dialog instead of snackbar
+                                        showQaRequiredDialog = true
                                         return@launch
                                     }
+
                                     val photo = capturedImage ?: run {
-                                        Toast.makeText(
-                                            context,
-                                            "No photo available for PDF.",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
+                                        Toast.makeText(context, "No photo available for PDF.", Toast.LENGTH_SHORT).show()
                                         return@launch
                                     }
-                                    val userId =
-                                        com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+
+                                    val userId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
                                     if (userId == null) {
-                                        Toast.makeText(
-                                            context,
-                                            "You must be signed in to export.",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
+                                        Toast.makeText(context, "You must be signed in to export.", Toast.LENGTH_SHORT).show()
                                         return@launch
                                     }
 
                                     try {
-
+                                        // Build answers
                                         val answerPairs: List<Pair<String, String>> =
                                             questions.indices.map { i ->
                                                 val a = qa!![i] ?: false
                                                 questions[i] to if (a) "Yes" else "No"
                                             }
 
-// You already checked userId above
+                                        // Fetch user profile fields (name, birthday)
                                         val userSnap = FirebaseFirestore.getInstance()
                                             .collection("users")
                                             .document(userId)
@@ -652,18 +657,19 @@ fun TakePhotoScreen(
 
                                         val first = userSnap.getString("firstName").orEmpty()
                                         val last = userSnap.getString("lastName").orEmpty()
-                                        val birthdayStr =
-                                            userSnap.getString("birthday")   // "MM/dd/yyyy" from your app (may be null/blank)
+                                        val birthdayStr = userSnap.getString("birthday") // may be null
 
-                                        val fullName =
-                                            listOf(first, last).filter { it.isNotBlank() }
-                                                .joinToString(" ")
+                                        val fullName = listOf(first, last).filter { it.isNotBlank() }.joinToString(" ")
 
-                                        // 3) Generate a report id per user (you already use this util)
-                                        val reportId = PdfExporter.nextUserReportSeq(userId)
+                                        // Compute the *short* code ONLY for the PDF:
+                                        // Prefer the actually saved case id (reservedCaseId), else your temp reportCode,
+                                        // else just use PdfExporter.shortReportFrom(null, "TEMP0")
+                                        val shortCode: String = PdfExporter.shortReportFrom(
+                                            caseId = reservedCaseId ?: reportCode,   // could be null; helper handles it
+                                            fallback = "TEMP0"
+                                        )
 
-                                        // 4) Build CasePdfData WITH BIRTHDAY (PdfExporter will auto-compute age)
-                                        // --- Build the same "possible conditions" list the UI shows, based on probability ---
+                                        // Make the conditions list exactly like in UI
                                         val prob = inferenceResult?.probability ?: 0f
                                         val pPct = prob * 100f
                                         val alerted = prob >= 0.0112f
@@ -679,7 +685,7 @@ fun TakePhotoScreen(
                                             }
                                         }
 
-// --- Make the PDF summary WITHOUT the bullet list so it doesn't leak into "Summary" ---
+                                        // Friendly summary text for the PDF
                                         val pdfSummary = if (!alerted) {
                                             "This scan looks reassuring, with a very low likelihood of a serious issue. " +
                                                     "You can continue your normal skincare routine. Just keep being mindful of your skin and how it changes over time."
@@ -689,52 +695,48 @@ fun TakePhotoScreen(
                                                 pPct < 30f -> "Your result suggests a low chance of concern. Keep an eye on changes and consult if something evolves."
                                                 pPct < 60f -> "We noticed some minor concern. Consider discussing this with a doctor for guidance and peace of mind."
                                                 pPct < 80f -> "There’s moderate concern. We recommend scheduling a skin check with a dermatologist."
-                                                else        -> "There’s higher concern. Please visit a dermatologist soon for proper care and support."
+                                                else       -> "There’s higher concern. Please visit a dermatologist soon for proper care and support."
                                             }
                                         }
 
-// --- Build the CasePdfData and INCLUDE the list ---
+                                        // Build PDF data with the SHORT code
                                         val data = PdfExporter.CasePdfData(
-                                            reportId = reportId,
+                                            reportId = shortCode,             // ⬅️ only short code goes into the PDF
                                             title = "Result",
                                             userFullName = fullName,
                                             birthday = birthdayStr,
                                             timestamp = nowTimestamp(),
                                             photo = photo,
                                             heatmap = inferenceResult?.heatmap,
-                                            shortMessage = pdfSummary,                 // <-- important: NO bullets here
-                                            possibleConditions = idsToShow,            // <-- pass the list to the PDF
+                                            shortMessage = pdfSummary,
+                                            possibleConditions = idsToShow,
                                             answers = answerPairs
                                         )
 
-// Create + open the PDF
-                                        val uri = withContext(Dispatchers.IO) { PdfExporter.createCasePdf(context, data) }
-                                        PdfExporter.openPdf(context, uri)
-                                        Toast.makeText(
-                                            context,
-                                            "PDF saved successfully",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                        Toast.makeText(
-                                            context,
-                                            "PDF saved successfully",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
+                                        // Create + (optionally) upload + write index. If you only want local file, call createCasePdf + openPdf.
+                                        val localUri = withContext(Dispatchers.IO) {
+                                            PdfExporter.saveReportAndPdf(
+                                                context = context,
+                                                userId = userId,
+                                                baseData = data,
+                                                uploadPdfToStorage = true
+                                            )
+                                        }
+
+                                        PdfExporter.openPdf(context, localUri)
+                                        Toast.makeText(context, "PDF saved successfully", Toast.LENGTH_SHORT).show()
 
                                     } catch (t: Throwable) {
                                         Log.e("TakePhotoScreen", "PDF export failed", t)
-                                        Toast.makeText(
-                                            context,
-                                            "Failed to create PDF: ${t.message ?: "Unknown error"}",
-                                            Toast.LENGTH_LONG
-                                        ).show()
+                                        Toast.makeText(context, "Failed to create PDF: ${t.message ?: "Unknown error"}", Toast.LENGTH_LONG).show()
                                     }
                                 }
-
                             },
                             onFindClinicClick = { onFindClinicClick() },
                             compact = true
                         )
+
+
 
                         DialogTemplate(
                             show = showPrivacyDialog,
@@ -763,16 +765,21 @@ fun TakePhotoScreen(
                                             return@launch
                                         }
 
-                                        val ok = uploadScanWithLabel(
+                                        val upload = uploadScanWithLabel(
                                             bitmap = capturedImage!!,
                                             heatmap = inferenceResult?.heatmap,
                                             probability = inferenceResult?.probability ?: 0f,
                                             prediction = modelFlag,
-                                            status = "completed"
+                                            status = "completed",
+                                            caseIdOverride = reservedCaseId,
+                                            labelOverride  = reservedLabel
                                         )
 
-                                        if (ok) {
+                                        if (upload != null) {
                                             hasSaved = true
+                                            // ✅ keep on-screen badge + PDF in sync
+                                            reservedCaseId = upload.caseId
+                                            reportCode = upload.caseId.takeLast(4).uppercase()
                                             Toast.makeText(context, "Scan saved successfully.", Toast.LENGTH_SHORT).show()
                                         } else {
                                             Toast.makeText(context, "Save failed (rules or network).", Toast.LENGTH_LONG).show()
@@ -1032,25 +1039,38 @@ fun rotateBitmapAccordingToExif(context: Context, file: File): Bitmap {
     return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
 }
 
+data class UploadResult(
+    val caseId: String,
+    val label: String,
+    val scanUrl: String,
+    val heatmapUrl: String?,
+    val timestampMs: Long
+)
+
 suspend fun uploadScanWithLabel(
-    bitmap: Bitmap,            // original cropped photo
-    heatmap: Bitmap?,          // heatmap/overlay to save (can be null)
+    bitmap: Bitmap,
+    heatmap: Bitmap?,
     probability: Float,
     prediction: String,
-    status: String = "completed"
-): Boolean {
-    val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return false
-    val db = FirebaseFirestore.getInstance()
+    status: String = "completed",
+    caseIdOverride: String? = null,
+    labelOverride: String? = null
+): UploadResult? {
 
-    // Tighter retry windows so Firebase SDK doesn’t keep retrying forever in the background
+    val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return null
+    val db = FirebaseFirestore.getInstance()
     FirebaseStorage.getInstance().apply {
         maxUploadRetryTimeMillis = TimeoutConfig.UPLOAD_MS
         maxOperationRetryTimeMillis = TimeoutConfig.UPLOAD_MS
         maxDownloadRetryTimeMillis = TimeoutConfig.URL_MS
     }
 
-    // 1) Reserve Firestore doc id + "Scan N" label (you already have this repo)
-    val (caseId, label) = ScanRepository.reserveScanLabelAndId(db, uid)
+    // 1) Use overrides if present; otherwise reserve now
+    val (caseId, label) = if (caseIdOverride != null && labelOverride != null) {
+        caseIdOverride to labelOverride
+    } else {
+        ScanRepository.reserveScanLabelAndId(db, uid)
+    }
 
 
     val storage = FirebaseStorage.getInstance().reference
@@ -1062,31 +1082,28 @@ suspend fun uploadScanWithLabel(
         bitmap.compress(Bitmap.CompressFormat.JPEG, 90, this)
     }.toByteArray()
     val photoTask = photoRef.putBytes(photoBytes)
-    val photoSnap = withTimeoutOrNull(TimeoutConfig.UPLOAD_MS) { photoTask.await() }
-        ?: run {
-            photoTask.cancel()
-            return false
-        }
+    val photoSnap = withTimeoutOrNull(TimeoutConfig.UPLOAD_MS) { photoTask.await() } ?: run {
+        photoTask.cancel(); return null
+    }
     val photoUrl = withTimeoutOrNull(TimeoutConfig.URL_MS) {
         photoRef.downloadUrl.await().toString()
-    } ?: return false
+    } ?: return null
 
-    // 4) Upload heatmap (if provided)
+    // upload heatmap (optional)
     var heatmapUrl: String? = null
     if (heatmap != null) {
-        val heatmapBytes = ByteArrayOutputStream().apply {
+        val heatBytes = ByteArrayOutputStream().apply {
             heatmap.compress(Bitmap.CompressFormat.JPEG, 90, this)
         }.toByteArray()
-        val heatTask = heatmapRef.putBytes(heatmapBytes)
-        val heatSnap = withTimeoutOrNull(TimeoutConfig.UPLOAD_MS) { heatTask.await() }
-            ?: run {
-                heatTask.cancel()
-                return false // or proceed without heatmap if you prefer
-            }
+        val heatTask = heatmapRef.putBytes(heatBytes)
+        val heatSnap = withTimeoutOrNull(TimeoutConfig.UPLOAD_MS) { heatTask.await() } ?: run {
+            heatTask.cancel(); return null
+        }
+        heatmapUrl = withTimeoutOrNull(TimeoutConfig.URL_MS) { heatmapRef.downloadUrl.await().toString() } ?: return null
+    }
 
-        heatmapUrl = withTimeoutOrNull(TimeoutConfig.URL_MS) {
-            heatmapRef.downloadUrl.await().toString()
-        } ?: return false        }
+    val nowMs = System.currentTimeMillis()
+    val reportCode = caseId.takeLast(4).uppercase()
 
     // 5) Firestore metadata
     val doc = hashMapOf(
@@ -1098,17 +1115,18 @@ suspend fun uploadScanWithLabel(
         "prediction" to prediction,
         "probability" to probability.toDouble(),
         "status" to status,
+        "report_code" to reportCode,
+        "public_allowed" to true,
         "heatmap_url" to heatmapUrl            // may be null if no heatmap
     )
 
-    val writeOk = withTimeoutOrNull(TimeoutConfig.FIRESTORE_MS) {
-        db.collection("lesion_case").document(caseId).set(doc).await()
-        true
+    val ok = withTimeoutOrNull(TimeoutConfig.FIRESTORE_MS) {
+        db.collection("lesion_case").document(caseId).set(doc).await(); true
     } ?: false
+    if (!ok) return null
 
-    return writeOk
+    return UploadResult(caseId, label, photoUrl, heatmapUrl, nowMs)
 }
-
 @Composable
 fun CameraPermissionGate(
     onGranted: @Composable () -> Unit,

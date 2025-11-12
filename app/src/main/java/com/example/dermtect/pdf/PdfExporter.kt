@@ -8,23 +8,10 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
-import com.example.dermtect.ui.components.DialogTemplate
 import com.google.android.gms.tasks.Task
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.SetOptions
 import com.google.firebase.storage.FirebaseStorage
 import java.io.File
 import java.io.FileOutputStream
@@ -63,6 +50,8 @@ private fun computeAgeFrom(birthday: String?): Int? {
     }
 }
 
+
+
 object PdfExporter {
 
     data class CasePdfData(
@@ -77,6 +66,10 @@ object PdfExporter {
         val possibleConditions: List<String> = emptyList(),
         val answers: List<Pair<String, String>>
     )
+    // Keep short report IDs consistent
+    fun shortReportFrom(caseId: String?, fallback: String = "TEMP0"): String =
+        caseId?.takeLast(4)?.uppercase() ?: fallback
+
 
     // Extract "Possible identification(s): ..." from a paragraph.
     private fun extractPossibleFromSummary(raw: String): Pair<String, List<String>> {
@@ -97,34 +90,7 @@ object PdfExporter {
         return cleanSummary to items
     }
 
-    // ---- Shorten UID ----
-    private fun shortUid(uid: String, take: Int = 6): String {
-        val clean = uid.filter { it.isLetterOrDigit() }
-        return if (clean.length >= take) clean.substring(0, take) else clean.padEnd(take, '0')
-    }
 
-    // ---- Unique per-user Report ID: DTX-<uid6>-<yyyyMMdd>-<seq4> ----
-    suspend fun nextUserReportId(userId: String): String {
-        val db = FirebaseFirestore.getInstance()
-        val userRef = db.collection("users").document(userId)
-
-        val (seq, ymd) = taskAwait(
-            db.runTransaction { tx ->
-                val snap = tx.get(userRef)
-                val current = (snap.getLong("reportSeq") ?: 0L).toInt()
-                val next = current + 1
-                tx.set(userRef, mapOf("reportSeq" to next), SetOptions.merge())
-                val today = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())
-                next to today
-            }
-        )
-        val uid6 = shortUid(userId, 6)
-        val seq4 = seq.toString().padStart(4, '0')
-        return "DTX-$uid6-$ymd-$seq4"
-    }
-
-    @Deprecated("Use nextUserReportId(userId) for unique per-user IDs with date prefix.")
-    suspend fun nextUserReportSeq(userId: String): String = nextUserReportId(userId)
 
     // ---- Create clinic-style PDF (1–2 pages) ----
     fun createCasePdf(context: Context, data: CasePdfData): Uri {
@@ -403,12 +369,14 @@ object PdfExporter {
         var downloadUrl: String? = null
         var storagePath: String? = null
         if (uploadPdfToStorage) {
-            val pdfRef = storageRoot.child("users/$userId/reports/$reportId.pdf")
+            val displayShort = baseData.reportId // this is the 4-char code shown in the PDF
+            val safeName = "report_${displayShort}_${System.currentTimeMillis()}.pdf"
+            val pdfRef = storageRoot.child("users/$userId/reports/$safeName")
             context.contentResolver.openInputStream(localUri)?.use { input ->
                 taskAwait(pdfRef.putStream(input))
             }
             downloadUrl = taskAwait(pdfRef.downloadUrl).toString()
-            storagePath = "users/$userId/reports/$reportId.pdf"
+            storagePath = "users/$userId/reports/$safeName"
         }
         val ageVal = computeAgeFrom(baseData.birthday)
 
@@ -456,67 +424,4 @@ object PdfExporter {
     }
 }
 
-// ---------- Composable that gates PDF creation on questionnaire + assigns unique ID ----------
-@Composable
-fun CreateCasePdfWithDialog(
-    context: Context,
-    userId: String,
-    data: PdfExporter.CasePdfData,
-    onPdfReady: (Uri) -> Unit,
-    onNavigateToAssessment: () -> Unit
-) {
-    var showDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(data) {
-        if (data.answers.isEmpty()) {
-            showDialog = true
-        } else {
-            // Generate per-user unique reportId
-            val reportId = PdfExporter.nextUserReportId(userId)
-
-            // Build data with reportId
-            val withId = data.copy(reportId = reportId)
-
-            // Create PDF + (optional) upload + Firestore write
-            val localUri = PdfExporter.saveReportAndPdf(
-                context = context,
-                userId = userId,
-                baseData = withId,
-                uploadPdfToStorage = true
-            )
-
-            onPdfReady(localUri)
-        }
-    }
-
-    if (showDialog) {
-        DialogTemplate(
-            show = showDialog,
-            title = "Questionnaire Required",
-            description = "You must complete your questionnaire before exporting your report.",
-            primaryText = "Go to Assessment Report",
-            onPrimary = {
-                showDialog = false
-                onNavigateToAssessment()
-            },
-            secondaryText = "Cancel",
-            onSecondary = { showDialog = false },
-            onDismiss = { showDialog = false },
-            extraContent = {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "You can tap the button above, or go manually to:\nSettings → Profile → My Assessment Report",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = Color.DarkGray,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            textAlign = TextAlign.Center
-                        ),
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-        )
-    }
-}

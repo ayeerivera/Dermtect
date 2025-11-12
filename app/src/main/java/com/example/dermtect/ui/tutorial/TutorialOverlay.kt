@@ -38,6 +38,7 @@ fun TutorialOverlay(
     tutorialManager: TutorialManager,
     onFinish: () -> Unit // Called when tutorial is completed or skipped
 ) {
+
     val stepIndex = tutorialManager.currentStep
     val steps = tutorialManager.steps
 

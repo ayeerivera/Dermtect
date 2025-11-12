@@ -4,7 +4,6 @@ package com.example.dermtect.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.google.firebase.firestore.FirebaseFirestore
-
 class DermaHistoryVmFactory(
     private val feed: DermaFeed
 ) : ViewModelProvider.Factory {
@@ -16,3 +15,4 @@ class DermaHistoryVmFactory(
         ) as T
     }
 }
+

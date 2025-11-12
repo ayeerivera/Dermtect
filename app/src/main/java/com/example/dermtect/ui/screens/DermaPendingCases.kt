@@ -51,7 +51,9 @@ fun PendingCasesScreen(
                         newestFirst = newestFirst,
                         onSortChange = { newestFirst = it }
                     )
-                }
+                },
+                        isDerma = true                  // ← hides “Take your first scan” button + derma copy
+
             )
         }
     }

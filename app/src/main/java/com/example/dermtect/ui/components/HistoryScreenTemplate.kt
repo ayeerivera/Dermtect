@@ -16,7 +16,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.zIndex
 import com.example.dermtect.ui.screens.ResultFilter
 import com.example.dermtect.ui.screens.StatusFilter
 
@@ -57,9 +57,11 @@ fun HistoryScreenTemplate(
     caseList: List<CaseData>,
     showIndicators: Boolean = true,
     topContent: @Composable () -> Unit = {},
-    actions: @Composable RowScope.() -> Unit = {}
+    actions: @Composable RowScope.() -> Unit = {},
+    isDerma: Boolean = false
 ) {
     BubblesBackground {
+        // ── Header ───────────────────────────────────────────────
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -69,6 +71,7 @@ fun HistoryScreenTemplate(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp)
+                    .zIndex(1f) // keep on top of bubbles/scroll
             ) {
                 BackButton(
                     onClick = { navController.popBackStack() },
@@ -94,13 +97,13 @@ fun HistoryScreenTemplate(
             ) {
                 actions()
             }
+
             topContent()
         }
 
-
         Spacer(Modifier.height(20.dp))
+        // ── Scrollable list ──────────────────────────────────────
 
-        // Scrollable case list...
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -120,28 +123,36 @@ fun HistoryScreenTemplate(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
 
                         Text(
-                            text = "There’s no scan history yet.",
+                            text = if (isDerma)
+                                "No cases yet."
+                            else
+                                "There’s no scan history yet.",
                             style = MaterialTheme.typography.headlineMedium,
                             color = Color(0xFF1D1D1D),
                             textAlign = TextAlign.Center
                         )
+
                         Spacer(Modifier.height(6.dp))
+
                         Text(
-                            text = "Your saved scans will appear here after you take your first photo.",
+                            text = if (isDerma)
+                                "Cases you review will appear here."
+                            else
+                                "Your saved scans will appear here after you take your first photo.",
                             style = MaterialTheme.typography.headlineSmall,
                             color = Color.Gray,
                             textAlign = TextAlign.Center
                         )
 
-                        // Optional: quick action button to start scanning
-                        Spacer(Modifier.height(16.dp))
-                        Spacer(Modifier.height(16.dp))
-                        PrimaryButton(
-                            text = "Take your first scan",
-                            onClick = { navController.navigate("camera") }, // ✅ redirects to your camera route
-                            modifier = Modifier.fillMaxWidth(0.9f)
-                        )
-
+                        // 👇 Show action only for regular users (NOT for derma)
+                        if (!isDerma) {
+                            Spacer(Modifier.height(16.dp))
+                            PrimaryButton(
+                                text = "Take your first scan",
+                                onClick = { navController.navigate("camera") },
+                                modifier = Modifier.fillMaxWidth(0.9f)
+                            )
+                        }
                     }
                 }
             } else {
@@ -177,7 +188,6 @@ fun HistoryScreenTemplate(
         }
     }
 }
-
 
 @Composable
 fun CaseListItem(

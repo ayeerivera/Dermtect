@@ -13,9 +13,7 @@ import com.example.dermtect.ui.components.HistoryScreenTemplate
 import com.example.dermtect.ui.viewmodel.DermaFeed
 import com.example.dermtect.ui.viewmodel.DermaHistoryViewModel
 import com.example.dermtect.ui.viewmodel.DermaHistoryVmFactory
-import com.example.dermtect.ui.viewmodel.HistoryViewModel
 
-// com/example/dermtect/ui/screens/DermaHistoryScreen.kt
 @Composable
 fun DermaHistoryScreen(
     navController: NavController,
@@ -66,8 +64,10 @@ fun DermaHistoryScreen(
                         newestFirst = newestFirst,
                         onSortChange = { newestFirst = it }
                     )
-                }
+                },
+                isDerma = true // ← add this
             )
+
         }
     }
 }

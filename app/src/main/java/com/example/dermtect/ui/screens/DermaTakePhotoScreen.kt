@@ -58,8 +58,6 @@ import androidx.compose.foundation.border
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.window.Dialog
 import kotlin.math.min
-import kotlin.math.max
-import kotlin.math.roundToInt
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlinx.coroutines.TimeoutCancellationException
@@ -69,14 +67,30 @@ import kotlinx.coroutines.TimeoutCancellationException
 private val DERMA_FOCUS_BOX = 320.dp
 private val BottomBarHeight = 120.dp
 private const val INFER_TIMEOUT_MS = 120_000L
+data class RiskInfo(val label: String, val fg: Color, val bg: Color)
+
+fun computeRisk(prob: Float): RiskInfo {
+    val pPct = prob * 100f
+    return when {
+        pPct < 10f  -> RiskInfo("Very Low", Color(0xFF0E6B57), Color(0xFFCFF8EC))
+        pPct < 30f  -> RiskInfo("Low",      Color(0xFF1769AA), Color(0xFFD9EEFF))
+        pPct < 60f  -> RiskInfo("Medium",   Color(0xFF8A6D00), Color(0xFFFFF1BF))
+        pPct < 80f  -> RiskInfo("High",     Color(0xFF9A3412), Color(0xFFFFE2D1))
+        else        -> RiskInfo("Very High",Color(0xFF7F1D1D), Color(0xFFFFD5D5))
+    }
+}
+fun formatProb(prob: Float): String =
+    "${(prob * 100f).coerceIn(0f, 100f).toInt()}%"
 
 @Composable
 fun DermaTakePhotoScreen(
     onBackClick: () -> Unit = {},
+    isDerma: Boolean = true
+
 ) {
     // reuse the permission gate from your user screen file
     CameraPermissionGate(
-        onGranted = { DermaTakePhotoScreenContent(onBackClick) },
+        onGranted = { DermaTakePhotoScreenContent(onBackClick, isDerma) }, // <-- pass it
         title = "Camera access is required",
         message = "We need the camera so you can capture a lesion photo."
     )
@@ -84,7 +98,8 @@ fun DermaTakePhotoScreen(
 
 @Composable
 private fun DermaTakePhotoScreenContent(
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    isDerma: Boolean
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -112,7 +127,12 @@ private fun DermaTakePhotoScreenContent(
     var inferenceResult by remember { mutableStateOf<DermtectResult?>(null) }
     var modelFlag by remember { mutableStateOf("Benign") }
     var fullImagePage by remember { mutableStateOf<Int?>(null) }
+    var lastAnalyzeMs by remember { mutableStateOf(0L) }
+    val minGapMs = 120L                         // ~8 fps
+    var analyzing by remember { mutableStateOf(false) }
 
+// if you need coroutines here:
+    val scope = rememberCoroutineScope()
     // ===== Camera bind (same pattern as user) =====
     DisposableEffect(Unit) {
         val cameraProvider = cameraProviderFuture.get()
@@ -132,18 +152,56 @@ private fun DermaTakePhotoScreenContent(
             .build()
             .also { ia ->
                 ia.setAnalyzer(cameraExecutor) { proxy ->
-                    try {
-                        val bmp = proxy.toBitmapFast()
-                        val gate = analyzeImageForSkin(bmp, SkinGateConfig())
-                        liveGateResult = gate
-                        canCapture = gate.accepted
-                    } catch (t: Throwable) {
-                        Log.e("SkinGate", "Analyzer error", t)
-                        canCapture = false
-                    } finally {
+                    // 1) throttle: skip frames if we analyzed too recently
+                    val now = System.currentTimeMillis()
+                    if (now - lastAnalyzeMs < minGapMs || analyzing) {
                         proxy.close()
+                        return@setAnalyzer
+                    }
+                    lastAnalyzeMs = now
+                    analyzing = true
+
+                    try {
+                        // 2) Copy out what you need FAST, then close the frame ASAP
+                        //    If your toBitmapFast() needs the proxy alive, do a very quick copy.
+                        val bmp: Bitmap = try {
+                            proxy.toBitmapFast()
+                        } catch (t: Throwable) {
+                            Log.e("SkinGate", "toBitmapFast failed", t)
+                            // ensure UI updates don’t say “ready”
+                            canCapture = false
+                            return@setAnalyzer
+                        } finally {
+                            // Always free the camera buffer
+                            proxy.close()
+                        }
+
+                        // 3) Do heavier work off the analyzer thread
+                        scope.launch(Dispatchers.Default) {
+                            try {
+                                val gate = analyzeImageForSkin(bmp, SkinGateConfig())
+                                withContext(Dispatchers.Main) {
+                                    liveGateResult = gate
+                                    canCapture = gate.accepted
+                                }
+                            } catch (t: Throwable) {
+                                Log.e("SkinGate", "Analyzer error", t)
+                                withContext(Dispatchers.Main) {
+                                    canCapture = false
+                                }
+                            } finally {
+                                analyzing = false
+                            }
+                        }
+                    } catch (t: Throwable) {
+                        // Any unexpected issue → don’t block the stream
+                        Log.e("SkinGate", "Analyzer outer error", t)
+                        canCapture = false
+                        analyzing = false
+                        // proxy already closed in the finally above
                     }
                 }
+
             }
 
         try {
@@ -258,6 +316,7 @@ private fun DermaTakePhotoScreenContent(
                 .background(Color(0xFFCDFFFF)),
             contentAlignment = Alignment.Center
         ) {
+            // 📸 Camera button (center) — with emulator/demo fallback
             val canShoot = canCapture
             val enabledColor = Color(0xFF0097A7)
             val disabledColor = Color(0xFFBDBDBD)
@@ -327,6 +386,7 @@ private fun DermaTakePhotoScreenContent(
                 )
             }
 
+
             // flash toggle
             Row(
                 modifier = Modifier
@@ -395,6 +455,7 @@ private fun DermaTakePhotoScreenContent(
                 }
             }
 
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -412,9 +473,33 @@ private fun DermaTakePhotoScreenContent(
                         }
                     }
                     inferenceResult != null -> {
+
+
                         val r = inferenceResult!!
                         val pPct = r.probability * 100f
                         val alerted = r.probability >= 0.0112f
+
+                        if (isDerma) {
+                            val risk = computeRisk(r.probability)
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                PillBadge(
+                                    text = "Prediction: $modelFlag",
+                                    fg = if (modelFlag == "Benign") Color(0xFF126E3A) else Color(0xFF8A1C1C),
+                                    bg = if (modelFlag == "Benign") Color(0xFFDFFCEB) else Color(0xFFFFE4E4)
+                                )
+                                Spacer(Modifier.width(10.dp))
+
+                                PillBadge(text = "Risk: ${risk.label}", fg = risk.fg, bg = risk.bg)
+                                Spacer(Modifier.width(10.dp))
+                                PillBadge(text = formatProb(r.probability), fg = Color(0xFF1B3B3B), bg = Color(0xFFE6FFFF))
+                            }}
+
 
                         // build possible conditions (same rule-set you used before)
                         val idsToShow: List<String> = if (!alerted) {
@@ -435,10 +520,11 @@ private fun DermaTakePhotoScreenContent(
                             camBitmap = r.heatmap,
                             title = "Result",
                             timestamp = nowTimestamp(),
-                            riskTitle = "Prediction:",
+                            riskTitle = "Result:",
                             riskDescription = modelFlag,     // just show Benign/Malignant here
                             prediction = modelFlag,
                             probability = r.probability,
+                            isDerma = isDerma,
                             showPrimaryButtons = false,
                             showSecondaryActions = false,
                             onImageClick = { page -> fullImagePage = page }, // 0=photo, 1=heatmap
@@ -495,14 +581,22 @@ private fun DermaTakePhotoScreenContent(
         }
     }
 }
+@Composable
+fun PillBadge(
+    text: String,
+    fg: Color,
+    bg: Color,
+    modifier: Modifier = Modifier
+) {
+    Text(
+        text = text,
+        color = fg,
+        style = MaterialTheme.typography.bodyMedium.copy(
+            fontWeight = FontWeight.Bold
+        ),
+        modifier = modifier
+            .background(bg, CircleShape)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+    )
+}
 
-/* ============== NOTE ==============
- * This file assumes the following already exist in your project (they do, from your user screen):
- *  - CameraPermissionGate(...) composable (import from your user screen’s package)
- *  - LesionCaseTemplate(...)
- *  - LesionIds.benignIds / lt30Ids / lt60Ids / lt80Ids / gte80Ids
- *  - util functions: rotateBitmapAccordingToExif, mapViewRectToImageSquare, toBitmapFast, overlayBitmaps
- *  - TfLiteService + DermtectResult
- * If any live under different packages, just adjust the imports above.
- * No saving, no Firestore, no PDFs here.
- */

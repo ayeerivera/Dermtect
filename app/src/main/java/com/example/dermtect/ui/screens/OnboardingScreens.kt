@@ -47,6 +47,41 @@ import com.example.dermtect.ui.components.ProgressIndicator
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import com.example.dermtect.data.OnboardingPrefs
+import android.os.Build
+import com.example.dermtect.R
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import coil.disk.DiskCache
+import coil.memory.MemoryCache
+import coil.decode.ImageDecoderDecoder
+import androidx.compose.runtime.*
+
+@Composable
+private fun rememberGifImageLoader(): ImageLoader {
+    val context = LocalContext.current
+    return remember {
+        ImageLoader.Builder(context)
+            .components {
+                if (Build.VERSION.SDK_INT >= 28) {
+                    add(ImageDecoderDecoder.Factory())
+                } else {
+                    add(GifDecoder.Factory())
+                }
+            }
+            .crossfade(false)
+            .diskCache(
+                DiskCache.Builder()
+                    .directory(context.cacheDir.resolve("coil_gif_cache"))
+                    .build()
+            )
+            .memoryCache(
+                MemoryCache.Builder(context)
+                    .maxSizePercent(0.25)
+                    .build()
+            )
+            .build()
+    }
+}
 
 
 @Composable
@@ -57,15 +92,23 @@ fun OnboardingScreen(
     buttonText: String = "Next",
     onNextClick: () -> Unit,
     currentIndex: Int? = null,
-    onBackClick: (() -> Unit)? = null
+    onBackClick: (() -> Unit)? = null,
+    nextImageRes: Int? = null,
 ) {
     val context = LocalContext.current
-    val imageLoader = ImageLoader.Builder(context)
-        .components {
-            add(GifDecoder.Factory())
-        }
-        .build()
+    val imageLoader = rememberGifImageLoader()
 
+    LaunchedEffect(nextImageRes) {
+        nextImageRes?.let { res ->
+            imageLoader.enqueue(
+                ImageRequest.Builder(context)
+                    .data(res)
+                    .allowHardware(false)
+                    .size(280)
+                    .build()
+            )
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -102,12 +145,14 @@ fun OnboardingScreen(
                 AsyncImage(
                     model = ImageRequest.Builder(context)
                         .data(imageRes)
+                        .allowHardware(false)
+                        .size(280)                 // decode to display size
                         .build(),
                     imageLoader = imageLoader,
                     contentDescription = null,
-                    modifier = Modifier
-                        .size(280.dp)
+                    modifier = Modifier.size(280.dp)
                 )
+
                 Spacer(modifier = Modifier.height(60.dp))
                 Text(
                     text = title,
@@ -240,7 +285,8 @@ fun OnboardingScreen1(navController: NavController) {
         title = "Welcome to DermTect!",
         description = "Your AI-powered tool for early skin health checks.",
         onNextClick = { navController.navigate("onboarding_screen2") },
-        currentIndex = 0
+        currentIndex = 0,
+        nextImageRes = R.drawable.onboarding_2
     )
 }
 
@@ -253,7 +299,8 @@ fun OnboardingScreen2(navController: NavController) {
         description = "Take a photo, answer quick questions, and see instant insights.",
         onNextClick = { navController.navigate("onboarding_screen3") },
         onBackClick = { navController.popBackStack() }, // ✅ back to previous
-        currentIndex = 1
+        currentIndex = 1,
+        nextImageRes = R.drawable.skin_health
     )
 }
 
@@ -280,7 +327,8 @@ fun OnboardingScreen3(navController: NavController) {
             }
         },
         onBackClick = { navController.popBackStack() }, // ✅ back to previous
-        currentIndex = 2
+        currentIndex = 2,
+        nextImageRes = null
     )
 }
 

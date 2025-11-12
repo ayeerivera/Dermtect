@@ -120,6 +120,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
     // Gson
     implementation("com.google.code.gson:gson:2.10.1")
+    implementation(libs.androidx.foundation)
 
     // Testing
     testImplementation(libs.junit)
