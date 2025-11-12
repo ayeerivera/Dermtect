@@ -90,7 +90,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.example.dermtect.ui.tutorial.TutorialManager
 import kotlinx.coroutines.launch
 import android.graphics.Color as AColor
-
+import com.example.dermtect.ui.screens.DermaTakePhotoScreen
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -361,12 +361,24 @@ class MainActivity : ComponentActivity() {
                         DermaHomeScreen(
                             navController = navController,
                             onPendingCasesClick = { navController.navigate("pending_cases") },
-                            onTotalCasesClick = { navController.navigate("case_history") },
-                            onNotifClick = { navController.navigate("notifications") },
-                            onSettingsClick = { navController.navigate("derma_settings") },
-                            firstName = firstName
+                            onTotalCasesClick   = { navController.navigate("case_history") },
+                            onNotifClick        = { navController.navigate("notifications") },
+                            onSettingsClick     = { navController.navigate("derma_settings") },
+                            firstName           = firstName,
+                            onCameraClick       = {
+                                navController.navigate("derma_take_photo") {
+                                    launchSingleTop = true
+                                    restoreState = false
+                                    popUpTo("derma_home") { inclusive = false }
+                                }
+                            }
                         )
                     }
+
+                    composable("derma_take_photo") {
+                        DermaTakePhotoScreen(onBackClick = { navController.popBackStack() })
+                    }
+
                     composable(
                         "derma_assessment_screen/{caseJson}",
                         arguments = listOf(navArgument("caseJson") { type = NavType.StringType })

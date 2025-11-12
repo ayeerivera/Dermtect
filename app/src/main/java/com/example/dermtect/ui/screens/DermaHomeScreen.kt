@@ -2,15 +2,19 @@ package com.example.dermtect.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -29,6 +33,7 @@ fun DermaHomeScreen(
     onTotalCasesClick: () -> Unit,
     onNotifClick: () -> Unit,
     onSettingsClick: () -> Unit,
+    onCameraClick: () -> Unit,
     firstName: String
 ) {
     fun indicatorColorOf(result: String?, status: String?): Color = when {
@@ -145,7 +150,9 @@ fun DermaHomeScreen(
             Spacer(modifier = Modifier.height(60.dp)) // bottom nav spacing
         }
 
-        BottomNavBar(onSettingsClick = onSettingsClick)
+        BottomNavBar(
+            onSettingsClick = onSettingsClick,
+            onCameraClick = onCameraClick)
     }
 }
 
@@ -240,29 +247,47 @@ fun StatCard(
 
 @Composable
 fun BottomNavBar(
-    onSettingsClick: () -> Unit = {}
+    onSettingsClick: () -> Unit = {},
+    onCameraClick: () -> Unit = {}
 ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(72.dp)
             .background(Color.White)
     ) {
+        // The bar itself (gradient like user’s)
         Surface(
-            color = Color(0xFFCDFFFF),
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
+                .shadow(
+                    elevation = 8.dp,
+                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+                    clip = false
+                )
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xFFBFFDFD),
+                            Color(0xFF88E7E7),
+                            Color(0xFF55BFBF)
+                        )
+                    ),
+                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+                ),
+            color = Color.Transparent,
+            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+            tonalElevation = 0.dp
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(60.dp)
-                    .padding(horizontal = 32.dp),
-                horizontalArrangement = Arrangement.spacedBy(200.dp, Alignment.CenterHorizontally),
+                    .height(74.dp)
+                    .padding(horizontal = 65.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // left & right icons (leave center empty for the floating camera)
                 Image(
                     painter = painterResource(id = R.drawable.home_vector),
                     contentDescription = "Home",
@@ -277,5 +302,54 @@ fun BottomNavBar(
                 )
             }
         }
+
+        // Floating camera button (centered, overlapping the bar)
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .offset(y = (-28).dp)
+                .size(70.dp)
+                .shadow(
+                    elevation = 6.dp,
+                    shape = CircleShape,
+                    clip = false
+                )
+                .background(
+                    color = Color(0xFFCDFFFF),
+                    shape = CircleShape
+                )
+                .border(
+                    width = 1.dp,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xFFBFFDFD),
+                            Color(0xFF88E7E7),
+                            Color(0xFF41A6A6)
+                        )
+                    ),
+                    shape = CircleShape
+                )
+                .border(
+                    width = 5.dp,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xFFBFFDFD),
+                            Color(0xFF88E7E7),
+                            Color(0xFF55BFBF)
+                        )
+                    ),
+                    shape = CircleShape
+                )
+                .padding(5.dp)
+                .clickable { onCameraClick() },
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.camera_fill), // or camera_vector
+                contentDescription = "Camera",
+                modifier = Modifier.size(30.dp)
+            )
+        }
     }
 }
+
