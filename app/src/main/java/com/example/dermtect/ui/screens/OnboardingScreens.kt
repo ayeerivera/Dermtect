@@ -83,7 +83,6 @@ private fun rememberGifImageLoader(): ImageLoader {
     }
 }
 
-
 @Composable
 fun OnboardingScreen(
     imageRes: Int,
@@ -114,46 +113,46 @@ fun OnboardingScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White),
-        contentAlignment = Alignment.Center
-    )
-    {
-        // ✅ Place BackButton at top start if provided
+    ) {
+        // ✅ Back button on top of everything
         if (onBackClick != null) {
             BackButton(
                 onClick = onBackClick,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(top = 50.dp, start = 24.dp)
-
             )
         }
 
-
+        // ✅ Main content column: top scrollable, bottom fixed
         Column(
             modifier = Modifier
-                .fillMaxSize(0.9f)
-                .padding(20.dp),
+                .fillMaxSize()
+                .padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween,
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
+            // TOP: image + texts (scrollable, takes remaining height)
             Column(
                 modifier = Modifier
-                    .padding(top = 70.dp)
-                    .verticalScroll(rememberScrollState()), // Add scroll support
+                    .weight(1f)
+                    .padding(top = 80.dp) // some top spacing below status bar
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 AsyncImage(
                     model = ImageRequest.Builder(context)
                         .data(imageRes)
                         .allowHardware(false)
-                        .size(280)                 // decode to display size
+                        .size(280)
                         .build(),
                     imageLoader = imageLoader,
                     contentDescription = null,
                     modifier = Modifier.size(280.dp)
                 )
 
-                Spacer(modifier = Modifier.height(60.dp))
+                Spacer(modifier = Modifier.height(40.dp))
+
                 Text(
                     text = title,
                     style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold),
@@ -161,9 +160,7 @@ fun OnboardingScreen(
                     textAlign = TextAlign.Center
                 )
 
-
-                Spacer(modifier = Modifier.height(20.dp))
-
+                Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
                     text = description,
@@ -171,13 +168,13 @@ fun OnboardingScreen(
                     color = Color(0xFF1D1D1D),
                     textAlign = TextAlign.Center
                 )
-
-
             }
+
+            // BOTTOM: dots + button (fixed, always visible)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 70.dp),
+                    .padding(bottom = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 if (currentIndex != null) {
@@ -186,13 +183,15 @@ fun OnboardingScreen(
                         selectedIndex = currentIndex
                     )
                 }
-                Spacer(modifier = Modifier.height(40.dp))
+
+                Spacer(modifier = Modifier.height(24.dp))
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(0.9f)
                         .height(56.dp)
                         .shadow(
-                            elevation = 10.dp, // outer shadow strength
+                            elevation = 10.dp,
                             shape = RoundedCornerShape(15.dp),
                             clip = false
                         )
@@ -201,7 +200,7 @@ fun OnboardingScreen(
                         onClick = onNextClick,
                         modifier = Modifier.matchParentSize(),
                         shape = RoundedCornerShape(15.dp),
-                        elevation = ButtonDefaults.buttonElevation(0.dp), // disable default button shadow
+                        elevation = ButtonDefaults.buttonElevation(0.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color.Transparent,
                             contentColor = Color.White
@@ -211,7 +210,6 @@ fun OnboardingScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                // Background gradient
                                 .background(
                                     brush = Brush.linearGradient(
                                         colors = listOf(
@@ -224,7 +222,6 @@ fun OnboardingScreen(
                                     ),
                                     shape = RoundedCornerShape(15.dp)
                                 )
-                                // Emboss border
                                 .border(
                                     width = 1.dp,
                                     brush = Brush.linearGradient(
@@ -237,13 +234,12 @@ fun OnboardingScreen(
                                     ),
                                     shape = RoundedCornerShape(15.dp)
                                 )
-                                // Inner shine overlay
                                 .drawWithContent {
                                     drawContent()
                                     drawRoundRect(
                                         brush = Brush.verticalGradient(
                                             colors = listOf(
-                                                Color.White.copy(alpha = 0.15f), // lowered a bit
+                                                Color.White.copy(alpha = 0.15f),
                                                 Color.Transparent
                                             )
                                         ),
@@ -268,8 +264,6 @@ fun OnboardingScreen(
                         }
                     }
                 }
-
-
             }
         }
     }
