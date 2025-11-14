@@ -621,7 +621,7 @@ fun TakePhotoScreen(
                             },
                             onDownloadClick = {
                                 coroutineScope.launch {
-                                    // Gate: questionnaire complete?
+                                    // 1) Gate: questionnaire complete?
                                     val qa = existingAnswers
                                     val notCompleted = (qa == null) || (qa.size != questions.size) || qa.any { it == null }
                                     if (notCompleted) {
@@ -629,11 +629,13 @@ fun TakePhotoScreen(
                                         return@launch
                                     }
 
+                                    // 2) Ensure we have a photo
                                     val photo = capturedImage ?: run {
                                         Toast.makeText(context, "No photo available for PDF.", Toast.LENGTH_SHORT).show()
                                         return@launch
                                     }
 
+                                    // 3) Ensure signed in
                                     val userId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
                                     if (userId == null) {
                                         Toast.makeText(context, "You must be signed in to export.", Toast.LENGTH_SHORT).show()
@@ -641,14 +643,14 @@ fun TakePhotoScreen(
                                     }
 
                                     try {
-                                        // Build answers
+                                        // 4) Build answers (Q → Yes/No)
                                         val answerPairs: List<Pair<String, String>> =
                                             questions.indices.map { i ->
                                                 val a = qa!![i] ?: false
                                                 questions[i] to if (a) "Yes" else "No"
                                             }
 
-                                        // Fetch user profile fields (name, birthday)
+                                        // 5) Fetch user profile (same idea as LesionCaseScreen)
                                         val userSnap = FirebaseFirestore.getInstance()
                                             .collection("users")
                                             .document(userId)
@@ -656,20 +658,21 @@ fun TakePhotoScreen(
                                             .await()
 
                                         val first = userSnap.getString("firstName").orEmpty()
-                                        val last = userSnap.getString("lastName").orEmpty()
+                                        val last  = userSnap.getString("lastName").orEmpty()
                                         val birthdayStr = userSnap.getString("birthday") // may be null
 
-                                        val fullName = listOf(first, last).filter { it.isNotBlank() }.joinToString(" ")
+                                        val fullName = listOf(first, last)
+                                            .filter { it.isNotBlank() }
+                                            .joinToString(" ")
+                                            .ifBlank { "—" }
 
-                                        // Compute the *short* code ONLY for the PDF:
-                                        // Prefer the actually saved case id (reservedCaseId), else your temp reportCode,
-                                        // else just use PdfExporter.shortReportFrom(null, "TEMP0")
+                                        // 6) Compute *short* report code for PDF only
                                         val shortCode: String = PdfExporter.shortReportFrom(
-                                            caseId = reservedCaseId ?: reportCode,   // could be null; helper handles it
+                                            caseId = reservedCaseId ?: reportCode,
                                             fallback = "TEMP0"
                                         )
 
-                                        // Make the conditions list exactly like in UI
+                                        // 7) Possible conditions list (same logic you already had)
                                         val prob = inferenceResult?.probability ?: 0f
                                         val pPct = prob * 100f
                                         val alerted = prob >= 0.0112f
@@ -685,7 +688,7 @@ fun TakePhotoScreen(
                                             }
                                         }
 
-                                        // Friendly summary text for the PDF
+                                        // 8) Friendly summary text for PDF
                                         val pdfSummary = if (!alerted) {
                                             "This scan looks reassuring, with a very low likelihood of a serious issue. " +
                                                     "You can continue your normal skincare routine. Just keep being mindful of your skin and how it changes over time."
@@ -699,9 +702,9 @@ fun TakePhotoScreen(
                                             }
                                         }
 
-                                        // Build PDF data with the SHORT code
+                                        // 9) Build PDF data (like LesionCaseScreen, but using current scan)
                                         val data = PdfExporter.CasePdfData(
-                                            reportId = shortCode,             // ⬅️ only short code goes into the PDF
+                                            reportId = shortCode,
                                             title = "Result",
                                             userFullName = fullName,
                                             birthday = birthdayStr,
@@ -713,13 +716,11 @@ fun TakePhotoScreen(
                                             answers = answerPairs
                                         )
 
-                                        // Create + (optionally) upload + write index. If you only want local file, call createCasePdf + openPdf.
+                                        // 10) LOCAL-ONLY PDF (no Firebase upload here – same as LesionCaseScreen)
                                         val localUri = withContext(Dispatchers.IO) {
-                                            PdfExporter.saveReportAndPdf(
+                                            PdfExporter.createCasePdf(
                                                 context = context,
-                                                userId = userId,
-                                                baseData = data,
-                                                uploadPdfToStorage = true
+                                                data = data
                                             )
                                         }
 
@@ -728,7 +729,11 @@ fun TakePhotoScreen(
 
                                     } catch (t: Throwable) {
                                         Log.e("TakePhotoScreen", "PDF export failed", t)
-                                        Toast.makeText(context, "Failed to create PDF: ${t.message ?: "Unknown error"}", Toast.LENGTH_LONG).show()
+                                        Toast.makeText(
+                                            context,
+                                            "Failed to create PDF: ${t.message ?: "Unknown error"}",
+                                            Toast.LENGTH_LONG
+                                        ).show()
                                     }
                                 }
                             },
