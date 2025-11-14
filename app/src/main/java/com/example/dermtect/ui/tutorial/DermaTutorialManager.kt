@@ -29,10 +29,10 @@ class DermaTutorialManager : TutorialManager() {
             "search_bar",
             "Quickly find a case by entering its Report ID in the search bar."
         ),
-        TutorialStep(
-            "pending_cases_highlight",
-            "Your newest pending case appears here for quick access."
-        ),
+//        TutorialStep(
+//            "pending_cases_highlight",
+//            "Your newest pending case appears here for quick access."
+//        ),
         TutorialStep(
             "camera_scanner",
             "Capture a lesion photo for assessment."

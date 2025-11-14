@@ -387,13 +387,33 @@ class MainActivity : ComponentActivity() {
                         DermaTakePhotoScreen(onBackClick = { navController.popBackStack() })
                     }
 
-                    composable("derma_assessment/{caseId}") { backStackEntry ->
-                        val caseId = backStackEntry.arguments?.getString("caseId")!!
+                    composable(
+                        route = "DermaAssessmentScreenReport/{caseId}?startEdit={startEdit}",
+                        arguments = listOf(
+                            navArgument("caseId") { type = NavType.StringType },
+                            navArgument("startEdit") {
+                                type = NavType.BoolType
+                                defaultValue = false
+                            }
+                        )
+                    ) { backStackEntry ->
+                        val caseId = backStackEntry.arguments?.getString("caseId") ?: ""
+                        val startEdit = backStackEntry.arguments?.getBoolean("startEdit") ?: false
+
                         DermaAssessmentScreenReport(
                             caseId = caseId,
-                            onBackClick = { navController.popBackStack() }
+                            startInEditMode = startEdit,
+                            onBackClick = {
+                                // 🔔 tell the previous screen it should refresh
+                                navController.previousBackStackEntry
+                                    ?.savedStateHandle
+                                    ?.set("refresh_history", true)
+
+                                navController.popBackStack()
+                            }
                         )
                     }
+
 
 //                    composable(
 //                        "derma_assessment_screen/{caseJson}",

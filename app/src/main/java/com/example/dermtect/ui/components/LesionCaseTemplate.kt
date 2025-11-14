@@ -730,7 +730,7 @@ fun generateTherapeuticMessage(
     // --- Copy ---
     if (!alerted) {
         return "This scan looks reassuring, with a very low likelihood of a serious issue. " +
-                "You can continue your normal skincare routine. Just keep being mindful of your skin and how it changes over time." +
+                "You can continue your normal skincare routine. Just keep being mindful of your skin and how it changes over time."+
                 possibleBlock
     }
     val base = when {

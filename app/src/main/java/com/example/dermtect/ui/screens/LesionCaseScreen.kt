@@ -256,14 +256,15 @@ fun LesionCaseScreen(
 
                                 // 8) Compact summary text (no bullets; bullets come from possibleConditions)
                                 val pdfSummary = if (!alerted) {
-                                    "This scan looks reassuring, with a very low likelihood of a serious issue."
+                                    "This scan looks reassuring, with a very low likelihood of a serious issue. " +
+                                            "You can continue your normal skincare routine. Just keep being mindful of your skin and how it changes over time."
                                 } else {
                                     when {
-                                        pPct < 10f -> "Very low chance of concern. Casual self-checks are enough."
-                                        pPct < 30f -> "Low chance of concern. Keep an eye on changes."
-                                        pPct < 60f -> "Minor concern. Consider discussing with a doctor."
-                                        pPct < 80f -> "Moderate concern. We recommend a dermatologist visit."
-                                        else       -> "Higher concern. Please visit a dermatologist soon."
+                                        pPct < 10f -> "Your result shows a very low chance of concern. This is reassuring, and there’s no need to worry. It may help to simply check your skin from time to time, just to stay aware of any changes."
+                                        pPct < 30f -> "Your result suggests only a low chance of concern. Everything appears fine. We encourage you to casually observe your skin every now and then, and let a doctor know if you notice something different."
+                                        pPct < 60f -> "We noticed some minor concern in your skin. This does not mean there is a serious issue, but talking with a doctor could provide peace of mind and helpful guidance."
+                                        pPct < 80f -> "Your result shows some concern. To better understand this, we recommend scheduling a skin check with a dermatologist. They can give you clearer answers and reassurance."
+                                        else       -> "Your result shows a higher level of concern. For your safety and peace of mind, we encourage you to visit a dermatologist soon so you can receive proper care and support."
                                     }
                                 }
 

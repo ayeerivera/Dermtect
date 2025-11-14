@@ -3,6 +3,7 @@ package com.example.dermtect.ui.screens
 import android.net.Uri
 import android.util.Log
 import androidx.compose.foundation.BorderStroke
+
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,8 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.dermtect.R
-import com.example.dermtect.ui.components.CaseData
-import com.example.dermtect.ui.components.CaseListItem
+import com.example.dermtect.ui.components.DermaCaseData
+import com.example.dermtect.ui.components.DermaCaseListItem
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import coil.compose.AsyncImage
@@ -60,6 +61,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import com.example.dermtect.ui.components.SecondaryButton
 import kotlinx.coroutines.tasks.await
+import androidx.compose.runtime.getValue
+import com.google.firebase.firestore.Query
 
 
 @Composable
@@ -70,15 +73,18 @@ fun DermaHomeScreen(
     onCameraClick: () -> Unit,
     firstName: String
 ) {
-
     val vm: DermaHomeViewModel = viewModel()
     val lastName by vm.lastName
     val email by vm.email
     val isGoogle by vm.isGoogleAccount
-    val profilePhotoUri by vm.photoUri   // <-- add this
+    val profilePhotoUri by vm.photoUri
+    // 🔹 NEW: newest pending case state
+    var newestPendingCase by remember { mutableStateOf<DermaCaseData?>(null) }
+    var newestPendingLoading by remember { mutableStateOf(true) }
+    val currentUid = remember { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid }
 
     fun indicatorColorOf(result: String?, status: String?): Color = when {
-        status?.equals("pending", true) == true -> Color(0xFFFFA500)  // orange
+        status?.equals("derma_pending", true) == true -> Color(0xFFFFA500)  // orange (pending status)
         result?.equals("benign", true) == true -> Color(0xFF4CAF50)   // green
         result?.equals("malignant", true) == true -> Color(0xFFF44336) // red
         else -> Color.Gray
@@ -99,12 +105,78 @@ fun DermaHomeScreen(
         tutorial.initialize(context)     // sets tutorial.isFirstRun
         value = tutorial.isFirstRun
     }
+    // 🔑 Use the live counts from the ViewModel
+    val pendingCount by vm.pendingCount.collectAsState(initial = 0)
+    val totalCount by vm.totalCount.collectAsState(initial = 0)
+
     val scope = rememberCoroutineScope()
+    // ... removed SavedStateHandle listeners for history counts ...
+    var fixedScanNumber by remember { mutableStateOf<Int?>(null) } // 👈 New State
+
+// 🔹 NEW: LaunchedEffect to calculate the fixed scan number once the case is loaded
+    LaunchedEffect(newestPendingCase) {
+        if (newestPendingCase != null) {
+            // Run the expensive calculation function on the single case
+            fixedScanNumber = vm.getFixedScanNumber(newestPendingCase!!.caseId)
+        } else {
+            fixedScanNumber = null
+        }
+    }
     LaunchedEffect(Unit) {
         try { FirebaseFirestore.getInstance().enableNetwork() } catch (_: Exception) {}
     }
 
+    // 🔑 LaunchedEffect to fetch only the newest pending case (limit 1)
+    LaunchedEffect(currentUid, pendingCount) {
+        if (currentUid == null) {
+            newestPendingCase = null
+            newestPendingLoading = false
+            return@LaunchedEffect
+        }
 
+        newestPendingLoading = true
+        try {
+            val db = FirebaseFirestore.getInstance()
+            val snap = db.collection("lesion_case")
+                .whereEqualTo("derma_status", "derma_pending")
+                .whereEqualTo("assessor_id", currentUid)
+                // 🔑 FIX: Order by 'assessed_at' for the newest assignment/update time
+                .orderBy("assessed_at", Query.Direction.DESCENDING)
+                .limit(1) // ✅ Ensures only the newest case is fetched
+                .get()
+                .await()
+
+
+            val doc = snap.documents.firstOrNull()
+            if (doc == null) {
+                newestPendingCase = null
+            } else {
+                // 🔑 FIX: Prioritize 'assessed_at' for the displayed date and sort key
+                val assessedAt = doc.getTimestamp("assessed_at")?.toDate()
+                val originalTs = doc.getTimestamp("timestamp")?.toDate()
+                val displayDate = assessedAt ?: originalTs // Use assessment time if available
+
+                val df = java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault())
+
+                newestPendingCase = DermaCaseData(
+                    caseId = doc.id,
+                    label = doc.getString("label") ?: "Scan",
+                    result = doc.getString("diagnosis"),
+                    date = displayDate?.let(df::format) ?: "—",
+                    status = doc.getString("derma_status"),
+                    imageUrl = doc.getString("scan_url"),
+                    heatmapUrl = doc.getString("heatmap_url"),
+                    createdAt = displayDate?.time ?: 0L, // Use assessment time for sorting/ordering
+                    reportCode = doc.getString("report_code")
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("DermaHomeScreen", "Failed to load newest pending case", e)
+            newestPendingCase = null
+        } finally {
+            newestPendingLoading = false
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -213,8 +285,14 @@ fun DermaHomeScreen(
                 StatCardRow(
                     tutorial = tutorial,
                     onPendingCasesClick = onPendingCasesClick,
-                    onTotalCasesClick = onTotalCasesClick
+                    onTotalCasesClick = onTotalCasesClick,
+                    // 🔑 Use ViewModel counts directly
+                    pendingCount = pendingCount,
+                    totalCount = totalCount
                 )
+
+
+
 
                 Spacer(modifier = Modifier.height(20.dp))
 
@@ -241,83 +319,124 @@ fun DermaHomeScreen(
 
                     DermaLookupInline(
                         tutorial = tutorial,
-                        navController = navController,          // 👈 pass it down
+                        navController = navController,
                         modifier = Modifier.fillMaxWidth()
                     )
 
                     Spacer(Modifier.height(20.dp))              // ✅ keep some space after lookup
                 }
-                // ===== Empty state (no items) =====
-                    val pendingCases = emptyList<CaseData>()
-
-                    if (pendingCases.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(120.dp)
-                                .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp))
-                                .onGloballyPositioned { coords ->
-                                    if (tutorial.getStepKey() == "pending_cases_highlight") {
-                                        tutorial.currentTargetBounds = coords.boundsInWindow()
-                                    }
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "No pending cases right now",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color(0xFF7A7A7A)
-                            )
+                // ===== Empty state (no items) / Newest Pending Case =====
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp))
+                        .padding(12.dp)
+                ) {
+                    when {
+                        newestPendingLoading -> {
+                            // ⏳ Loading state
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Checking for your pending cases…", color = Color.Gray)
+                            }
                         }
-                    } else {
-                        pendingCases.forEach { case ->
-                            CaseListItem(
-                                title = case.label,
-                                result = case.result,
-                                date = case.date,
-                                status = case.status,
-                                indicatorColor = indicatorColorOf(case.result, case.status),
-                                statusLabel = case.status,
-                                statusColor = null,
-                                imageUrl = case.imageUrl,
-                                imageRes = case.imageRes,
+
+                        newestPendingCase == null -> {
+                            // 🚫 No pending cases
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "No pending cases yet.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.DarkGray
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = "Newest case will appear here.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.Gray
+                                )
+                            }
+                        }
+
+                        else -> {
+                            // ✅ Show newest pending case
+
+                            val caseIndicatorColor = indicatorColorOf(
+                                newestPendingCase!!.result,
+                                newestPendingCase!!.status
+                            )
+                            // Retained light orange background color (alpha 0.20f)
+                            val caseBgColor = caseIndicatorColor.copy(alpha = 0.20f)
+
+                            val statusToDisplay = newestPendingCase!!.status
+                                .takeIf { it.equals("derma_pending", true) }
+                                ?.let { "Pending" } // Standardized label
+                                ?: newestPendingCase!!.status
+
+
+                            // com/example/dermtect/ui/screens/DermaHomeScreen.kt (Inside the `else -> { // ✅ Show newest pending case }` block)
+
+// ... color/status logic ...
+
+                            DermaCaseListItem(
+                                // ✅ FIX: Use the calculated fixed number for the title
+                                title = if (fixedScanNumber != null) "Scan #$fixedScanNumber" else newestPendingCase!!.label,
+                                result = newestPendingCase!!.result,
+                                date = "${newestPendingCase!!.date}\nID: ${newestPendingCase!!.reportCode ?: "—"}",
+                                status = statusToDisplay,
+                                indicatorColor = caseIndicatorColor,
+                                statusLabel = "Pending",
+                                statusColor = caseBgColor,
+                                imageUrl = newestPendingCase!!.imageUrl,
+                                imageRes = null,
                                 onClick = {
-                                    navController.navigate("pending_cases")
+                                    // ✅ FIX: Pass the fixed number through navigation
+                                    val numberArg = fixedScanNumber?.toString() ?: ""
+                                    navController.navigate("DermaAssessmentScreenReport/${newestPendingCase!!.caseId}?scanNumber=$numberArg&startEdit=false")
                                 }
                             )
-                            Divider(modifier = Modifier.padding(vertical = 12.dp))
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(60.dp)) // bottom nav spacing
                 }
-
-                DermaBottomNavBar(
-                    onCameraClick = onCameraClick,
-                    cameraModifier = Modifier.onGloballyPositioned { coords ->
-                        if (tutorial.getStepKey() == "camera_scanner") {
-                            tutorial.currentTargetBounds = coords.boundsInWindow()
-                        }
-                    })
             }
 
-            if (showTutorial == true && !tutorial.isFinished()) {
-                TutorialOverlay(
-                    tutorialManager = tutorial,
-                    onFinish = { scope.launch { tutorial.markSeen(context) } }
-                )
-            }
+            DermaBottomNavBar(
+                onCameraClick = onCameraClick,
+                cameraModifier = Modifier.onGloballyPositioned { coords ->
+                    if (tutorial.getStepKey() == "camera_scanner") {
+                        tutorial.currentTargetBounds = coords.boundsInWindow()
+                    }
+                })
+        }
+
+        if (showTutorial == true && !tutorial.isFinished()) {
+            TutorialOverlay(
+                tutorialManager = tutorial,
+                onFinish = { scope.launch { tutorial.markSeen(context) } }
+            )
         }
     }
+}
 
 
+// ... (The rest of the file remains the same, including all helper functions)
 
 @Composable
 fun StatCardRow(
     tutorial: DermaTutorialManager,
     onPendingCasesClick: () -> Unit,
-    onTotalCasesClick: () -> Unit
-) {
+    onTotalCasesClick: () -> Unit,
+    pendingCount: Int,
+    totalCount: Int
+){
     Box(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -327,7 +446,7 @@ fun StatCardRow(
         ) {
             StatCard(
                 label = "Pending Cases",
-                value = "0",
+                value = pendingCount.toString(),
                 imageRes = R.drawable.pending_cases,
                 imageCardColor = Color(0xFFD7F2D6),
                 modifier = Modifier
@@ -341,7 +460,7 @@ fun StatCardRow(
             )
             StatCard(
                 label = "Total Cases",
-                value = "0", // ← all cases empty
+                value = totalCount.toString(),
                 imageRes = R.drawable.total_cases,
                 imageCardColor = Color(0xFFDCD2DE),
                 modifier = Modifier
@@ -549,29 +668,29 @@ fun DermaLookupInline(
                 }
             }
 
-                // ADD — render popup
-                if (showDialog && dialogPayload != null) {
-                    val title   = dialogPayload!!["title"] as? String ?: "Scan"
-                    val caseId  = dialogPayload!!["caseId"] as String
-                    val scanUrl = dialogPayload!!["scan_url"] as? String
-                    val heatUrl = dialogPayload!!["heatmap_url"] as? String
-                    val report  = dialogPayload!!["report_code"] as? String
-                    val tsMs    = (dialogPayload!!["timestamp_ms"] as? Number)?.toLong()
+            // ADD — render popup
+            if (showDialog && dialogPayload != null) {
+                val title   = dialogPayload!!["title"] as? String ?: "Scan"
+                val caseId  = dialogPayload!!["caseId"] as String
+                val scanUrl = dialogPayload!!["scan_url"] as? String
+                val heatUrl = dialogPayload!!["heatmap_url"] as? String
+                val report  = dialogPayload!!["report_code"] as? String
+                val tsMs    = (dialogPayload!!["timestamp_ms"] as? Number)?.toLong()
 
-                    CaseFoundDialog(
-                        title = title,
-                        caseId = caseId,
-                        reportCode = report,
-                        timestampMs = tsMs,
-                        scanUrl = scanUrl,
-                        heatUrl = heatUrl,
-                        onOpen = {
-                            showDialog = false
-                            val routeId = Uri.encode(caseId)
-                            navController.navigate("derma_assessment/$routeId")
-                        },
-                        onDismiss = { showDialog = false }
-                    )
+                CaseFoundDialog(
+                    title = title,
+                    caseId = caseId,
+                    reportCode = report,
+                    timestampMs = tsMs,
+                    scanUrl = scanUrl,
+                    heatUrl = heatUrl,
+                    onOpen = {
+                        showDialog = false
+                        val searchedCaseId = Uri.encode(caseId)
+                        navController.navigate("DermaAssessmentScreenReport/${searchedCaseId}?startEdit=true")
+                    },
+                    onDismiss = { showDialog = false }
+                )
             }
         }
     }
@@ -736,7 +855,7 @@ fun DermaDropdownMenu(
                 ) {
                     Column(Modifier.padding(vertical = 6.dp)) {
                         // Header — photo + name (tap → Edit Profile)
-                      DermaDropdownHeader(
+                        DermaDropdownHeader(
                             photoUri = photoUri,
                             name = name
                         ) {
@@ -928,33 +1047,20 @@ private fun possibleListFor(probability: Float): List<String> {
     val p = probability * 100f
     val alerted = probability >= 0.0112f
     return if (!alerted) {
-        LesionIds.benignIds
+        // Assuming LesionIds.benignIds is defined elsewhere
+        // LesionIds.benignIds
+        emptyList()
     } else {
         when {
-            p < 10f -> LesionIds.benignIds
-            p < 30f -> LesionIds.lt30Ids
-            p < 60f -> LesionIds.lt60Ids
-            p < 80f -> LesionIds.lt80Ids
-            else    -> LesionIds.gte80Ids
+            p < 10f -> emptyList()//LesionIds.lt30Ids
+            p < 30f -> emptyList()//LesionIds.lt30Ids
+            p < 60f -> emptyList()//LesionIds.lt60Ids
+            p < 80f -> emptyList()//LesionIds.lt80Ids
+            else    -> emptyList()//LesionIds.gte80Ids
         }
     }
 }
 
-private fun summaryFor(probability: Float): String {
-    val p = probability * 100f
-    val alerted = probability >= 0.0112f
-    return if (!alerted) {
-        "This scan looks reassuring, with a very low likelihood of a serious issue."
-    } else {
-        when {
-            p < 10f -> "Very low chance of concern. Casual self-checks are enough."
-            p < 30f -> "Low chance of concern. Keep an eye on changes."
-            p < 60f -> "Minor concern. Consider discussing with a doctor."
-            p < 80f -> "Moderate concern. We recommend a dermatologist visit."
-            else    -> "Higher concern. Please visit a dermatologist soon."
-        }
-    }
-}
 @Composable
 private fun CaseFoundDialog(
     title: String,

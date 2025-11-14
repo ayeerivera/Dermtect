@@ -3,12 +3,41 @@ package com.example.dermtect.ui.viewmodel
 import android.net.Uri
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
+import androidx.compose.runtime.State
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import androidx.compose.runtime.State
-import com.example.dermtect.ui.components.DermaReport
-import com.google.firebase.Firebase
-import com.google.firebase.storage.storage
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import com.google.firebase.firestore.ListenerRegistration
+
+// 🔑 NEW IMPORTS FOR COROUTINES, FIRESTORE QUERY, AND DATE FORMATTING
+import androidx.lifecycle.viewModelScope
+import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.DocumentSnapshot
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Locale
+
+// ℹ️ Helper Data Classes (Assuming these are needed for internal ViewModel scope)
+// NOTE: CaseData should ideally be defined in a common file, e.g., ui.components
+data class DermaCaseData(
+    val caseId: String,
+    val label: String,
+    val result: String?,
+    val date: String,
+    val status: String?,
+    val imageUrl: String? = null,
+    val imageRes: Int? = null,
+    val createdAt: Long = 0,
+    val heatmapUrl: String? = null,
+    val reportCode: String? = null
+)
+
+data class IndexedCase(
+    val case: DermaCaseData,
+    val scanNumber: Int
+)
 
 data class DermaReport(
     val id: String = "",
@@ -19,6 +48,7 @@ data class DermaReport(
 )
 
 class DermaHomeViewModel : ViewModel() {
+    // --- Profile bits ---
     private val _firstName = mutableStateOf("")
     val firstName: State<String> = _firstName
 
@@ -34,45 +64,40 @@ class DermaHomeViewModel : ViewModel() {
     private val _photoUri = mutableStateOf<Uri?>(null)
     val photoUri: State<Uri?> = _photoUri
 
+    // --- Firestore / Auth handles ---
+    private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
+    private val uid: String? = FirebaseAuth.getInstance().currentUser?.uid
+
+    // --- Live listeners for counters ---
+    private var regCases: ListenerRegistration? = null
+
+    private val _pendingCount = MutableStateFlow(0)
+    val pendingCount: StateFlow<Int> = _pendingCount
+
+    private val _totalCount = MutableStateFlow(0)
+    val totalCount: StateFlow<Int> = _totalCount
+
     init {
+        android.util.Log.d("DermaVM", "uid=$uid")
+        fetchUserBits()
         loadProfilePhoto()
+        startCaseCounters()
     }
+
     private fun loadProfilePhoto() {
         val auth = FirebaseAuth.getInstance()
-        val uid = auth.currentUser?.uid ?: return
-
-        // If Google account has a photo:
-        auth.currentUser?.photoUrl?.let {
-            _photoUri.value = it
-        }
-
-        // Firestore "photoUrl" (must be HTTPS, not gs://)
-        FirebaseFirestore.getInstance().collection("users").document(uid)
+        val u = auth.currentUser ?: return
+        u.photoUrl?.let { _photoUri.value = it }
+        db.collection("users").document(u.uid)
             .get()
             .addOnSuccessListener { doc ->
-                val url = doc.getString("photoUrl") // store an https download URL here
-                if (!url.isNullOrBlank()) {
-                    _photoUri.value = Uri.parse(url)
-                }
+                val url = doc.getString("photoUrl")
+                if (!url.isNullOrBlank()) _photoUri.value = Uri.parse(url)
             }
     }
-
-    // If you saved a Firebase Storage PATH instead of https URL, use this:
-    fun resolveFromStoragePath(pathOrGsUrl: String) {
-        val ref = if (pathOrGsUrl.startsWith("gs://"))
-            Firebase.storage.getReferenceFromUrl(pathOrGsUrl)
-        else
-            Firebase.storage.getReference(pathOrGsUrl)
-
-        ref.downloadUrl.addOnSuccessListener { uri ->
-            _photoUri.value = uri
-        }
-    }
-    init { fetchUserBits() }
-
     private fun fetchUserBits() {
-        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        FirebaseFirestore.getInstance().collection("users").document(uid)
+        val u = uid ?: return
+        db.collection("users").document(u)
             .get()
             .addOnSuccessListener { doc ->
                 _firstName.value = doc.getString("firstName") ?: ""
@@ -82,33 +107,137 @@ class DermaHomeViewModel : ViewModel() {
             }
     }
 
-    fun updateName(first: String, last: String) {
-        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        FirebaseFirestore.getInstance().collection("users").document(uid)
-            .update(mapOf("firstName" to first, "lastName" to last))
+
+    private fun startCaseCounters() {
+        val u = uid ?: run {
+            android.util.Log.w("DermaVM", "No UID; not listening for cases.")
+            return
+        }
+
+        regCases?.remove()
+
+        regCases = db.collection("lesion_case")
+            .addSnapshotListener { snap, e ->
+                if (e != null) {
+                    android.util.Log.e("DermaVM", "cases listen error", e)
+                    return@addSnapshotListener
+                }
+
+                val docs = snap?.documents ?: emptyList()
+
+                val mine = docs.filter { d ->
+                    val assessorId  = d.getString("assessor_id") ?: d.getString("assessorId")
+                    val isAssessor = assessorId == u
+
+                    val assessedByUid = d.getString("assessed_by_uid")
+                    val isAssessedBy = assessedByUid == u
+
+                    val openedBy = (d.get("opened_by") as? List<*>)?.map { it?.toString() }?.filterNotNull() ?: emptyList()
+                    val participants = (d.get("participants") as? List<*>)?.map { it?.toString() }?.filterNotNull() ?: emptyList()
+
+                    val isOpenedBy = openedBy.contains(u)
+                    val isParticipant = participants.contains(u)
+
+                    isAssessor || isOpenedBy || isParticipant || isAssessedBy
+                }
+
+                val total   = mine.size
+
+                val pending = mine.count { (it.getString("derma_status") ?: "")
+                    .equals("derma_pending", ignoreCase = true) }
+
+                _totalCount.value   = total
+                _pendingCount.value = pending
+
+                android.util.Log.d(
+                    "DermaVM",
+                    "HOME COUNTS: total=$total pending=$pending (mine=${mine.size}, all=${docs.size})"
+                )
+            }
     }
-}
 
-class RetrieveCaseViewModel : ViewModel() {
-    var showInputDialog = mutableStateOf(false)
-    var reportId = mutableStateOf("")
-    var isLoading = mutableStateOf(false)
-    var error = mutableStateOf<String?>(null)
-    var loadedReport = mutableStateOf<DermaReport?>(null)
-    var showReportDialog = mutableStateOf(false)
+    // 🔑 ADDED: toCaseData helper function
+    private fun DocumentSnapshot.toDermaCaseData(): DermaCaseData {
+        val assessedAtMs = getTimestamp("assessed_at")?.toDate()?.time
+        val createdMs = assessedAtMs ?: getTimestamp("timestamp")?.toDate()?.time ?: 0L
 
-    fun open() { showInputDialog.value = true }
-    fun close() {
-        showInputDialog.value = false
-        isLoading.value = false
-        error.value = null
-        reportId.value = ""
+        return DermaCaseData(
+            caseId   = id,
+            label    = getString("label") ?: "Scan",
+            result   = getString("diagnosis"),
+            date     = createdMs.formatAsDate(),
+            status   = getString("derma_status"),
+            imageUrl = getString("scan_url"),
+            createdAt= createdMs,
+            heatmapUrl = getString("heatmap_url")
+        )
     }
 
-    fun closeReport() {
-        showReportDialog.value = false
-        loadedReport.value = null
+    // 🔑 ADDED: formatAsDate extension function
+    private fun Long.formatAsDate(): String {
+        if (this <= 0L) return "—"
+        val sdf = SimpleDateFormat("MMM dd, yyyy • HH:mm", Locale.getDefault())
+        return sdf.format(java.util.Date(this))
     }
 
-    fun setError(msg: String?) { error.value = msg }
+    // 🔑 ADDED: The function to calculate the fixed scan number
+    suspend fun getFixedScanNumber(caseId: String): Int? {
+        val u = uid ?: return null // 1. Use the ViewModel's UID
+
+        try {
+            // A. Load ALL cases (needed to check all fields for 'mine')
+            val allCasesQuery = db.collection("lesion_case")
+                // Sort by the original timestamp for consistent chronological order
+                .orderBy("timestamp", Query.Direction.ASCENDING)
+                .get()
+                .await()
+
+            val allDermaCaseData = allCasesQuery.documents
+                .map { d -> d.toDermaCaseData() }
+
+            // B. Filter the cases to include ONLY those relevant to the current Derma (u)
+            val mineCases = allDermaCaseData.filter { dermacaseData ->
+                val d = allCasesQuery.documents.first { it.id == dermacaseData.caseId } // Re-fetch DocumentSnapshot for list fields
+
+                // Safely extract and check assessor ID
+                val assessorId = d.getString("assessor_id") ?: d.getString("assessorId")
+                val isAssessor = assessorId == u
+
+                // Safely extract and check assessed_by_uid
+                val assessedByUid = d.getString("assessed_by_uid")
+                val isAssessedBy = assessedByUid == u
+
+                // Safely extract and check list fields
+                val openedBy = (d.get("opened_by") as? List<*>)?.map { it?.toString() }?.filterNotNull() ?: emptyList()
+                val participants = (d.get("participants") as? List<*>)?.map { it?.toString() }?.filterNotNull() ?: emptyList()
+
+                val isOpenedBy = openedBy.contains(u)
+                val isParticipant = participants.contains(u)
+
+                // CRITERIA: Case is "mine" if the derma is the assessor OR is listed as a participant/opened_by OR assessed by them
+                isAssessor || isOpenedBy || isParticipant || isAssessedBy
+            }
+
+            // C. Assign permanent chronological number based on the filtered list (mineCases)
+            val chronologicallyNumberedCases = mineCases
+                .sortedBy { it.createdAt } // Ensure chronological sort
+                .mapIndexed { index, dermacaseData ->
+                    IndexedCase(case = dermacaseData, scanNumber = index + 1)
+                }
+
+            // D. Find the corresponding scan number from the new, smaller list
+            return chronologicallyNumberedCases
+                .firstOrNull { it.case.caseId == caseId }
+                ?.scanNumber
+
+        } catch (e: Exception) {
+            android.util.Log.e("DermaVM", "Failed to get fixed scan number for $caseId", e)
+            return null
+        }
+    }
+
+    override fun onCleared() {
+        regCases?.remove()
+        super.onCleared()
+    }
 }

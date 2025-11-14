@@ -147,5 +147,7 @@ dependencies {
 
     implementation ("androidx.datastore:datastore-preferences:1.1.1")
 
+    implementation ("androidx.compose.runtime:runtime-livedata:1.7.0")// or your Compose version
+
 
 }

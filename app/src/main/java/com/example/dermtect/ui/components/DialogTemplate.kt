@@ -115,7 +115,6 @@ fun DialogTemplate(
                     Spacer(modifier = Modifier.height(20.dp))
 
 // 🔹 PRIMARY (Teal gradient)
-                    // 🔹 PRIMARY (Teal when enabled, gray when disabled)
                     primaryText?.let {
                         Box(
                             modifier = Modifier
@@ -127,24 +126,13 @@ fun DialogTemplate(
                                     clip = false
                                 )
                                 .background(
-                                    brush = if (primaryEnabled) {
-                                        Brush.verticalGradient(
-                                            colors = listOf(
-                                                Color(0xFF5FEAEA), // top lighter teal
-                                                Color(0xFF2A9D9D), // middle
-                                                Color(0xFF187878)  // bottom darker teal
-                                            )
+                                    brush = Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color(0xFF5FEAEA), // top lighter teal
+                                            Color(0xFF2A9D9D), // middle
+                                            Color(0xFF187878)  // bottom darker teal
                                         )
-                                    } else {
-                                        // flat gray when disabled
-                                        Brush.verticalGradient(
-                                            colors = listOf(
-                                                Color(0xFFBDBDBD),
-                                                Color(0xFFBDBDBD),
-                                                Color(0xFF9E9E9E)
-                                            )
-                                        )
-                                    },
+                                    ),
                                     shape = RoundedCornerShape(12.dp)
                                 )
                                 .clickable(enabled = primaryEnabled) {
@@ -155,7 +143,7 @@ fun DialogTemplate(
                         ) {
                             Text(
                                 text = it,
-                                color = if (primaryEnabled) Color.White else Color(0xFFECECEC),
+                                color = Color.White,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold
                             )

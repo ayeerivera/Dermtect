@@ -16,7 +16,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,7 +37,7 @@ import androidx.compose.ui.graphics.Brush
 import com.example.dermtect.ui.screens.ResultFilter
 import com.example.dermtect.ui.screens.StatusFilter
 
-data class CaseData(
+data class DermaCaseData(
     val caseId: String,
     val label: String,                 // "Scan 1"
     val result: String?,               // "Benign"/"Malignant"
@@ -47,17 +46,28 @@ data class CaseData(
     val imageUrl: String? = null,      // Storage URL
     val imageRes: Int? = null,
     val createdAt: Long = 0,
-    val heatmapUrl: String? = null
+    val heatmapUrl: String? = null,
+    val reportCode: String? = null
 )
-
+data class IndexedCase(
+    val case: DermaCaseData,
+    val scanNumber: Int
+)
 @Composable
-fun HistoryScreenTemplate(
+fun DermaHistoryScreenTemplate(
     navController: NavController,
     screenTitle: String,
-    caseList: List<CaseData>,
+    caseList: List<DermaCaseData>,
+    scanNumbers: List<Int>? = null,
     showIndicators: Boolean = true,
     topContent: @Composable () -> Unit = {},
-    actions: @Composable RowScope.() -> Unit = {}
+    actions: @Composable RowScope.() -> Unit = {},
+    isDerma: Boolean = false,
+    onCaseClick: (DermaCaseData, Int?) -> Unit = { case, scanNumber ->
+        // The number is correctly extracted and added to the navigation path:
+        val numberArg = scanNumber?.toString() ?: ""
+        navController.navigate("DermaAssessmentScreenReport/${case.caseId}?scanNumber=$numberArg&startEdit=false")
+    }
 ) {
     BubblesBackground {
         Column(
@@ -109,7 +119,8 @@ fun HistoryScreenTemplate(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
-            if (caseList.isEmpty()) {
+
+        if (caseList.isEmpty()) {
                 // ✅ Empty state
                 Box(
                     modifier = Modifier
@@ -120,32 +131,49 @@ fun HistoryScreenTemplate(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
 
                         Text(
-                            text = "There’s no scan history yet.",
+                            text = if (isDerma)
+                                "No cases yet."
+                            else
+                                "There’s no scan history yet.",
                             style = MaterialTheme.typography.headlineMedium,
                             color = Color(0xFF1D1D1D),
                             textAlign = TextAlign.Center
                         )
+
                         Spacer(Modifier.height(6.dp))
+
                         Text(
-                            text = "Your saved scans will appear here after you take your first photo.",
+                            text = if (isDerma)
+                                "Cases you review will appear here."
+                            else
+                                "Your saved scans will appear here after you take your first photo.",
                             style = MaterialTheme.typography.headlineSmall,
                             color = Color.Gray,
                             textAlign = TextAlign.Center
                         )
 
-                        // Optional: quick action button to start scanning
-                        Spacer(Modifier.height(16.dp))
-                        Spacer(Modifier.height(16.dp))
-                        PrimaryButton(
-                            text = "Take your first scan",
-                            onClick = { navController.navigate("camera") }, // ✅ redirects to your camera route
-                            modifier = Modifier.fillMaxWidth(0.9f)
-                        )
-
+                        // 👇 Show action only for regular users (NOT for derma)
+                        if (!isDerma) {
+                            Spacer(Modifier.height(16.dp))
+                            PrimaryButton(
+                                text = "Take your first scan",
+                                onClick = { navController.navigate("camera") },
+                                modifier = Modifier.fillMaxWidth(0.9f)
+                            )
+                        }
                     }
                 }
             } else {
-                caseList.forEach { case ->
+                caseList.forEachIndexed { index, case ->
+
+                    val sequentialNumber = scanNumbers?.getOrNull(index) // Retrieves fixed number 1, 2, 3...
+
+                    // 2. Set the label text. Use the sequential number, falling back to the default label ("Scan") if not found.
+                    val scanLabel = if (sequentialNumber != null) {
+                        "Scan #$sequentialNumber" // Will now be Scan #4, Scan #1, etc.
+                    } else {
+                        case.label // Fallback
+                    }
                     // compute colors/labels per item
                     val indicatorColor = when {
                         case.result?.equals("malignant", true) == true -> Color(0xFFF44336)
@@ -153,13 +181,17 @@ fun HistoryScreenTemplate(
                         else -> Color(0xFFBDBDBD)
                     }
 
+                    // Check for both "pending" and "derma_pending", use 0.20f alpha
                     val (statusLabel, statusColor) = when (case.status?.lowercase()) {
-                        "completed" -> "Completed" to Color(0xFF00B69B).copy(alpha = 0.2f)
+                        "completed" -> "Completed" to Color(0xFF00B69B).copy(alpha = 0.20f)
+                        "pending", "derma_pending" -> "Pending" to Color(0xFFFFC107).copy(alpha = 0.20f) // bg for pending
                         else -> null to null
                     }
 
-                    CaseListItem(
-                        title = case.label,
+
+
+                    DermaCaseListItem(
+                        title = scanLabel, // Pass the new sequential label
                         result = case.result,
                         date = case.date,
                         status = case.status,
@@ -168,8 +200,7 @@ fun HistoryScreenTemplate(
                         statusColor = statusColor,
                         imageUrl = case.imageUrl,
                     ) {
-                        navController.navigate("case_detail/${case.caseId}")
-                    }
+                        onCaseClick(case, sequentialNumber)                    }
 
                     Divider(modifier = Modifier.padding(vertical = 12.dp))
                 }
@@ -178,9 +209,8 @@ fun HistoryScreenTemplate(
     }
 }
 
-
 @Composable
-fun CaseListItem(
+fun DermaCaseListItem(
     title: String,
     result: String?,
     date: String,
@@ -266,7 +296,9 @@ fun HistoryFilterButton(
     resultFilter: ResultFilter,
     onResultChange: (ResultFilter) -> Unit,
     newestFirst: Boolean,
-    onSortChange: (Boolean) -> Unit
+    onSortChange: (Boolean) -> Unit,
+    showStatusFilters: Boolean = true,   // 👈 new
+    showResultFilters: Boolean = true    // 👈 new
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -308,16 +340,35 @@ fun HistoryFilterButton(
 
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
 
-            if (isDerma) {
-                // Result (Derma-only)
-                DropdownMenuItem(text = { Text("All") },       onClick = { onResultChange(ResultFilter.ALL); expanded = false })
-                DropdownMenuItem(text = { Text("Malignant") }, onClick = { onResultChange(ResultFilter.MALIGNANT); expanded = false })
-                DropdownMenuItem(text = { Text("Benign") },    onClick = { onResultChange(ResultFilter.BENIGN); expanded = false })
+            if (showStatusFilters) {
+                DropdownMenuItem(text = { Text("All Status") }, onClick = {
+                    onStatusChange(StatusFilter.ALL); expanded = false
+                })
+                DropdownMenuItem(text = { Text("Completed") }, onClick = {
+                    onStatusChange(StatusFilter.COMPLETED); expanded = false
+                })
+                DropdownMenuItem(text = { Text("Pending") }, onClick = {
+                    onStatusChange(StatusFilter.PENDING); expanded = false
+                })
+                Divider()
             }
 
-            // Sort
-            DropdownMenuItem(text = { Text("Newest to Oldest") }, onClick = { onSortChange(true);  expanded = false })
-            DropdownMenuItem(text = { Text("Oldest to Newest") }, onClick = { onSortChange(false); expanded = false })
+            if (showResultFilters && isDerma) {
+                DropdownMenuItem(text = { Text("Malignant") }, onClick = {
+                    onResultChange(ResultFilter.MALIGNANT); expanded = false
+                })
+                DropdownMenuItem(text = { Text("Benign") }, onClick = {
+                    onResultChange(ResultFilter.BENIGN); expanded = false
+                })
+                Divider()
+            }
+
+            DropdownMenuItem(text = { Text("Newest to Oldest") }, onClick = {
+                onSortChange(true); expanded = false
+            })
+            DropdownMenuItem(text = { Text("Oldest to Newest") }, onClick = {
+                onSortChange(false); expanded = false
+            })
         }
     }
 }

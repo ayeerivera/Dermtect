@@ -43,7 +43,7 @@ val AppTypography = Typography(
     titleLarge = TextStyle(
         fontFamily = Poppins,
         fontWeight = FontWeight.Bold,
-        fontSize = 20.sp
+        fontSize = 22.sp
     ),
     bodyLarge = TextStyle(
         fontFamily = Poppins,
