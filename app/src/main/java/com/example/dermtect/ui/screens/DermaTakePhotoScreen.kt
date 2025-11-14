@@ -440,7 +440,19 @@ private fun DermaTakePhotoScreenContent(
                         val r = withTimeout(INFER_TIMEOUT_MS) {
                             withContext(Dispatchers.Default) { tfService.infer(image) }
                         }
-                        modelFlag = if (r.probability >= 0.0112f) "Malignant" else "Benign"
+
+                        val prob = r.probability          // 0.0–1.0
+                        val pPct = prob * 100f            // 0–100%
+                        val alerted = prob >= 0.0112f     // keep this threshold exactly
+
+                        // Only call it "Malignant" if it's alerted AND at least 30%
+                        // You can tweak 30f later if needed.
+                        modelFlag = if (alerted && pPct > 30f) {
+                            "Malignant"
+                        } else {
+                            "Benign"
+                        }
+
                         val merged = r.heatmap?.let { overlayBitmaps(image, it, 115) }
                         inferenceResult = r.copy(heatmap = merged)
                     } catch (_: TimeoutCancellationException) {

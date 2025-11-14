@@ -621,16 +621,17 @@ fun TakePhotoScreen(
                             },
                             onDownloadClick = {
                                 coroutineScope.launch {
-                                    // 1) Gate: questionnaire complete?
+                                    // 1) Gate: questionnaire complete? (same style as LesionCaseScreen)
                                     val qa = existingAnswers
-                                    val notCompleted = (qa == null) || (qa.size != questions.size) || qa.any { it == null }
+                                    val notCompleted = (qa == null) || qa.any { it == null }
                                     if (notCompleted) {
                                         showQaRequiredDialog = true
                                         return@launch
                                     }
 
-                                    // 2) Ensure we have a photo
-                                    val photo = capturedImage ?: run {
+                                    // 2) Ensure we have the photo (live captured image)
+                                    val photo = capturedImage
+                                    if (photo == null) {
                                         Toast.makeText(context, "No photo available for PDF.", Toast.LENGTH_SHORT).show()
                                         return@launch
                                     }
@@ -643,14 +644,14 @@ fun TakePhotoScreen(
                                     }
 
                                     try {
-                                        // 4) Build answers (Q → Yes/No)
+                                        // 4) Build (Q → Yes/No) pairs in the same order
                                         val answerPairs: List<Pair<String, String>> =
                                             questions.indices.map { i ->
                                                 val a = qa!![i] ?: false
                                                 questions[i] to if (a) "Yes" else "No"
                                             }
 
-                                        // 5) Fetch user profile (same idea as LesionCaseScreen)
+                                        // 5) Pull user profile (same as LesionCaseScreen)
                                         val userSnap = FirebaseFirestore.getInstance()
                                             .collection("users")
                                             .document(userId)
@@ -660,19 +661,18 @@ fun TakePhotoScreen(
                                         val first = userSnap.getString("firstName").orEmpty()
                                         val last  = userSnap.getString("lastName").orEmpty()
                                         val birthdayStr = userSnap.getString("birthday") // may be null
-
                                         val fullName = listOf(first, last)
                                             .filter { it.isNotBlank() }
                                             .joinToString(" ")
                                             .ifBlank { "—" }
 
-                                        // 6) Compute *short* report code for PDF only
-                                        val shortCode: String = PdfExporter.shortReportFrom(
-                                            caseId = reservedCaseId ?: reportCode,
+                                        // 6) Short report code (mirror LesionCaseScreen, but use reservedCaseId if we have it)
+                                        val shortCode = PdfExporter.shortReportFrom(
+                                            caseId = reservedCaseId ?: reportCode ?: "TEMP0",
                                             fallback = "TEMP0"
                                         )
 
-                                        // 7) Possible conditions list (same logic you already had)
+                                        // 7) Possible conditions (same logic)
                                         val prob = inferenceResult?.probability ?: 0f
                                         val pPct = prob * 100f
                                         val alerted = prob >= 0.0112f
@@ -688,43 +688,39 @@ fun TakePhotoScreen(
                                             }
                                         }
 
-                                        // 8) Friendly summary text for PDF
+                                        // 8) Summary paragraph (same as LesionCaseScreen version)
                                         val pdfSummary = if (!alerted) {
                                             "This scan looks reassuring, with a very low likelihood of a serious issue. " +
                                                     "You can continue your normal skincare routine. Just keep being mindful of your skin and how it changes over time."
                                         } else {
                                             when {
-                                                pPct < 10f -> "Your result shows a very low chance of concern. Everything appears fine. Casual self-checks are enough."
-                                                pPct < 30f -> "Your result suggests a low chance of concern. Keep an eye on changes and consult if something evolves."
-                                                pPct < 60f -> "We noticed some minor concern. Consider discussing this with a doctor for guidance and peace of mind."
-                                                pPct < 80f -> "There’s moderate concern. We recommend scheduling a skin check with a dermatologist."
-                                                else       -> "There’s higher concern. Please visit a dermatologist soon for proper care and support."
+                                                pPct < 10f -> "Your result shows a very low chance of concern. This is reassuring, and there’s no need to worry. It may help to simply check your skin from time to time, just to stay aware of any changes."
+                                                pPct < 30f -> "Your result suggests only a low chance of concern. Everything appears fine. We encourage you to casually observe your skin every now and then, and let a doctor know if you notice something different."
+                                                pPct < 60f -> "We noticed some minor concern in your skin. This does not mean there is a serious issue, but talking with a doctor could provide peace of mind and helpful guidance."
+                                                pPct < 80f -> "Your result shows some concern. To better understand this, we recommend scheduling a skin check with a dermatologist. They can give you clearer answers and reassurance."
+                                                else       -> "Your result shows a higher level of concern. For your safety and peace of mind, we encourage you to visit a dermatologist soon so you can receive proper care and support."
                                             }
                                         }
 
-                                        // 9) Build PDF data (like LesionCaseScreen, but using current scan)
+                                        // 9) Build PDF payload – same structure as LesionCaseScreen
                                         val data = PdfExporter.CasePdfData(
                                             reportId = shortCode,
                                             title = "Result",
                                             userFullName = fullName,
                                             birthday = birthdayStr,
-                                            timestamp = nowTimestamp(),
-                                            photo = photo,
-                                            heatmap = inferenceResult?.heatmap,
+                                            timestamp = nowTimestamp(),          // live timestamp here
+                                            photo = photo,                       // live captured bitmap
+                                            heatmap = inferenceResult?.heatmap,  // live heatmap
                                             shortMessage = pdfSummary,
                                             possibleConditions = idsToShow,
                                             answers = answerPairs
                                         )
 
-                                        // 10) LOCAL-ONLY PDF (no Firebase upload here – same as LesionCaseScreen)
-                                        val localUri = withContext(Dispatchers.IO) {
-                                            PdfExporter.createCasePdf(
-                                                context = context,
-                                                data = data
-                                            )
+                                        // 10) Create & open the PDF locally (no upload)
+                                        val uri = withContext(Dispatchers.IO) {
+                                            PdfExporter.createCasePdf(context, data)
                                         }
-
-                                        PdfExporter.openPdf(context, localUri)
+                                        PdfExporter.openPdf(context, uri)
                                         Toast.makeText(context, "PDF saved successfully", Toast.LENGTH_SHORT).show()
 
                                     } catch (t: Throwable) {
@@ -799,21 +795,21 @@ fun TakePhotoScreen(
                                     }
                                 }
                             },
-                        secondaryText = "Cancel",
-                        onSecondary = {
-                            if (!isSaving) {
-                                showPrivacyDialog = false
-                                consentToSave = false
-                            }
-                        },
-                        onDismiss = {
-                            if (!isSaving) {
-                                showPrivacyDialog = false
-                                consentToSave = false
-                            }
-                        },
-                        primaryEnabled = consentToSave && !isSaving,
-                        secondaryEnabled = !isSaving,
+                            secondaryText = "Cancel",
+                            onSecondary = {
+                                if (!isSaving) {
+                                    showPrivacyDialog = false
+                                    consentToSave = false
+                                }
+                            },
+                            onDismiss = {
+                                if (!isSaving) {
+                                    showPrivacyDialog = false
+                                    consentToSave = false
+                                }
+                            },
+                            primaryEnabled = consentToSave && !isSaving,
+                            secondaryEnabled = !isSaving,
                             extraContent = {
                                 val scrollState = rememberScrollState()
                                 val atBottom by remember {
@@ -1002,10 +998,10 @@ fun TakePhotoScreen(
                             }
                         }
                     }
-                    }
                 }
             }
         }
+    }
 
 }
 
