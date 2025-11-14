@@ -171,7 +171,7 @@ fun DermaAssessmentScreenReport(
             notes          = finalDoc.getString("notes") ?: ""
 
             // 🔑 FIX 1: Read status from the consistent field "status", falling back to "assessment_status"
-            status = finalDoc.getString("status")
+            status = finalDoc.getString("derma_status")
 
 
 
@@ -200,7 +200,7 @@ fun DermaAssessmentScreenReport(
             if (dermaUid != null && !currentStatus.equals("completed", ignoreCase = true)) {
                 try {
                     // 🔑 FIX 2: Use "derma_pending" status string for consistency
-                    val updates = mutableMapOf<String, Any>("status" to "derma_pending")
+                    val updates = mutableMapOf<String, Any>("derma_status" to "derma_pending")
                     if (currentAssessorId.isNullOrBlank()) {
                         updates["assessor_id"] = dermaUid   // 👈 unified field
                     }
@@ -474,7 +474,7 @@ fun DermaAssessmentScreenReport(
                                                             "assessed_at" to FieldValue.serverTimestamp(),
                                                             "diagnosis"   to (diagnosis ?: ""),
                                                             "notes"       to notes,
-                                                            "status"      to "completed"
+                                                            "derma_status"      to "completed"
                                                         )
                                                     )
                                                     .await()
