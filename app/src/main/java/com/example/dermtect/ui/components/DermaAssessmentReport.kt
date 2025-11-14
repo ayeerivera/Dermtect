@@ -1222,16 +1222,18 @@ fun ScrollDownHint(
             )
         }
     }
-}private fun riskLevelLabel(probability: Float): String {
+}
+
+private fun riskLevelLabel(probability: Float): String {
     val p = probability * 100f
     return when {
         // NOTE: 0.0112f is 1.12%
         probability < 0.0112f -> "Very Low"
         p < 10f  -> "Very Low"
         p < 30f  -> "Low"
-        p < 60f  -> "Moderate"
-        p < 80f  -> "Elevated"
-        else     -> "High"
+        p < 60f  -> "Medium" // CHANGED: Was "Moderate"
+        p < 80f  -> "High"   // CHANGED: Was "Elevated"
+        else     -> "Very High" // CHANGED: Was "High"
     }
 }
 
@@ -1318,9 +1320,9 @@ private fun getRiskColor(riskLabel: String): Color {
     return when (riskLabel.uppercase(Locale.getDefault())) {
         "VERY LOW" -> Color(0xFFE0FFF0)  // Light Green/Teal (Reassuring)
         "LOW" -> Color(0xFFF0FFF0)       // Lighter Green
-        "MODERATE" -> Color(0xFFFFE0A0)  // Light Orange (Caution)
-        "ELEVATED" -> Color(0xFFFFB0B0)  // Light Red (Warning)
-        "HIGH" -> Color(0xFFFF8080)      // Red (High Alert)
+        "MEDIUM" -> Color(0xFFFFE0A0)  // CHANGED: Was "MODERATE"
+        "HIGH" -> Color(0xFFFFB0B0)  // CHANGED: Was "ELEVATED"
+        "VERY HIGH" -> Color(0xFFFF8080) // CHANGED: Was "HIGH"
         else -> Color(0xFFE0E0E0)        // Gray (Default)
     }
 }
@@ -1328,8 +1330,8 @@ private fun getRiskColor(riskLabel: String): Color {
 private fun getBorderColor(riskLabel: String): Color {
     return when (riskLabel.uppercase(Locale.getDefault())) {
         "VERY LOW", "LOW" -> Color(0xFF00ADB5) // Teal
-        "MODERATE" -> Color(0xFFFFA500) // Orange
-        "ELEVATED", "HIGH" -> Color(0xFFFF0000) // Red
+        "MEDIUM" -> Color(0xFFFFA500) // CHANGED: Was "MODERATE"
+        "HIGH", "VERY HIGH" -> Color(0xFFFF0000) // CHANGED: Was "ELEVATED", "HIGH"
         else -> Color(0xFF888888) // Gray
     }
 }
