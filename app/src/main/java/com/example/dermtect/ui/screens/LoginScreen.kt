@@ -43,9 +43,6 @@ import android.widget.Toast
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.fillMaxSize
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.ApiException
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Scaffold
@@ -76,50 +73,7 @@ fun Login(navController: NavController) {
     val focusManager = LocalFocusManager.current
 
     val context = LocalContext.current
-    val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-        .requestIdToken("50445058822-fn9cea4e0bduos6t0g7ofb2g9ujri5s2.apps.googleusercontent.com")
-        .requestEmail()
-        .build()
-    val googleSignInClient = GoogleSignIn.getClient(context, gso)
     val isLoading by viewModel.isLoading.collectAsState()
-
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-        try {
-            val account = task.getResult(ApiException::class.java)
-            val idToken = account?.idToken
-            if (idToken != null) {
-                viewModel.signInWithGoogle(
-                    idToken,
-                    onSuccess = {
-                        val uid = FirebaseAuth.getInstance().currentUser?.uid
-                        if (uid != null) {
-                            FirebaseFirestore.getInstance()
-                                .collection("users")
-                                .document(uid)
-                                .get()
-                                .addOnSuccessListener { document ->
-                                    val role = document.getString("role")
-                                    when (role) {
-                                        "patient" -> navController.navigate("user_home")
-                                        "derma" -> navController.navigate("derma_home")
-                                        else -> navController.navigate("user_home")
-                                    }
-                                }
-                                .addOnFailureListener {
-                                    Toast.makeText( context, "Failed to fetch role.", Toast.LENGTH_SHORT ).show()
-                                }
-                        }
-                    },
-                    onError = { error ->
-                        Toast.makeText(context, error, Toast.LENGTH_LONG).show()
-                    }
-                )
-            }
-        } catch (e: ApiException) {
-            Toast.makeText(context, "Sign-in failed: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
-    }
 
     BubblesBackground {
 
@@ -274,28 +228,7 @@ fun Login(navController: NavController) {
                         )
                     }
 
-
-                    Spacer(modifier = Modifier.height(32.dp))
-
-                    Text(
-                        text = "Other",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color(0xFF828282)
-                    )
-
                     Spacer(modifier = Modifier.height(12.dp))
-
-                    Image(
-                        painter = painterResource(id = R.drawable.google_icon),
-                        contentDescription = "Google Login",
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clickable {
-                                val signInIntent = googleSignInClient.signInIntent
-                                launcher.launch(signInIntent)
-                            }
-                    )
-
 
                     Spacer(modifier = Modifier.height(16.dp))
 

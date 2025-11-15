@@ -270,65 +270,6 @@ class AuthViewModel(private val authUseCase: AuthUseCase) : ViewModel() {
             }
     }
 
-    // --- Google Sign-In --- //
-    fun signInWithGoogle(idToken: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
-        val credential = GoogleAuthProvider.getCredential(idToken, null)
-        auth.signInWithCredential(credential)
-            .addOnCompleteListener { task ->
-                if (!task.isSuccessful) {
-                    val exception = task.exception
-                    if (exception is FirebaseAuthUserCollisionException) {
-                        val email = exception.email
-                        if (email != null) {
-                            onError("This email is already registered with another method. Please login with email/password first.")
-                        } else {
-                            onError("Email already in use. Try a different method.")
-                        }
-                    } else {
-                        onError(exception?.localizedMessage ?: "Google Sign-In Failed")
-                    }
-                    return@addOnCompleteListener
-                }
-
-                val user = auth.currentUser ?: return@addOnCompleteListener
-                val uid = user.uid
-                val email = user.email ?: ""
-
-                val userDocRef = firestore.collection("users").document(uid)
-                userDocRef.get()
-                    .addOnSuccessListener { document ->
-                        if (!document.exists()) {
-                            val names = user.displayName?.split(" ") ?: listOf("", "")
-                            val firstName = names.getOrNull(0) ?: ""
-                            val lastName = names.getOrNull(1) ?: ""
-
-                            val userData = mapOf(
-                                "uid" to uid,
-                                "email" to email,
-                                "firstName" to firstName,
-                                "lastName" to lastName,
-                                "role" to "patient",
-                                "provider" to "google",
-                                "createdAt" to FieldValue.serverTimestamp()
-                            )
-
-                            userDocRef.set(userData)
-                                .addOnSuccessListener {
-                                    logAudit(uid, email, "google_sign_in_created")
-                                    onSuccess()
-                                    evaluateUserState(user)
-                                }
-                                .addOnFailureListener { onError("Failed to save user data") }
-                        } else {
-                            logAudit(uid, email, "google_sign_in_existing")
-                            onSuccess()
-                            evaluateUserState(user)
-                        }
-                    }
-                    .addOnFailureListener { onError("Failed to fetch user document") }
-            }
-    }
-
     // --- Verify helpers --- //
     fun resendVerificationEmail(onResult: (Boolean, String?) -> Unit) {
         val user = auth.currentUser

@@ -27,12 +27,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.dermtect.ui.components.DialogTemplate
 import com.example.dermtect.ui.viewmodel.AuthViewModel
 import com.example.dermtect.ui.viewmodel.AuthViewModelFactory
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.ApiException
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.GoogleAuthProvider
-import com.google.firebase.firestore.FirebaseFirestore
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import com.example.dermtect.ui.components.BackButton
@@ -85,72 +79,11 @@ fun Register(navController: NavController) {
         password == confirmPassword && viewModel.isPasswordStrong(password)
     }
 
-    val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-        .requestIdToken("50445058822-fn9cea4e0bduos6t0g7ofb2g9ujri5s2.apps.googleusercontent.com")
-        .requestEmail()
-        .build()
-
     val isFormValid = firstName.isNotBlank() &&
             lastName.isNotBlank() &&
             isEmailValid &&
             isPasswordValid &&
             birthday.isNotBlank()
-
-
-    val googleSignInClient = GoogleSignIn.getClient(context, gso)
-
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-
-        try {
-            val account = task.getResult(ApiException::class.java)
-            val credential = GoogleAuthProvider.getCredential(account.idToken, null)
-
-            FirebaseAuth.getInstance().signInWithCredential(credential)
-                .addOnCompleteListener { authTask ->
-                    if (authTask.isSuccessful) {
-                        val user = FirebaseAuth.getInstance().currentUser
-                        val uid = user?.uid
-
-                        viewModel.signInWithGoogle(
-                            idToken = account.idToken ?: "",
-                            onSuccess = {
-                                navController.navigate("user_home")
-                            },
-                            onError = {
-                                Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
-                            }
-                        )
-
-
-                        if (uid != null) {
-                            FirebaseFirestore.getInstance()
-                                .collection("users")
-                                .document(uid)
-                                .set(
-                                    mapOf(
-                                        "birthday" to birthday,
-                                    ),
-                                    com.google.firebase.firestore.SetOptions.merge()   // ✅ merge instead of overwrite
-                                )
-
-                                .addOnSuccessListener {
-                                    Toast.makeText(context, "Google sign-in successful!", Toast.LENGTH_SHORT).show()
-                                    navController.navigate("user_home")
-                                }
-                                .addOnFailureListener {
-                                    Toast.makeText(context, "Failed to save user info", Toast.LENGTH_SHORT).show()
-                                }
-                        }
-                    } else {
-                        Toast.makeText(context, "Google sign-in failed", Toast.LENGTH_SHORT).show()
-                    }
-                }
-        } catch (e: ApiException) {
-            Toast.makeText(context, "Sign-in error: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
-    }
-
 
     BubblesBackground {
 
@@ -338,27 +271,7 @@ fun Register(navController: NavController) {
                     )
                 }
 
-
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                Text(
-                    "Other",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Color(0xFF828282)
-                )
                 Spacer(modifier = Modifier.height(12.dp))
-
-                Image(
-                    painter = painterResource(id = R.drawable.google_icon),
-                    contentDescription = "Google Login",
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clickable {
-                            val signInIntent = googleSignInClient.signInIntent
-                            launcher.launch(signInIntent)
-                        }
-                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
