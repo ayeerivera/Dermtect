@@ -447,7 +447,7 @@ private fun DermaTakePhotoScreenContent(
 
                         // Only call it "Malignant" if it's alerted AND at least 30%
                         // You can tweak 30f later if needed.
-                        modelFlag = if (alerted && pPct > 30f) {
+                        modelFlag = if (alerted && pPct >= 30f) {
                             "Malignant"
                         } else {
                             "Benign"
