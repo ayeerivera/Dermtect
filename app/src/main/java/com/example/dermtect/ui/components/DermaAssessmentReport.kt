@@ -95,6 +95,7 @@ fun DermaAssessmentScreenReport(
     var modelDetailedSummary by remember { mutableStateOf<String?>(null) }
     var rawProbability by remember { mutableStateOf<Double?>(null) }
 // Inside DermaAssessmentScreenReport:
+    var dermaDisplayName by remember { mutableStateOf<String?>(null) }  // 👈 ADD
 
 // ...
     // Load case + existing assessment
@@ -125,6 +126,7 @@ fun DermaAssessmentScreenReport(
             val patientUid = finalDoc.getString("user_id")
             val dermaUid = FirebaseAuth.getInstance().currentUser?.uid
 
+// 1) Share questionnaire access with this derma
             if (!patientUid.isNullOrBlank() && !dermaUid.isNullOrBlank()) {
                 try {
                     db.collection("questionnaires")
@@ -139,10 +141,27 @@ fun DermaAssessmentScreenReport(
                 }
             }
 
+// 2) Mark that THIS derma has opened this case (for their own history)
+            if (!dermaUid.isNullOrBlank()) {
+                try {
+                    db.collection("lesion_case")
+                        .document(finalDoc.id)
+                        .set(
+                            mapOf("opened_by" to FieldValue.arrayUnion(dermaUid)),
+                            SetOptions.merge()
+                        )
+                        .await()
+                } catch (e: Exception) {
+                    Log.e("DermaAssessment", "Failed to add opened_by: ${e.message}")
+                }
+            }
+
+
             // parent fields
             // parent fields
 // 🔍 Extra safety: also read from derma_assessment/latest if present
             try {
+
                 val latestSnap = db.collection("lesion_case")
                     .document(finalDoc.id)
                     .get(Source.SERVER)
@@ -173,7 +192,32 @@ fun DermaAssessmentScreenReport(
             // 🔑 FIX 1: Read status from the consistent field "status", falling back to "assessment_status"
             status = finalDoc.getString("derma_status")
 
+            dermaDisplayName = finalDoc.getString("assessor_display_name")
 
+// ⬇️ INSERT RIGHT AFTER setting `dermaDisplayName` from finalDoc
+            if (!dermaUid.isNullOrBlank()) {
+                val resolvedNow = resolveCurrentDermaName(db, dermaUid).cleanDrPrefix().trim()
+
+                // Use it locally only if we don't already have a real name
+                if (dermaDisplayName.isNullOrBlank() ||
+                    dermaDisplayName.equals("Dermatologist", ignoreCase = true)) {
+
+                    dermaDisplayName = resolvedNow
+
+                    // Optionally persist once so future loads show it immediately
+                    if (finalDoc.getString("assessor_display_name").isNullOrBlank() &&
+                        resolvedNow.isNotBlank() &&
+                        !resolvedNow.equals("Dermatologist", ignoreCase = true)
+                    ) {
+                        runCatching {
+                            db.collection("lesion_case")
+                                .document(finalDoc.id)
+                                .set(mapOf("assessor_display_name" to resolvedNow), SetOptions.merge())
+                                .await()
+                        }
+                    }
+                }
+            }
 
             // remember originals for cancel behavior
             originalStatus    = status
@@ -194,28 +238,71 @@ fun DermaAssessmentScreenReport(
 // 2. Set the detailed summary RATIONALE
             modelDetailedSummary = getModelRationaleMessage(rawProbability) // Now uses the state variable
 
-            val currentStatus = finalDoc.getString("status") ?: ""
+            val currentDermaStatus = finalDoc.getString("derma_status")
             val currentAssessorId = finalDoc.getString("assessor_id")
 
-            if (dermaUid != null && !currentStatus.equals("completed", ignoreCase = true)) {
+// only mark as pending for brand-new cases (no diagnosis yet, no derma_status)
+            val hasDiagnosis = !finalDoc.getString("diagnosis").isNullOrBlank()
+            val hasNotes = !finalDoc.getString("notes").isNullOrBlank()
+
+            if (dermaUid != null &&
+                currentDermaStatus.isNullOrBlank() &&
+                !hasDiagnosis && !hasNotes) {
+
                 try {
-                    // 🔑 FIX 2: Use "derma_pending" status string for consistency
                     val updates = mutableMapOf<String, Any>("derma_status" to "derma_pending")
                     if (currentAssessorId.isNullOrBlank()) {
-                        updates["assessor_id"] = dermaUid   // 👈 unified field
+                        updates["assessor_id"] = dermaUid
                     }
                     if (finalDoc.get("timestamp") == null) {
                         updates["timestamp"] = FieldValue.serverTimestamp()
                     }
 
+                    // Resolve a proper display name: profiles_public → users → FirebaseAuth → fallback
+                    // Replace the whole resolvedPendingName block with:
+                    val resolvedPendingName = run {
+                        // 1) users/{uid}
+                        val u = try {
+                            db.collection("users").document(dermaUid).get(Source.SERVER).await()
+                        } catch (_: Throwable) { null }
+
+                        val full  = u?.getString("full_name")?.trim()
+                        val first = u?.getString("firstName")?.trim()
+                        val last  = u?.getString("lastName")?.trim()
+
+                        val fromUsers = when {
+                            !full.isNullOrBlank() -> full
+                            !first.isNullOrBlank() || !last.isNullOrBlank() ->
+                                listOfNotNull(first, last).filter { it.isNotBlank() }.joinToString(" ")
+                            else -> null
+                        }
+
+                        // 2) FirebaseAuth displayName → 3) final fallback
+                        fromUsers ?: FirebaseAuth.getInstance().currentUser?.displayName ?: "Dermatologist"
+                    }
+
+                    val cleanPendingName = resolvedPendingName.cleanDrPrefix()
+                        .replace(Regex("^\\s*Dr\\.\\s*", RegexOption.IGNORE_CASE), "")
+                        .trim()
+
+// Only write a real name; avoid saving the generic fallback
+                    if (!cleanPendingName.equals("Dermatologist", ignoreCase = true) && cleanPendingName.isNotBlank()) {
+                        updates["assessor_display_name"] = cleanPendingName
+                        dermaDisplayName = cleanPendingName
+                    }
+
+
                     db.collection("lesion_case")
                         .document(finalDoc.id)
                         .update(updates)
                         .await()
+                    dermaDisplayName = cleanPendingName
                 } catch (e: Throwable) {
-                    error = "Failed to mark pending: ${e.message}"
+                    Log.e("DermaAssessment", "Failed to mark pending: ${e.message}")
                 }
             }
+
+
         } catch (t: Throwable) {
             error = "Load failed: ${t.message}"
         } finally {
@@ -270,7 +357,7 @@ fun DermaAssessmentScreenReport(
                     )
                     Spacer(Modifier.height(5.dp))
                     Text(
-                        text = "Report ID: ${reportCodeText ?: "—"}",
+                        text = "Report ID: $reportCodeText",
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.bodyMedium.copy(color = Color.DarkGray)
                     )
@@ -295,7 +382,7 @@ fun DermaAssessmentScreenReport(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(top = 160.dp, bottom = 50.dp, start = 20.dp, end = 20.dp)
-                            .verticalScroll(rememberScrollState()),
+                            .verticalScroll(scrollState),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         // Image
@@ -380,11 +467,14 @@ fun DermaAssessmentScreenReport(
 // --- Derma Notes (optional) ---
                         Spacer(Modifier.height(10.dp))
 
+                        val shownDerma = dermaDisplayName?.takeIf { it.isNotBlank() }
+
                         Text(
-                            text = "Notes (optional)",
+                            text = formatDermaHeader(dermaDisplayName),
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                             modifier = Modifier.align(Alignment.Start)
                         )
+
 
                         Spacer(Modifier.height(8.dp))
 
@@ -467,17 +557,28 @@ fun DermaAssessmentScreenReport(
                                         scope.launch {
                                             try {
                                                 // Save as completed (even when editing a completed case)
+                                                // ⬇️ resolve display name once
+                                                val resolvedName = resolveCurrentDermaName(db, dermaId)
+                                                val cleanResolvedName = resolvedName.cleanDrPrefix()
+                                                    .replace(Regex("^\\s*Dr\\.\\s*", RegexOption.IGNORE_CASE), "")
+                                                    .trim()
+
                                                 db.collection("lesion_case").document(id)
                                                     .update(
                                                         mapOf(
-                                                            "assessor_id" to dermaId,   // 👈 here too
+                                                            "assessor_id" to dermaId,
+                                                            "assessor_display_name" to cleanResolvedName, // ← save CLEAN value
                                                             "assessed_at" to FieldValue.serverTimestamp(),
                                                             "diagnosis"   to (diagnosis ?: ""),
                                                             "notes"       to notes,
-                                                            "derma_status"      to "completed"
+                                                            "status"      to "reviewed",
+                                                            "derma_status" to "completed",
+                                                            "has_new_derma_assessment" to true
                                                         )
                                                     )
                                                     .await()
+
+                                                dermaDisplayName = cleanResolvedName // ← update local UI
 
 
                                                 // Optional: append audit entry
@@ -656,7 +757,6 @@ fun DermaAssessmentScreenReport(
                                         mapOf(
                                             "derma_status" to "derma_pending", // 🔑 FIX 2: Use consistent "derma_pending"
                                             "assessor_id" to (dermaUid ?: ""),
-                                            "assessed_at" to FieldValue.serverTimestamp()
                                         ),
                                         SetOptions.merge()
                                     )
@@ -1306,11 +1406,19 @@ private fun getModelRationaleMessage(probability: Double?): String? {
 
     // This is the base rationale text, which is the only thing we now return.
     val base = when {
-        pPct < 10f -> "Your result shows a very low chance of concern. This is reassuring, and there’s no need to worry. It may help to simply check your skin from time to time, just to stay aware of any changes."
-        pPct < 30f -> "Your result suggests only a low chance of concern. Everything appears fine. We encourage you to casually observe your skin every now and then, and let a doctor know if you notice something different."
-        pPct < 60f -> "We noticed some minor concern in your skin. This does not mean there is a serious issue, but talking with a doctor could provide peace of mind and helpful guidance."
-        pPct < 80f -> "Your result shows some concern. To better understand this, we recommend scheduling a skin check with a dermatologist. They can give you clearer answers and reassurance."
-        else       -> "Your result shows a higher level of concern. For your safety and peace of mind, we encourage you to visit a dermatologist soon so you can receive proper care and support."
+        pPct < 10f -> "Your result shows a very low chance of concern. This is reassuring, and there’s no need to worry. " +
+                "Still, we recommend consulting a dermatologist for proper assessment. " +
+                "If the mole or spot changes in the next 2 to 4 weeks, it's best to get it checked."
+
+        pPct < 30f -> "Your result suggests a low chance of concern. Everything appears fine. " +
+                "For safety, we still encourage visiting a dermatologist for confirmation. " +
+                "Monitor the area and consult a doctor if you notice changes within 1 to 3 weeks."
+        pPct < 60f -> "We noticed a minor concern in your scan. This does not mean there is a serious issue, but consulting a dermatologist can provide clarity and peace of mind. " +
+                "Please also monitor the spot for any changes within 1 to 3 weeks."
+        pPct < 80f -> "Your result shows some concern. To better understand this finding, we recommend scheduling a skin check with a dermatologist. " +
+                "If the area changes in appearance over the next 1 to 2 weeks, please seek medical care sooner."
+        else       -> "Your result shows a higher level of concern. For your safety and peace of mind, we strongly encourage you to visit a dermatologist soon for proper evaluation. " +
+                "If you notice any changes in the spot within 1 to 2 weeks, seek medical attention immediately."
     }
 
     return base
@@ -1334,4 +1442,57 @@ private fun getBorderColor(riskLabel: String): Color {
         "HIGH", "VERY HIGH" -> Color(0xFFFF0000) // CHANGED: Was "ELEVATED", "HIGH"
         else -> Color(0xFF888888) // Gray
     }
+}
+private fun formatDermaHeader(raw: String?): String {
+    val name = raw?.cleanDrPrefix()?.trim().orEmpty()
+    // If we don't have a real name (or it's literally "Dermatologist"), just show "Notes"
+    if (name.isBlank() || name.equals("Dermatologist", ignoreCase = true)) {
+        return "Notes"
+    }
+    // If the stored name already contains Dr., don't duplicate
+    val hasDr = name.matches(Regex("(?i)^dr\\.?\\s+.*"))
+    return if (hasDr) "Notes from $name" else "Notes from Dr. $name"
+}
+
+
+private fun String.cleanDrPrefix(): String =
+    this.replace(Regex("^\\s*Dr\\.\\s*", RegexOption.IGNORE_CASE), "").trim()
+suspend fun resolveCurrentDermaName(db: FirebaseFirestore, uid: String): String {
+    // Try users/{uid} first
+    runCatching {
+        val u = db.collection("users").document(uid).get(Source.SERVER).await()
+
+        val full  = u.getString("full_name")?.trim()
+        val first = u.getString("firstName")?.trim()
+        val last  = u.getString("lastName")?.trim()
+        val creds = u.getString("credentials")?.trim()   // 👈 NEW
+
+        // Base name
+        val baseName = when {
+            !full.isNullOrBlank() -> full
+            !first.isNullOrBlank() || !last.isNullOrBlank() ->
+                listOfNotNull(first, last)
+                    .filter { it.isNotBlank() }
+                    .joinToString(" ")
+            else -> null
+        }
+
+        if (baseName != null) {
+            // If credentials exist, append them
+            val withCreds = if (!creds.isNullOrBlank()) {
+                "$baseName, $creds"
+            } else {
+                baseName
+            }
+            return withCreds
+        }
+    }
+
+    // Fallback to FirebaseAuth profile
+    FirebaseAuth.getInstance().currentUser?.displayName
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+        ?.let { return it }
+
+    return "Dermatologist"
 }

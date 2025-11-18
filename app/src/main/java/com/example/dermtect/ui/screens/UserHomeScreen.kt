@@ -61,6 +61,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.saveable.rememberSaveable
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.flow.flowOf
 
 @Composable
 fun ProfileDropdownMenu(
@@ -74,7 +76,8 @@ fun ProfileDropdownMenu(
     onViewNotifications: () -> Unit,
     onAboutClick: () -> Unit,
     onDataPrivacyClick: () -> Unit,
-    onLogoutClick: () -> Unit
+    onLogoutClick: () -> Unit,
+    unreadCount: Int            // 👈 NEW
 ) {
     // Brand-ish colors
     val edge = listOf(Color(0xFFBFFDFD), Color(0xFF88E7E7), Color(0xFF55BFBF))
@@ -93,20 +96,39 @@ fun ProfileDropdownMenu(
                 .clickable { onExpandedChange(true) }
                 .padding(horizontal = 6.dp, vertical = 6.dp)
         ) {
-            if (photoUri != null) {
-                AsyncImage(
-                    model = photoUri,
-                    contentDescription = "Profile",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(35.dp).clip(CircleShape)
-                )
-            } else {
-                Image(
-                    painter = painterResource(id = R.drawable.profilepicture),
-                    contentDescription = "Profile",
-                    modifier = Modifier.size(35.dp).clip(CircleShape)
-                )
+            Box(
+                modifier = Modifier.size(35.dp)
+            ) {
+                if (photoUri != null) {
+                    AsyncImage(
+                        model = photoUri,
+                        contentDescription = "Profile",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clip(CircleShape)
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(id = R.drawable.profilepicture),
+                        contentDescription = "Profile",
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clip(CircleShape)
+                    )
+                }
+
+                // 🔴 small dot if there are unread notifications
+                if (unreadCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .size(15.dp)
+                            .background(Color.Red, CircleShape)
+                    )
+                }
             }
+
             Spacer(Modifier.width(6.dp))
             Icon(
                 imageVector = Icons.Default.ArrowDropDown,
@@ -155,8 +177,25 @@ fun ProfileDropdownMenu(
                                 onExpandedChange(false); onViewNotifications()
                             }
                         ) {
-                            IconBadge { Icon(Icons.Outlined.NotificationsNone, null, tint = Color(0xFF2B6E6E)) }
+                            IconBadge {
+                                Box {
+                                    Icon(
+                                        Icons.Outlined.NotificationsNone,
+                                        contentDescription = null,
+                                        tint = Color(0xFF2B6E6E)
+                                    )
+                                    if (unreadCount > 0) {
+                                        Box(
+                                            modifier = Modifier
+                                                .align(Alignment.TopEnd)
+                                                .size(8.dp)
+                                                .background(Color.Red, CircleShape)
+                                        )
+                                    }
+                                }
+                            }
                         }
+
 
                         MenuRow(
                             label = "Edit Profile",
@@ -342,6 +381,21 @@ fun UserHomeScreen(
     val email by viewModel.email.collectAsState()
     val isGoogleAccount by viewModel.isGoogleAccount.collectAsState()
     val userRole = "user"
+// 🔔 Unread notifications badge
+    val auth = remember { FirebaseAuth.getInstance() }
+    val currentUserId = auth.currentUser?.uid
+
+    val diagnosisFlow = remember(currentUserId) {
+        if (currentUserId.isNullOrBlank()) {
+            flowOf(emptyList<NotificationItem>())
+        } else {
+            buildDiagnosisNotificationFlow(currentUserId)
+        }
+    }
+
+// Collect as state
+    val diagnosisNotifications by diagnosisFlow.collectAsState(initial = emptyList())
+    val unreadCount = diagnosisNotifications.count { !it.isRead }
 
 // Load profile photo once
     LaunchedEffect(Unit) { sharedProfileViewModel.loadPhoto("users") }  // 👈 NEW
@@ -350,6 +404,8 @@ fun UserHomeScreen(
     val hasConsented by viewModel.hasConsented.collectAsState()
     val consentChecked by viewModel.consentChecked.collectAsState()
     val coroutineScope = rememberCoroutineScope()
+    // Make sure we only auto-show the consent dialog once per session
+    var initialConsentDialogShown by rememberSaveable { mutableStateOf(false) }
     var pendingCameraAction by remember { mutableStateOf(false) }
     val newsItems by viewModel.newsItems.collectAsState()
     val isLoadingNews by viewModel.isLoadingNews.collectAsState()
@@ -364,6 +420,8 @@ fun UserHomeScreen(
             hasInitialAssessment = false
         }
     }
+
+
     val assessmentLabel = if (hasInitialAssessment == true) "My Initial Assessment" else "Start Assessment"
 
     LaunchedEffect(Unit) {
@@ -371,6 +429,13 @@ fun UserHomeScreen(
         viewModel.checkConsentStatus()
         viewModel.fetchNews()
     }
+    LaunchedEffect(consentChecked, hasConsented) {
+       if (consentChecked && !hasConsented && !initialConsentDialogShown) {
+            showConsentDialog = true
+            initialConsentDialogShown = true
+        }
+    }
+
 
     val tutorialSeen by viewModel.tutorialSeen.collectAsState()
 // Local guard so it won’t reappear again in the same session after Skip/Finish
@@ -462,9 +527,8 @@ fun UserHomeScreen(
                                 showConsentDialog = true
                             } else {
                                 navController.navigate("questionnaire")
-
                             }
-                                   },
+                        },
                         onViewNotifications = {
                             if (!hasConsented) {
                                 showConsentDialog = true
@@ -474,9 +538,17 @@ fun UserHomeScreen(
                         },
                         onAboutClick = { navController.navigate("about") },
                         onDataPrivacyClick = { navController.navigate("terms_privacy") },
-                        onLogoutClick = { navController.navigate("login") }
+                        onLogoutClick = {
+                            FirebaseAuth.getInstance().signOut()
+                            navController.navigate("login") {
+                                popUpTo("user_home") {
+                                    inclusive = true     // remove home itself too
+                                }
+                                launchSingleTop = true
+                            }
+                        },
+                        unreadCount = unreadCount     // 👈 NEW
                     )
-
                 }
             }
 

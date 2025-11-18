@@ -36,7 +36,7 @@ import androidx.compose.animation.animateContentSize
 @Composable
 fun TutorialOverlay(
     tutorialManager: TutorialManager,
-    onFinish: () -> Unit // Called when tutorial is completed or skipped
+    onFinish: () -> Unit
 ) {
 
     val stepIndex = tutorialManager.currentStep
@@ -47,7 +47,6 @@ fun TutorialOverlay(
         return
     }
 
-    // BackHandler for device back button press (REMAINS THE SAME)
     BackHandler(enabled = true) {
         if (stepIndex == 0) {
             onFinish()
@@ -72,12 +71,18 @@ fun TutorialOverlay(
     val maxCardWidthDp = 300.dp
     val verticalSpacingDp = 16.dp
 
+    val globalNudgeDp = 32.dp
+    val globalNudgePx = with(density) { globalNudgeDp.toPx() }
+
     val screenHeightThreshold = with(density) { 300.dp.toPx() }
-    val isTargetAtTop = targetBounds.top < screenHeightThreshold
+    val isTargetAtTop = targetBounds.top - globalNudgePx < screenHeightThreshold
     val arrowDirection = if (isTargetAtTop) "up" else "down"
 
-    // ✅ FIX: Declare arrowHorizontalPositionPx as a state variable here
     var arrowHorizontalPositionPx by remember { mutableStateOf(0f) }
+
+    val isFifthStep = stepIndex == 4
+    val nudgeAmountDp = if (isFifthStep) 28.dp else 0.dp
+    val nudgeAmountPx = with(density) { nudgeAmountDp.toPx() }
 
     BoxWithConstraints(
         modifier = Modifier
@@ -86,7 +91,6 @@ fun TutorialOverlay(
         val parentWidth = this.maxWidth
         val parentHeight = this.maxHeight
 
-        // 1. Dim background with transparent hole (REMAINS THE SAME)
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -95,16 +99,16 @@ fun TutorialOverlay(
                 .graphicsLayer(alpha = 0.99f)
                 .drawWithContent {
                     drawRect(color = Color(0x99000000))
+                    val topOffset = targetBounds.top - globalNudgePx - nudgeAmountPx
                     drawRect(
                         color = Color.Transparent,
-                        topLeft = Offset(targetBounds.left, targetBounds.top),
+                        topLeft = Offset(targetBounds.left, topOffset),
                         size = Size(targetBounds.width, targetBounds.height),
                         blendMode = BlendMode.Clear
                     )
                 }
         )
 
-        // Comment Card Positioning Logic (UPDATED SCOPE)
         val step = steps[stepIndex]
         val totalSteps = steps.size
         val currentStepDisplay = stepIndex + 1
@@ -122,13 +126,12 @@ fun TutorialOverlay(
                         (parentWidth.toPx() - maxCardWidthDp.toPx() - with(density) { 20.dp.roundToPx() }).toInt()
                     )
 
-                    // ✅ FIX: Update the state variable inside the offset lambda
                     arrowHorizontalPositionPx = (targetCenterX - safeXOffset).toFloat()
 
-                    val yOffsetForUpDirection = targetBounds.bottom.toInt() + verticalSpacingDp.roundToPx()
+                    val yOffsetForUpDirection = targetBounds.bottom.toInt() + verticalSpacingDp.roundToPx() - globalNudgePx.toInt() - nudgeAmountPx.toInt()
 
                     val finalYOffset = if (arrowDirection == "down") {
-                        targetBounds.top.toInt() - parentHeight.toPx().toInt() - verticalSpacingDp.roundToPx()
+                        targetBounds.top.toInt() - parentHeight.toPx().toInt() - verticalSpacingDp.roundToPx() - globalNudgePx.toInt() - nudgeAmountPx.toInt()
                     } else {
                         yOffsetForUpDirection
                     }
@@ -150,7 +153,6 @@ fun TutorialOverlay(
                 onNext = { tutorialManager.nextStep() },
                 onBack = { tutorialManager.previousStep() },
                 arrowHorizontalPositionPx = arrowHorizontalPositionPx,
-                // ✅ RE-INTRODUCE onSkip
                 onSkip = {
                     tutorialManager.currentStep = tutorialManager.steps.size
                     tutorialManager.currentTargetBounds = null
@@ -175,13 +177,11 @@ private fun CommentCard(
     onNext: () -> Unit,
     onBack: () -> Unit,
     arrowHorizontalPositionPx: Float,
-    // ✅ ADD NEW PARAMETER
     onSkip: () -> Unit
 ) {
     val density = LocalDensity.current
     val standardPadding = 16.dp
 
-    // Convert Dp to Px that are used in the drawing scope
     val arrowSizePx = with(density) { arrowSize.toPx() }
     val arrowMarginPx = with(density) { 4.dp.toPx() }
 
@@ -194,21 +194,15 @@ private fun CommentCard(
             .background(cardColor, RoundedCornerShape(cardCornerRadius))
             .drawWithContent {
 
-                // --- ARROW DRAWING LOGIC (FIXED) ---
-
-                // Define maxArrowX here using size.width, where it's available
                 val dynamicMaxArrowX = size.width - arrowSizePx - arrowMarginPx
 
-                // Final calculation for the arrow's center point
                 val xCenter = arrowHorizontalPositionPx.coerceIn(
                     arrowSizePx + arrowMarginPx,
                     dynamicMaxArrowX
                 )
 
-                // Draw the content (the Column) first
                 drawContent()
 
-                // Draw the arrow path on top
                 val path = Path().apply {
                     when (arrowDirection) {
                         "up" -> {
@@ -231,22 +225,18 @@ private fun CommentCard(
             .clip(RoundedCornerShape(cardCornerRadius))
     ) {
 
-        // Main content column
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                // ✅ Apply animateContentSize here for smooth resizing
                 .animateContentSize()
                 .padding(standardPadding)
         ) {
 
-            // CONCISE HEADER: Title and Minimized Step Counter
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Title
                 Text(
                     text = title,
                     fontSize = 18.sp,
@@ -254,7 +244,6 @@ private fun CommentCard(
                     color = Color.Black,
                     modifier = Modifier.weight(1f)
                 )
-                // Minimized Step Counter
                 Text(
                     text = "$stepNumber/$totalSteps",
                     fontSize = 14.sp,
@@ -265,7 +254,6 @@ private fun CommentCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Description
             Text(
                 text = description,
                 fontSize = 14.sp,
@@ -274,20 +262,15 @@ private fun CommentCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // NAVIGATION ROW: Back and Next/Finish Buttons
-            // ✅ NAVIGATION ROW: Skip, Back and Next/Finish Buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                // Change arrangement to SpaceBetween to push Skip/Back to left/center and Next to the right
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // ✅ 1. SKIP BUTTON (Left side)
                 Button(
                     onClick = onSkip,
                     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
                     colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                        // Use a light, secondary color for Skip
                         containerColor = Color.LightGray.copy(alpha = 0.5f),
                         contentColor = Color.Black
                     )
@@ -295,9 +278,7 @@ private fun CommentCard(
                     Text(text = "Skip")
                 }
 
-                // Group Back and Next buttons to the right
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // 2. Back Button
                     if (!isFirstStep) {
                         Button(
                             onClick = onBack,

@@ -33,7 +33,7 @@ fun InputField(
     onValueChange: (String) -> Unit,
     placeholder: String,
     iconRes: Int? = null,
-    iconVector: ImageVector? = null,     // NEW
+    iconVector: ImageVector? = null,
     isPassword: Boolean = false,
     errorMessage: String? = null,
     modifier: Modifier = Modifier,
@@ -52,72 +52,57 @@ fun InputField(
 
     Column(modifier = modifier) {
         if (valueTFV != null && onValueChangeTFV != null) {
-        TextField(
-            value = value,
-            onValueChange = onValueChange,
-            singleLine = true,
-            readOnly = readOnly, // ✅ prevents keyboard for birthday
-            keyboardOptions = keyboardOptions,
-            keyboardActions = keyboardActions,
-            visualTransformation = if (isPassword && !isPasswordVisible)
-                PasswordVisualTransformation() else VisualTransformation.None,
-            leadingIcon = {
-                when {
-                    iconVector != null -> Icon(
-                        imageVector = iconVector,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = Color.Gray
-                    )
-                    iconRes != null -> Icon(
-                        painter = painterResource(id = iconRes),
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = Color.Gray
-                    )
-                }
-            },
-            trailingIcon = {
-                if (isPassword) {
-                    val icon = if (isPasswordVisible) R.drawable.on else R.drawable.off
-                    IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
-                        Icon(
-                            painter = painterResource(id = icon),
-                            contentDescription = if (isPasswordVisible) "Hide password" else "Show password",
-                            modifier = Modifier.size(20.dp)
-                        )
+            TextField(
+                value = valueTFV,                  // ✅ use TFV
+                onValueChange = onValueChangeTFV,  // ✅ use TFV handler
+                singleLine = true,
+                readOnly = readOnly,
+                keyboardOptions = keyboardOptions,
+                keyboardActions = keyboardActions,
+                visualTransformation = if (isPassword && !isPasswordVisible)
+                    PasswordVisualTransformation() else VisualTransformation.None,
+                leadingIcon = {
+                    when {
+                        iconVector != null -> Icon(iconVector, null, Modifier.size(18.dp), tint = Color.Gray)
+                        iconRes != null    -> Icon(painterResource(iconRes), null, Modifier.size(18.dp), tint = Color.Gray)
                     }
-                }
-            },
-            textStyle = textStyle.copy(fontWeight = FontWeight.Bold),
-            placeholder = {
-                Text(
-                    text = placeholder,
-                    style = placeholderStyle.copy(fontWeight = FontWeight.Normal),
-                    color = Color.DarkGray,
-                    maxLines = 1,
-                    softWrap = false
-                )
-            },
-            shape = RoundedCornerShape(10.dp),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color(0xFFFFFFFF),
-                unfocusedContainerColor = Color(0xFFF7F7F7),
-                disabledContainerColor = Color(0xFFF0F0F0),
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                focusedTextColor = textColor,
-                unfocusedTextColor = textColor,
-                cursorColor = textColor
-            ),
-            // NEW ✅ (use the passed-in modifier)
-            modifier = modifier
-                .fillMaxWidth(0.9f)
-                .height(56.dp)
-                .let { if (onClick != null) it.clickable { onClick() } else it }
-
-        )} else {
-            // Original String overload
+                },
+                trailingIcon = {
+                    if (isPassword) {
+                        val icon = if (isPasswordVisible) R.drawable.on else R.drawable.off
+                        IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                            Icon(painterResource(icon), if (isPasswordVisible) "Hide password" else "Show password", Modifier.size(20.dp))
+                        }
+                    }
+                },
+                textStyle = textStyle.copy(fontWeight = FontWeight.Bold),
+                placeholder = {
+                    Text(
+                        text = placeholder,
+                        style = placeholderStyle.copy(fontWeight = FontWeight.Normal),
+                        color = Color.DarkGray,
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                },
+                shape = RoundedCornerShape(10.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color(0xFFFFFFFF),
+                    unfocusedContainerColor = Color(0xFFF7F7F7),
+                    disabledContainerColor = Color(0xFFF0F0F0),
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedTextColor = textColor,
+                    unfocusedTextColor = textColor,
+                    cursorColor = textColor
+                ),
+                modifier = modifier
+                    .fillMaxWidth(0.9f)
+                    .height(56.dp)
+                    .let { if (onClick != null) it.clickable { onClick() } else it }
+            )
+        } else {
+        // Original String overload
             TextField(
                 value = value,
                 onValueChange = onValueChange,

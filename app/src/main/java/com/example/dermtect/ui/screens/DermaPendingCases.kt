@@ -23,8 +23,9 @@ fun PendingCasesScreen(
 ) {
     // ✅ STEP 1: CHANGE FACTORY to load ALL_CASES to establish a global number
     val vm: DermaHistoryViewModel = viewModel(
-        factory = DermaHistoryVmFactory(DermaFeed.ALL_CASES) // Change from PENDING_ONLY
+        factory = DermaHistoryVmFactory(DermaFeed.PENDING_ONLY)
     )
+
     val uiState by vm.state.collectAsState()
 
     var newestFirst by rememberSaveable { mutableStateOf(true) }
@@ -35,44 +36,36 @@ fun PendingCasesScreen(
         else -> {
             // 1. ASSIGN PERMANENT CHRONOLOGICAL NUMBER (Global numbering)
             // Ensure the base list is sorted chronologically (Oldest to Newest) to establish Scan #1, #2, etc.
+            // 1. Sort whatever VM gives you (these are already pending)
             val masterChronologicalList = uiState.items
-                .sortedBy { it.createdAt } // Ensure chronological sort
+                .sortedBy { it.createdAt } // oldest → newest
 
-            val chronologicallyNumberedCases = masterChronologicalList.mapIndexed { index, dermacaseData ->
+// 2. Number them globally *within pending list* (Scan #1, #2 in Pending)
+            val numberedCases = masterChronologicalList.mapIndexed { index, dermacaseData ->
                 IndexedCase(
                     case = dermacaseData,
-                    scanNumber = index + 1 // Global chronological number (1, 2, 3, ...)
+                    scanNumber = index + 1
                 )
             }
 
-            // ✅ STEP 2: FILTER TO ONLY PENDING CASES (Explicitly filter the list)
-            val pendingOnly = chronologicallyNumberedCases.filter { numberedCase ->
-                val status = numberedCase.case.status?.lowercase()
-
-                // A case is pending ONLY IF its status is NOT "completed" AND NOT "derma_completed".
-                status != "completed" && status != "derma_completed"}
-
-            // 3. APPLY SORTING (to the pending subset)
-            val sorted = pendingOnly // Sort the PENDING-ONLY subset
-                .sortedBy { numberedCase -> numberedCase.case.createdAt }
+// 3. Apply sort order (newestFirst toggle)
+            val sorted = numberedCases
+                .sortedBy { it.case.createdAt }
                 .let { if (newestFirst) it.reversed() else it }
 
-            // 4. EXTRACT the case data and numbers for the template
+// 4. Extract for template
             val finalCaseList = sorted.map { it.case }
             val finalScanNumbers = sorted.map { it.scanNumber }
 
+// 5. This is the REAL pending count for home
+            val pendingForHome = finalCaseList.size
 
-            val pendingForHome = finalCaseList.size // Size of the final, pending list
-
-// ✅ Push to Home, then go back ONCE
             LaunchedEffect(pendingForHome) {
                 navController.previousBackStackEntry
                     ?.savedStateHandle
                     ?.set("home_pending_count", pendingForHome)
-                // navController.previousBackStackEntry
-                //     ?.savedStateHandle
-                //     ?.set("home_total_count", totalForHome) // REMOVED
             }
+
 
 
             DermaHistoryScreenTemplate(

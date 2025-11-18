@@ -70,6 +70,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.navigation.navDeepLink
 import kotlinx.coroutines.delay
 import com.example.dermtect.data.OnboardingPrefs
 import com.google.firebase.auth.FirebaseAuth
@@ -78,6 +79,11 @@ import com.example.dermtect.ui.screens.DermaTakePhotoScreen
 import com.example.dermtect.ui.components.DermaAssessmentScreenReport
 import com.example.dermtect.ui.screens.PendingCasesScreen
 import com.google.firebase.firestore.FirebaseFirestore
+import androidx.navigation.NavController
+import com.example.dermtect.ui.screens.ChooseAccount
+import com.example.dermtect.ui.screens.DermaProfileScreen
+import com.example.dermtect.ui.screens.DermaRegister
+import com.example.dermtect.ui.screens.DermaTermsPrivacyScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -150,7 +156,7 @@ class MainActivity : ComponentActivity() {
                                             launchSingleTop = true
                                         }
                                     } else {
-                                        navController.navigate("login") {
+                                        navController.navigate("choose_account") {
                                             popUpTo("splash") { inclusive = true }
                                             launchSingleTop = true
                                         }
@@ -160,52 +166,17 @@ class MainActivity : ComponentActivity() {
                                 // Loading → do nothing; keep showing SplashScreen
                             }
                         }
-
-
-                    // 🔹 Otherwise, react to your AuthViewModel state
-                        LaunchedEffect(authState) {
-                            if (didRoute) return@LaunchedEffect
-
-                            when (authState) {
-                                AuthViewModel.AuthUiState.Loading -> {
-                                    // show Splash while Firebase restores session
-                                }
-
-                                is AuthViewModel.AuthUiState.SignedIn -> {
-                                    delay(250)
-                                    didRoute = true
-                                    navController.navigate("user_home") {
-                                        popUpTo("splash") { inclusive = true }
-                                        launchSingleTop = true
-                                    }
-                                }
-
-                                AuthViewModel.AuthUiState.SignedOut,
-                                is AuthViewModel.AuthUiState.EmailUnverified -> {
-                                    val seen = OnboardingPrefs.hasSeen(context)
-                                    delay(250)
-                                    didRoute = true
-                                    if (!seen) {
-                                        navController.navigate("onboarding_screen1") {
-                                            popUpTo("splash") { inclusive = true }
-                                            launchSingleTop = true
-                                        }
-                                    } else {
-                                        navController.navigate("login") {
-                                            popUpTo("splash") { inclusive = true }
-                                            launchSingleTop = true
-                                        }
-                                    }
-                                }
-                            }
-                        }
                     }
 
                     composable("onboarding_screen1") { OnboardingScreen1(navController) }
                     composable("onboarding_screen2") { OnboardingScreen2(navController) }
                     composable("onboarding_screen3") { OnboardingScreen3(navController) }
-                    composable("login") { Login(navController = navController) }
-                    composable("register") { Register(navController = navController) }
+                    composable("login?role={role}") { backStackEntry ->
+                        val role = backStackEntry.arguments?.getString("role") ?: "patient"
+                        Login(navController, role) }
+                    composable("choose_account") { ChooseAccount(navController) }
+                    composable("register_user") { Register(navController) }
+                    composable("derma_register") { DermaRegister(navController) }
                     composable("forgot_pass1") { ForgotPass1(navController) }
                     composable("forgot_pass2?email={email}") { backStackEntry ->
                         val email = backStackEntry.arguments?.getString("email") ?: ""
@@ -215,6 +186,8 @@ class MainActivity : ComponentActivity() {
                     composable("forgot_pass3") { ForgotPass3(navController) }
                     composable("forgot_pass4") { ForgotPass4(navController) }
                     composable("terms_privacy") { TermsPrivacyScreen(navController) }
+                    composable("derma_terms_privacy") { DermaTermsPrivacyScreen(navController) }
+
                     composable("user_home") {
                         UserHomeScreen(
                             navController = navController,
@@ -255,6 +228,7 @@ class MainActivity : ComponentActivity() {
 
 
                     composable("history") { HistoryScreen(navController = navController) }
+
                     composable("case_detail/{caseId}") { backStackEntry ->
                         val caseId = backStackEntry.arguments?.getString("caseId")!!
                         LesionCaseScreen(
@@ -266,6 +240,24 @@ class MainActivity : ComponentActivity() {
 
                         )
                     }
+                    composable(
+                        route = "lesion_case/{caseId}",
+                        arguments = listOf(navArgument("caseId"){ type = NavType.StringType }),
+                        deepLinks = listOf(navDeepLink { uriPattern = "dermtect://case/{caseId}" })
+                    ) { backStackEntry ->
+                        val caseId = backStackEntry.arguments?.getString("caseId") ?: return@composable
+                        LesionCaseScreen(
+                            navController = navController,
+                            caseId = caseId,
+                            onBackClick = { navController.popBackStack() },
+                            onFindClinicClick = { navController.navigate("nearby_clinics") },
+                            onNavigateToAssessment = { navController.navigate("questionnaire") }
+                        )
+                    }
+
+
+
+
 
                     composable("article_detail_screen/{newsJson}") { backStackEntry ->
                         val json = backStackEntry.arguments?.getString("newsJson") ?: ""
@@ -274,31 +266,7 @@ class MainActivity : ComponentActivity() {
                             newsItem = newsItem,
                             onBackClick = { navController.popBackStack() })
                     }
-                    composable("user_settings") {
-                        val context = LocalContext.current
-                        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                            .requestIdToken("50445058822-fn9cea4e0bduos6t0g7ofb2g9ujri5s2.apps.googleusercontent.com")
-                            .requestEmail()
-                            .build()
-                        val googleSignInClient = GoogleSignIn.getClient(context, gso)
 
-                        SettingsScreenTemplate(
-                            navController = navController,
-                            userRole = "user",
-                            sharedProfileViewModel = sharedProfileViewModel,
-                            onLogout = {
-                                googleSignInClient.signOut().addOnCompleteListener {
-                                    authVm.logout {
-                                        navController.navigate("login") {
-                                            popUpTo(0) {
-                                                inclusive = true
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        )
-                    }
 
                     composable("tutorial_screen0") { TutorialScreen0(navController = navController) }
                     composable("tutorial_screen1") { TutorialScreen1(navController) }
@@ -382,6 +350,20 @@ class MainActivity : ComponentActivity() {
                             }
                         )
                     }
+                    composable(
+                        route = "derma_profile/{email}/{isGoogle}"
+                    ) { backStackEntry ->
+                        val emailArg = Uri.decode(backStackEntry.arguments?.getString("email") ?: "")
+                        val isGoogle = backStackEntry.arguments?.getString("isGoogle")?.toBoolean() ?: false
+
+                        DermaProfileScreen(
+                            navController = navController,
+                            email = emailArg,
+                            isGoogleAccount = isGoogle,
+                            sharedProfileViewModel = sharedProfileViewModel   // hoisted in MainActivity
+                        )
+                    }
+
 
                     composable("derma_take_photo") {
                         DermaTakePhotoScreen(onBackClick = { navController.popBackStack() })
@@ -415,58 +397,12 @@ class MainActivity : ComponentActivity() {
                     }
 
 
-//                    composable(
-//                        "derma_assessment_screen/{caseJson}",
-//                        arguments = listOf(navArgument("caseJson") { type = NavType.StringType })
-//                    ) { backStackEntry ->
-//                        val caseJson = backStackEntry.arguments?.getString("caseJson")
-//                        val case = Gson().fromJson(
-//                            caseJson,
-//                            com.example.dermtect.ui.components.CaseData::class.java
-//                        )
 //
-//                        DermaAssessmentScreen(
-//                            lesionImage = case.imageRes
-//                                ?: R.drawable.sample_skin, // fallback to a non-null drawable
-//                            scanTitle = case.label,                                 // use label instead of title
-//                            onBackClick = { navController.popBackStack() },
-//                            onCancel = { navController.popBackStack() },
-//                            onSubmit = { diagnosis, notes ->
-//                                navController.popBackStack()
-//                            }
-//                        )
-//                    }
 
                     composable("pending_cases") { PendingCasesScreen(navController) }
                     composable("case_history") { DermaHistoryScreen(navController) }
 
 
-
-                    composable("derma_settings") {
-                        val context = LocalContext.current
-                        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                            .requestIdToken("50445058822-fn9cea4e0bduos6t0g7ofb2g9ujri5s2.apps.googleusercontent.com")
-                            .requestEmail()
-                            .build()
-                        val googleSignInClient = GoogleSignIn.getClient(context, gso)
-
-                        SettingsScreenTemplate(
-                            navController = navController,
-                            sharedProfileViewModel = sharedProfileViewModel,
-                            userRole = "derma",
-                            onLogout = {
-                                googleSignInClient.signOut().addOnCompleteListener {
-                                    authVm.logout {
-                                        navController.navigate("login") {
-                                            popUpTo(0) {
-                                                inclusive = true
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        )
-                    }
                 }
 
                 }
@@ -476,10 +412,9 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-
 private fun routeToProperHome(navController: androidx.navigation.NavController) {
     val uid = FirebaseAuth.getInstance().currentUser?.uid ?: run {
-        navController.navigate("login") {
+        navController.navigate("choose_account") {
             popUpTo("splash") { inclusive = true }
             launchSingleTop = true
         }
@@ -504,4 +439,24 @@ private fun routeToProperHome(navController: androidx.navigation.NavController) 
                 launchSingleTop = true
             }
         }
+}
+
+
+private fun caseDetailRoute(rawId: String) = "case_detail/$rawId"
+
+fun NavController.navigateCaseDetail(rawId: String) {
+    val routeNow = currentBackStackEntry?.destination?.route
+    val isAlreadyOnSameDetail =
+        routeNow?.startsWith("case_detail/") == true &&
+                currentBackStackEntry?.arguments?.getString("caseId") == rawId
+
+    if (isAlreadyOnSameDetail) {
+        // If you’re already on the same detail, go back to the list first
+        popBackStack()
+    }
+
+    navigate(caseDetailRoute(rawId)) {
+        launchSingleTop = true
+        restoreState = false
+    }
 }

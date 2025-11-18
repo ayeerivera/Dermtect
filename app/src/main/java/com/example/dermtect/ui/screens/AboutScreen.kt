@@ -197,4 +197,144 @@ By using DermTect, you confirm that you have read and understood these Terms & P
             }
         }
     }
+}@Composable
+fun DermaTermsPrivacyScreen(navController: NavController) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF5F5F5)) // fallback bg
+    ) {
+        // Cyan background
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color(0xFFCDFFFF))
+        )
+
+        // Back
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 50.dp, start = 23.dp)
+        ) {
+            BackButton(
+                onClick = { navController.popBackStack() },
+                modifier = Modifier.align(Alignment.CenterStart)
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 80.dp, start = 20.dp, end = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Title (not bold, to match About)
+            Text(
+                text = "Terms & Privacy Policy",
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    color = Color(0xFF1D1D1D),
+                    fontWeight = FontWeight.Bold
+                )
+            )
+
+            Spacer(modifier = Modifier.height(15.dp))
+
+            Card(
+                modifier = Modifier.wrapContentHeight(),
+                shape = RoundedCornerShape(10.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(20.dp)
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = """
+DermTect – Terms & Privacy Policy
+
+1. Who This Policy Is For
+This Terms & Privacy Policy applies to:
+• Patients / app users who use DermTect to scan and track their skin  
+• Dermatologists / clinical users who access DermTect to review cases and support assessment  
+
+By using DermTect in any role, you agree to follow the terms below.
+
+2. Commitment to Privacy
+DermTect is dedicated to protecting your privacy. We collect and process only the information needed to:
+• Provide accurate and helpful skin-assessment support  
+• Improve the quality, safety, and reliability of the app  
+• Enable secure collaboration between patients and dermatologists  
+
+3. Information We Collect
+a) For Patients / App Users  
+• Skin photos you upload for analysis  
+• Assessment results, scan history, and generated reports  
+• Basic profile information (such as name and email) you provide during registration  
+
+b) For Dermatologists / Clinical Users  
+• Basic profile information (such as name, clinic details, and contact information)  
+• Professional details used to identify you as a licensed practitioner (e.g., credentials, clinic name)  
+• Notes, assessments, and recommendations that you add to patient cases  
+
+We do not collect information from your other apps, websites, or outside sources.
+
+4. How We Use Your Information
+Your data may be used to:
+• Analyze skin photos and generate AI-assisted assessment results  
+• Help dermatologists review cases and provide clinical feedback when applicable  
+• Improve DermTect’s performance, accuracy, safety features, and user experience  
+• Maintain a secure case history for reference, education, or follow-up care  
+
+DermTect is an assistive tool and is not a replacement for professional medical diagnosis or treatment.
+
+5. Clinical Use & Responsibilities (Dermatologists)
+If you are a dermatologist or clinical user, you agree to:
+• Treat all cases in DermTect as confidential medical records  
+• Use DermTect only as a support tool, not as the sole basis for diagnosis or medical decisions  
+• Avoid downloading, exporting, or screenshotting images and reports outside secure, clinic-approved channels  
+• Follow your clinic’s policies, professional ethics, and local health and privacy regulations  
+• Inform patients appropriately when AI-assisted tools like DermTect are used as part of their assessment  
+
+6. Data Security
+All photos, reports, and related details are stored securely.  
+We apply strict technical and organizational safeguards to protect your data against unauthorized access, loss, or misuse.  
+However, no system can be guaranteed 100% secure, and we encourage users and clinicians to also protect their own devices and accounts.
+
+7. Sharing of Information
+We do not sell or rent your personal information.  
+Information may only be shared:
+• With licensed healthcare professionals, and only when necessary to support your use of DermTect  
+• When required by law, regulation, or a valid legal process  
+
+Any sharing will always follow applicable privacy and health-data regulations.
+
+8. Your Choices and Control
+As a user, you may:
+• Withdraw consent to data processing where applicable  
+• Deactivate your account  
+• Request removal of your stored information, subject to legal or clinical record-keeping obligations  
+
+If you choose not to consent, some features of DermTect may be limited or unavailable.
+
+9. Updates to This Policy
+We may update these Terms & Privacy Policy from time to time to improve our services, enhance safety, or comply with legal requirements.  
+If there are significant changes, we will notify you within the app or through other appropriate channels.
+
+10. Agreement
+By continuing to use DermTect as a patient or as a dermatologist, you confirm that you have read and understood these Terms & Privacy Policy, and you consent to the responsible use of your information as described above.
+""".trimIndent(),
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = Color(0xFF484848),
+                            lineHeight = 20.sp,
+                            textAlign = TextAlign.Start
+                        )
+                    )
+                }
+            }
+        }
+    }
 }

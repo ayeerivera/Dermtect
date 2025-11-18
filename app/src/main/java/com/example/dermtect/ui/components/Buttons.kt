@@ -1,5 +1,6 @@
 package com.example.dermtect.ui.components
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.background
@@ -33,6 +34,7 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 
 // Dialog-style gradient brushes (same as your modal buttons)
 private val PrimaryBrushEnabled = Brush.verticalGradient(
@@ -52,48 +54,19 @@ private val PrimaryBrushDisabled = Brush.verticalGradient(
 )
 
 @Composable
-fun TopRightNotificationIcon(
-    onNotifClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .size(50.dp)
-            .background(
-                color = Color(0xFFCDFFFF),
-                shape = CircleShape
-            )
-            .clickable { onNotifClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        Image(
-            painter = painterResource(id = R.drawable.notifications_vector),
-            contentDescription = "Notifications",
-            modifier = Modifier.size(28.dp)
-        )
-    }
-}
-@Composable
 fun BackButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
-
 ) {
     Box(
         modifier = modifier
             .size(50.dp)
-            .shadow(
-                elevation = 6.dp,
-                shape = CircleShape
-            )
-            .background(
-                color = Color.White,
-                shape = CircleShape
-            )
+            .shadow(elevation = 6.dp, shape = CircleShape)
+            .background(Color.White, shape = CircleShape)
             .border(
                 width = 1.dp,
                 brush = Brush.linearGradient(
-                    colors = listOf(
+                    listOf(
                         Color(0xFFBFFDFD),
                         Color(0xFF88E7E7),
                         Color(0xFF55BFBF)
@@ -105,13 +78,49 @@ fun BackButton(
         contentAlignment = Alignment.Center
     ) {
         Icon(
-            painter = painterResource(id = R.drawable.back), // Your back icon
+            painter = painterResource(id = R.drawable.back),
             contentDescription = "Back",
             tint = Color.Black,
             modifier = Modifier.size(28.dp)
         )
     }
 }
+
+
+@Composable
+fun BackButtonWithUnsavedCheck(
+    navController: NavController,
+    hasUnsavedChanges: () -> Boolean,
+    onShowConfirmDialog: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    BackButton(
+        onClick = {
+            if (hasUnsavedChanges()) {
+                onShowConfirmDialog()
+            } else {
+                navController.popBackStack()
+            }
+        },
+        modifier = modifier
+    )
+}
+
+@Composable
+fun HandleBackNavigation(
+    navController: NavController,
+    hasUnsavedChanges: () -> Boolean,
+    onShowConfirmDialog: () -> Unit
+) {
+    BackHandler {
+        if (hasUnsavedChanges()) {
+            onShowConfirmDialog()
+        } else {
+            navController.popBackStack()
+        }
+    }
+}
+
 
 @Composable
 fun PrimaryButton(

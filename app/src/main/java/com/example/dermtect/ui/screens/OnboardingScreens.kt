@@ -314,7 +314,7 @@ fun OnboardingScreen3(navController: NavController) {
                 OnboardingPrefs.setSeen(context)
 
                 // then go to Login
-                navController.navigate("login") {
+                navController.navigate("choose_account") {
                     popUpTo(0) { inclusive = true }
                     launchSingleTop = true
                 }

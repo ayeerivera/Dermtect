@@ -46,14 +46,15 @@ import androidx.compose.animation.core.animateFloatAsState
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.MedicalInformation
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import com.example.dermtect.ui.components.DialogTemplate
 import com.example.dermtect.ui.components.PrimaryButton
 import com.example.dermtect.ui.components.SecondaryButton
-import kotlin.math.min
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.sp
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LesionCaseTemplate(
@@ -66,6 +67,7 @@ fun LesionCaseTemplate(
     riskDescription: String,
     prediction: String,
     probability: Float,
+    showRiskSection: Boolean = true,
     isDerma: Boolean = false,
     onBackClick: () -> Unit,
     onDownloadClick: () -> Unit,
@@ -80,7 +82,9 @@ fun LesionCaseTemplate(
     savedHeightFraction: Float = 0.35f,     // smaller after saving
     isSaving: Boolean = false,
     compact: Boolean = false,
-
+    dermaDiagnosis: String? = null,
+    dermaNotes: String? = null,
+    dermaName: String? = null,
     ) {
 // Which condition to show info for (null = no dialog)
     var showInfoFor by remember { mutableStateOf<String?>(null) }
@@ -247,10 +251,13 @@ fun LesionCaseTemplate(
 
 
                 Spacer(Modifier.height(20.dp))
+                if (!dermaNotes.isNullOrBlank()) {
+                    Spacer(Modifier.height(20.dp))
+                    NotesCard(notes = dermaNotes!!, dermaName = dermaName)
+                    Spacer(Modifier.height(12.dp))
+                }
 
-                // Risk description
-                // Optional title row
-                // --- INLINE RISK LOGIC (fastest, no extra function) ---
+
                 val pPct = probability * 100f
                 val alerted = probability >= 0.0112f
 
@@ -268,14 +275,22 @@ fun LesionCaseTemplate(
 
                 val summaryMessage = if (!alerted) {
                     "This scan looks reassuring, with a very low likelihood of a serious issue. " +
-                            "You can continue your normal skincare routine. Just keep being mindful of your skin and how it changes over time."
+                            "You can continue your normal skincare routine. However, it's still a good idea to consult a dermatologist for proper evaluation. " +
+                            "If you notice any changes in the spot within 2 to 4 weeks, such as growth, darkening, itching, or bleeding, please schedule a check-up."
                 } else {
                     when {
-                        pPct < 10f -> "Your result shows a very low chance of concern. This is reassuring, and there’s no need to worry. It may help to simply check your skin from time to time, just to stay aware of any changes."
-                        pPct < 30f -> "Your result suggests only a low chance of concern. Everything appears fine. We encourage you to casually observe your skin every now and then, and let a doctor know if you notice something different."
-                        pPct < 60f -> "We noticed some minor concern in your skin. This does not mean there is a serious issue, but talking with a doctor could provide peace of mind and helpful guidance."
-                        pPct < 80f -> "Your result shows some concern. To better understand this, we recommend scheduling a skin check with a dermatologist. They can give you clearer answers and reassurance."
-                        else       -> "Your result shows a higher level of concern. For your safety and peace of mind, we encourage you to visit a dermatologist soon so you can receive proper care and support."
+                        pPct < 10f -> "Your result shows a very low chance of concern. This is reassuring, and there’s no need to worry. " +
+                                "Still, we recommend consulting a dermatologist for proper assessment. " +
+                                "If the mole or spot changes in the next 2 to 4 weeks, it's best to get it checked."
+                        pPct < 30f -> "Your result suggests a low chance of concern. Everything appears fine. " +
+                                "For safety, we still encourage visiting a dermatologist for confirmation. " +
+                                "Monitor the area and consult a doctor if you notice changes within 1 to 3 weeks."
+                        pPct < 60f -> "We noticed a minor concern in your scan. This does not mean there is a serious issue, but consulting a dermatologist can provide clarity and peace of mind. " +
+                                "Please also monitor the spot for any changes within 1 to 3 weeks."
+                        pPct < 80f -> "Your result shows some concern. To better understand this finding, we recommend scheduling a skin check with a dermatologist. " +
+                                "If the area changes in appearance over the next 1 to 2 weeks, please seek medical care sooner."
+                        else       -> "Your result shows a higher level of concern. For your safety and peace of mind, we strongly encourage you to visit a dermatologist soon for proper evaluation. " +
+                                "If you notice any changes in the spot within 1 to 2 weeks, seek medical attention immediately."
                     }
                 }
 
@@ -729,16 +744,24 @@ fun generateTherapeuticMessage(
 
     // --- Copy ---
     if (!alerted) {
-        return "This scan looks reassuring, with a very low likelihood of a serious issue. " +
-                "You can continue your normal skincare routine. Just keep being mindful of your skin and how it changes over time."+
+        return  "This scan looks reassuring, with a very low likelihood of a serious issue. " +
+                "You can continue your normal skincare routine. However, it's still a good idea to consult a dermatologist for proper evaluation. " +
+                "If you notice any changes in the spot within 2 to 4 weeks, such as growth, darkening, itching, or bleeding, please schedule a check-up."+
                 possibleBlock
     }
     val base = when {
-        pPct < 10f -> "Your result shows a very low chance of concern. This is reassuring, and there’s no need to worry. It may help to simply check your skin from time to time, just to stay aware of any changes."
-        pPct < 30f -> "Your result suggests only a low chance of concern. Everything appears fine. We encourage you to casually observe your skin every now and then, and let a doctor know if you notice something different."
-        pPct < 60f -> "We noticed some minor concern in your skin. This does not mean there is a serious issue, but talking with a doctor could provide peace of mind and helpful guidance."
-        pPct < 80f -> "Your result shows some concern. To better understand this, we recommend scheduling a skin check with a dermatologist. They can give you clearer answers and reassurance."
-        else       -> "Your result shows a higher level of concern. For your safety and peace of mind, we encourage you to visit a dermatologist soon so you can receive proper care and support."
+        pPct < 10f -> "Your result shows a very low chance of concern. This is reassuring, and there’s no need to worry. " +
+                "Still, we recommend consulting a dermatologist for proper assessment. " +
+                "If the mole or spot changes in the next 2 to 4 weeks, it's best to get it checked."
+        pPct < 30f -> "Your result suggests a low chance of concern. Everything appears fine. " +
+                "For safety, we still encourage visiting a dermatologist for confirmation. " +
+                "Monitor the area and consult a doctor if you notice changes within 1 to 3 weeks."
+        pPct < 60f -> "We noticed a minor concern in your scan. This does not mean there is a serious issue, but consulting a dermatologist can provide clarity and peace of mind. " +
+                "Please also monitor the spot for any changes within 1 to 3 weeks."
+        pPct < 80f -> "Your result shows some concern. To better understand this finding, we recommend scheduling a skin check with a dermatologist. " +
+                "If the area changes in appearance over the next 1 to 2 weeks, please seek medical care sooner."
+        else       -> "Your result shows a higher level of concern. For your safety and peace of mind, we strongly encourage you to visit a dermatologist soon for proper evaluation. " +
+                "If you notice any changes in the spot within 1 to 2 weeks, seek medical attention immediately."
     }
 
     return base + possibleBlock
@@ -832,3 +855,97 @@ val conditionInfo: Map<String, ConditionInfo> = mapOf(
         imageResId = R.drawable.dermatofibroma
     )
 )
+
+
+@Composable
+private fun NotesCard(notes: String, dermaName: String? = null) {
+    if (notes.isBlank()) return
+
+    Card(
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier.fillMaxWidth(), // ✅ matches Risk Assessment width
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+        border = BorderStroke(
+            1.5.dp,
+            Brush.linearGradient(
+                listOf(Color(0xFF3DDAD7), Color(0xFF00BFA6)) // teal gradient border
+            )
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xFFE6FFFB),  // light aqua top
+                            Color(0xFFFFFFFF)   // fades to white
+                        )
+                    )
+                )
+                .padding(16.dp) // ✅ same padding as risk assessment card
+        ) {
+            // 🏥 Title Row with Icon
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.MedicalInformation,
+                    contentDescription = "Dermatologist Notes",
+                    tint = Color(0xFF009688), // teal tone
+                    modifier = Modifier.size(28.dp)
+                )
+                Text(
+                    text = "Dermatologist’s Official Notes",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF00695C)
+                    )
+                )
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            // 💬 Notes text
+            Text(
+                text = notes,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    color = Color(0xFF004D40),
+                    lineHeight = 20.sp
+                )
+            )
+
+            Spacer(Modifier.height(10.dp))
+
+            Divider(
+                color = Color(0xFFB2DFDB),
+                thickness = 1.dp,
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+            val footer = if (!dermaName.isNullOrBlank()) {
+                "This guidance was provided by ${ensureDrPrefix(dermaName)}, a certified dermatologist."
+            } else {
+                "This guidance was provided by a certified dermatologist."
+            }
+
+            Text(
+                text = footer,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    color = Color(0xFF00796B),
+                    fontWeight = FontWeight.Medium
+                ),
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+
+        }
+    }
+}
+
+private fun ensureDrPrefix(name: String): String {
+    val n = name.trim()
+    val startsWithDr = n.startsWith("Dr.", ignoreCase = true) || n.startsWith("Dr ", ignoreCase = true)
+    return if (startsWithDr) n else "Dr. $n"
+}
+

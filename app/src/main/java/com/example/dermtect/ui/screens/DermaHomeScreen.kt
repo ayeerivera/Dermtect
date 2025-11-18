@@ -2,8 +2,10 @@ package com.example.dermtect.ui.screens
 
 import android.net.Uri
 import android.util.Log
-import androidx.compose.foundation.BorderStroke
-
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.ui.window.Dialog
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,7 +21,6 @@ import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Logout
-import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -58,11 +59,14 @@ import com.example.dermtect.ui.tutorial.TutorialOverlay
 import com.example.dermtect.ui.viewmodel.DermaHomeViewModel
 import com.google.firebase.firestore.FirebaseFirestoreException
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import com.example.dermtect.ui.components.SecondaryButton
 import kotlinx.coroutines.tasks.await
 import androidx.compose.runtime.getValue
 import com.google.firebase.firestore.Query
+import androidx.compose.runtime.collectAsState
+import com.google.firebase.auth.FirebaseAuth
 
 
 @Composable
@@ -96,15 +100,20 @@ fun DermaHomeScreen(
     val profileUri: Uri? = null
     val isGoogleAccount = false
     val userRole = "derma" // or "user" – whatever your app expects
-    var hasConsented by remember { mutableStateOf(true) } // gate if you need it
-    var showConsentDialog by remember { mutableStateOf(false) }
+    val dermaHasConsented by vm.dermaHasConsented.collectAsState()
+    val dermaConsentChecked by vm.dermaConsentChecked.collectAsState()
+
+    var showDermaConsentDialog by remember { mutableStateOf(false) }
+    var initialDermaConsentDialogShown by rememberSaveable { mutableStateOf(false) }
+
     val assessmentLabel = "Start Assessment" // or "My Initial Assessment"
     val context = LocalContext.current
-    val tutorial = remember { DermaTutorialManager() } // or TutorialManager()
+    val tutorial = remember { DermaTutorialManager() }
     val showTutorial by produceState<Boolean?>(initialValue = null, tutorial, context) {
-        tutorial.initialize(context)     // sets tutorial.isFirstRun
+        tutorial.initialize(context)
         value = tutorial.isFirstRun
     }
+
     // 🔑 Use the live counts from the ViewModel
     val pendingCount by vm.pendingCount.collectAsState(initial = 0)
     val totalCount by vm.totalCount.collectAsState(initial = 0)
@@ -124,6 +133,16 @@ fun DermaHomeScreen(
     }
     LaunchedEffect(Unit) {
         try { FirebaseFirestore.getInstance().enableNetwork() } catch (_: Exception) {}
+    }
+
+    LaunchedEffect(Unit) {
+        vm.checkDermaConsentStatus()
+    }
+    LaunchedEffect(dermaConsentChecked, dermaHasConsented) {
+        if (dermaConsentChecked && !dermaHasConsented && !initialDermaConsentDialogShown) {
+            showDermaConsentDialog = true
+            initialDermaConsentDialogShown = true
+        }
     }
 
     // 🔑 LaunchedEffect to fetch only the newest pending case (limit 1)
@@ -234,6 +253,8 @@ fun DermaHomeScreen(
                         .align(Alignment.TopEnd)
                         .padding(top = 8.dp)
                         .onGloballyPositioned { coords ->
+                            Log.d("Tutorial", "derma_profile_menu bounds set")
+
                             if (tutorial.getStepKey() == "derma_profile_menu") {
                                 tutorial.currentTargetBounds = coords.boundsInWindow()
                             }
@@ -245,31 +266,35 @@ fun DermaHomeScreen(
                         onExpandedChange = { menuExpanded = it },
                         assessmentLabel = "Start Assessment",
                         onEditProfile = {
-                            val f = Uri.encode(firstName.ifBlank { "-" })
-                            val l = Uri.encode(lastName.ifBlank { "-" })
-                            val e = Uri.encode(email.ifBlank { "-" })
-                            val g = isGoogle.toString()
-
-                            navController.navigate("profile/$f/$l/$e/$g/derma")
+                            if (!dermaHasConsented) {
+                                showDermaConsentDialog = true
+                            } else {
+                                val e = Uri.encode(email.ifBlank { "-" })
+                                val g = isGoogle.toString()
+                                navController.navigate("derma_profile/$e/$g")
+                            }
                         },
+
                         onAssessmentClick = {
-                            if (!hasConsented) {
-                                showConsentDialog = true
+                            if (!dermaHasConsented) {
+                                showDermaConsentDialog = true
                             } else {
                                 navController.navigate("questionnaire")
 
                             }
                         },
-                        onViewNotifications = {
-                            if (!hasConsented) {
-                                showConsentDialog = true
-                            } else {
-                                navController.navigate("notifications")
-                            }
-                        },
+
                         onAboutClick = { navController.navigate("about") },
-                        onDataPrivacyClick = { navController.navigate("terms_privacy") },
-                        onLogoutClick = { navController.navigate("login") }
+                        onDataPrivacyClick = { navController.navigate("derma_terms_privacy") },
+                        onLogoutClick = {
+                            FirebaseAuth.getInstance().signOut()
+                            navController.navigate("login") {
+                                popUpTo("derma_home") {
+                                    inclusive = true     // remove home itself too
+                                }
+                                launchSingleTop = true
+                            }
+                        }
                     )
 
                 }
@@ -284,12 +309,24 @@ fun DermaHomeScreen(
             ) {
                 StatCardRow(
                     tutorial = tutorial,
-                    onPendingCasesClick = onPendingCasesClick,
-                    onTotalCasesClick = onTotalCasesClick,
-                    // 🔑 Use ViewModel counts directly
+                    onPendingCasesClick = {
+                        if (!dermaHasConsented) {
+                            showDermaConsentDialog = true
+                        } else {
+                            onPendingCasesClick()
+                        }
+                    },
+                    onTotalCasesClick = {
+                        if (!dermaHasConsented) {
+                            showDermaConsentDialog = true
+                        } else {
+                            onTotalCasesClick()
+                        }
+                    },
                     pendingCount = pendingCount,
                     totalCount = totalCount
                 )
+
 
 
 
@@ -320,6 +357,8 @@ fun DermaHomeScreen(
                     DermaLookupInline(
                         tutorial = tutorial,
                         navController = navController,
+                        hasConsented = dermaHasConsented,
+                        onRequireConsent = { showDermaConsentDialog = true },
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -409,20 +448,47 @@ fun DermaHomeScreen(
             }
 
             DermaBottomNavBar(
-                onCameraClick = onCameraClick,
+                onCameraClick = {
+                    if (!dermaHasConsented) {
+                        showDermaConsentDialog = true
+                    } else {
+                        onCameraClick()
+                    }
+                },
                 cameraModifier = Modifier.onGloballyPositioned { coords ->
                     if (tutorial.getStepKey() == "camera_scanner") {
                         tutorial.currentTargetBounds = coords.boundsInWindow()
                     }
-                })
+                }
+            )
         }
 
-        if (showTutorial == true && !tutorial.isFinished()) {
+        // 1) Show consent dialog first (on top of everything)
+        if (showDermaConsentDialog && !dermaHasConsented) {
+            DermaPrivacyDialog(
+                show = showDermaConsentDialog,
+                onAgree = {
+                    vm.saveDermaConsent()
+                    showDermaConsentDialog = false
+                },
+                onDismiss = {
+                    showDermaConsentDialog = false
+                },
+                onViewTermsClick = {
+                    navController.navigate("terms_privacy")
+                }
+            )
+        }
+
+// 2) Show tutorial ONLY when consent dialog is not showing
+        if (showTutorial == true && !tutorial.isFinished() && !showDermaConsentDialog) {
             TutorialOverlay(
                 tutorialManager = tutorial,
                 onFinish = { scope.launch { tutorial.markSeen(context) } }
             )
         }
+
+
     }
 }
 
@@ -536,9 +602,12 @@ fun StatCard(
 fun DermaLookupInline(
     tutorial: DermaTutorialManager,
     navController: NavController,
+    hasConsented: Boolean,
+    onRequireConsent: () -> Unit,
     modifier: Modifier = Modifier,
     onCameraClick: () -> Unit = {},
 ) {
+
     val db = remember { FirebaseFirestore.getInstance() }
     val scope = rememberCoroutineScope()
 
@@ -583,6 +652,11 @@ fun DermaLookupInline(
             PrimaryButton(
                 text = "Search",
                 onClick = {
+                    if (!hasConsented) {
+                        onRequireConsent()
+                        return@PrimaryButton
+                    }
+
                     scope.launch {
                         loading = true
                         error = null
@@ -788,7 +862,6 @@ fun DermaDropdownMenu(
     assessmentLabel: String,                 // "My Initial Assessment" or "Start Assessment"
     onEditProfile: () -> Unit,
     onAssessmentClick: () -> Unit,
-    onViewNotifications: () -> Unit,
     onAboutClick: () -> Unit,
     onDataPrivacyClick: () -> Unit,
     onLogoutClick: () -> Unit
@@ -865,15 +938,6 @@ fun DermaDropdownMenu(
 
                         Divider(color = divider)
 
-                        MenuRow(
-                            label = "View Notifications",
-                            rowHeight = rowH,
-                            onClick = {
-                                onExpandedChange(false); onViewNotifications()
-                            }
-                        ) {
-                            IconBadge { Icon(Icons.Outlined.NotificationsNone, null, tint = Color(0xFF2B6E6E)) }
-                        }
 
                         MenuRow(
                             label = "Edit Profile",
@@ -1145,3 +1209,192 @@ private fun CaseFoundDialog(
         }
     }
 }
+@Composable
+fun DermaPrivacyDialog(
+    show: Boolean,
+    onAgree: () -> Unit,
+    onDismiss: () -> Unit,
+    onViewTermsClick: () -> Unit
+) {
+    if (!show) return
+
+    Dialog(onDismissRequest = { /* block outside dismiss so they decide */ }) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White, shape = RoundedCornerShape(25.dp))
+                .widthIn(max = 500.dp)
+                .border(0.5.dp, Color(0xFF0FB2B2), shape = RoundedCornerShape(25.dp))
+                .padding(20.dp)
+        ) {
+            DermaPrivacyContent(
+                onAgree = onAgree,
+                onDismiss = onDismiss,
+                onViewTermsClick = onViewTermsClick
+            )
+        }
+    }
+}
+
+@Composable
+private fun DermaPrivacyContent(
+    onAgree: () -> Unit,
+    onDismiss: () -> Unit,
+    onViewTermsClick: () -> Unit
+) {
+    var isChecked by remember { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
+    val atBottom by remember {
+        derivedStateOf { scrollState.value >= scrollState.maxValue - 6 }
+    }
+
+    val fullText = """
+As a dermatologist using DermTect, you may view and handle sensitive patient information and images.
+
+By continuing, you confirm that you will:
+• Use patient data only for clinical assessment and care
+• Keep all case information confidential
+• Avoid saving or sharing screenshots or reports outside secure channels
+• Follow your clinic’s and local regulations on data privacy and record-keeping
+
+You can review our full Terms & Privacy Policy at any time.
+    """.trimIndent()
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 450.dp, max = 520.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .verticalScroll(scrollState)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Clinical Data Privacy",
+                style = MaterialTheme.typography.headlineMedium,
+                color = Color(0xFF0FB2B2)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = fullText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF1D1D1D)
+            )
+
+            Spacer(modifier = Modifier.height(23.dp))
+
+            // ✅ Checkbox area (same style as user)
+            Row(
+                verticalAlignment = Alignment.Top
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(22.dp)
+                        .border(1.dp, Color.Black, RoundedCornerShape(4.dp))
+                        .background(
+                            if (isChecked) Color(0xFF0FB2B2) else Color.Transparent,
+                            shape = RoundedCornerShape(4.dp)
+                        )
+                        .clickable { isChecked = !isChecked },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isChecked) {
+                        Text(
+                            text = "✓",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Text(
+                    text = "I understand that the cases I view may contain sensitive patient data and I will handle them confidentially according to clinic policy and local regulations.",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal),
+                    color = Color(0xFF1D1D1D),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            Spacer(modifier = Modifier.height(23.dp))
+
+            // ✅ Primary button – only enabled when checked
+            PrimaryButton(
+                text = "I Understand",
+                onClick = {
+                    if (isChecked) onAgree()
+                },
+                enabled = isChecked,
+                cornerRadius = 12.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            SecondaryButton(
+                text = "Not Now",
+                onClick = onDismiss,
+                cornerRadius = 12.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "🔗 View Full Terms & Privacy Policy",
+                color = Color(0xFF0FB2B2),
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                modifier = Modifier
+                    .clickable { onViewTermsClick() }
+                    .padding(vertical = 4.dp)
+            )
+        }
+
+        // 🔽 Scroll hint like in user dialog
+        AnimatedVisibility(
+            visible = !atBottom && scrollState.maxValue > 0,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.9f))
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.linearGradient(
+                            listOf(
+                                Color(0xFFBFFDFD),
+                                Color(0xFF88E7E7),
+                                Color(0xFF55BFBF)
+                            )
+                        ),
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.ArrowDownward,
+                    contentDescription = "Scroll down",
+                    tint = Color(0xFF0FB2B2)
+                )
+            }
+        }
+    }
+}
+

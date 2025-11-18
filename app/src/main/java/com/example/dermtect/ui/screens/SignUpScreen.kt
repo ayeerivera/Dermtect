@@ -2,9 +2,6 @@ package com.example.dermtect.ui.screens
 
 import android.util.Patterns
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -13,7 +10,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -40,14 +36,18 @@ import com.example.dermtect.domain.usecase.AuthUseCase
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarToday
-import androidx.compose.material.icons.outlined.HealthAndSafety
-import androidx.compose.material.icons.outlined.MedicalInformation
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.outlined.MedicalServices
+import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.TextRange
+import androidx.compose.material3.TextFieldDefaults
+
+
 
 @Composable
-fun Register(navController: NavController) {
+fun Register(
+    navController: NavController
+) {
     val focusManager = LocalFocusManager.current
 
     val context = LocalContext.current
@@ -71,6 +71,8 @@ fun Register(navController: NavController) {
     var showBackDialog by remember { mutableStateOf(false) }
     var birthday by rememberSaveable { mutableStateOf("") }
 
+    var birthdayValid by rememberSaveable { mutableStateOf(false) }
+
     val isEmailValid = email.isNotBlank() &&
             Patterns.EMAIL_ADDRESS.matcher(email).matches() &&
             !email.contains(" ")
@@ -79,11 +81,16 @@ fun Register(navController: NavController) {
         password == confirmPassword && viewModel.isPasswordStrong(password)
     }
 
-    val isFormValid = firstName.isNotBlank() &&
-            lastName.isNotBlank() &&
-            isEmailValid &&
-            isPasswordValid &&
-            birthday.isNotBlank()
+    val isFormValid = remember(
+        firstName, lastName, email, password, confirmPassword,
+        isEmailValid, isPasswordValid, birthdayValid
+    ) {
+        firstName.isNotBlank() &&
+                lastName.isNotBlank() &&
+                isEmailValid &&
+                isPasswordValid &&
+                birthdayValid
+    }
 
     BubblesBackground {
 
@@ -105,14 +112,19 @@ fun Register(navController: NavController) {
                 BackButton(
                     modifier = Modifier.align(Alignment.CenterStart),
                     onClick = {
-                        if (firstName.isNotBlank() || lastName.isNotBlank() || email.isNotBlank() || password.isNotBlank() || confirmPassword.isNotBlank()) {
+                        if (
+                            firstName.isNotBlank() ||
+                            lastName.isNotBlank() ||
+                            email.isNotBlank() ||
+                            password.isNotBlank() ||
+                            confirmPassword.isNotBlank()
+                        ) {
                             showBackDialog = true
                         } else {
                             navController.popBackStack()
                         }
                     }
                 )
-
             }
 
             Column(
@@ -126,14 +138,52 @@ fun Register(navController: NavController) {
                     style = MaterialTheme.typography.displayLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color(0xFF1D1D1D)
                 )
+                Box(
+                    modifier = Modifier
+                        .background(
+                            color = Color(0xFFE0FBFB),
+                            shape = RoundedCornerShape(50)
+                        )
+                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                ) {
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                color = Color(0xFFE0FBFB),
+                                shape = RoundedCornerShape(50)
+                            )
+                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Outlined.MedicalServices,
+                                contentDescription = null,
+                                tint = Color(0xFF0FB2B2),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Regular User Account",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF0FB2B2)
+                                )
+                            )
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(30.dp))
 
+                // First name (LIMIT 30)
                 InputField(
                     value = firstName,
                     onValueChange = {
-                        firstName = it.replaceFirstChar { char ->
-                            char.uppercaseChar().toString()
-                        }
+                        firstName = it
+                            .take(30) // ✅ same as derma
+                            .replaceFirstChar { char -> char.uppercaseChar().toString() }
 
                         if (!fnameTouched) fnameTouched = true
                     },
@@ -146,12 +196,14 @@ fun Register(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(5.dp))
 
+                // Last name (LIMIT 30)
                 InputField(
                     value = lastName,
                     onValueChange = {
-                        lastName = it.replaceFirstChar { char ->
-                            char.uppercaseChar().toString()
-                        }
+                        lastName = it
+                            .take(30) // ✅ same as derma
+                            .replaceFirstChar { char -> char.uppercaseChar().toString() }
+
                         if (!lnameTouched) lnameTouched = true
                     },
                     placeholder = "Last Name",
@@ -163,40 +215,39 @@ fun Register(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(5.dp))
 
+                // Birthday (already validated)
                 BirthdayMaskedField(
                     birthday = birthday,
                     onValueChange = { birthday = it },
-                    onValidDate = { birthday = it }, // keeps the validated value,
+                    onValidDate = { birthday = it },
+                    onValidationChange = { isValid -> birthdayValid = isValid },
                     modifier = Modifier.align(Alignment.CenterHorizontally)
-
                 )
-
-
 
                 Spacer(modifier = Modifier.height(5.dp))
 
+                // Email (LIMIT 64)
                 InputField(
                     value = email,
-                    onValueChange = { email = it },
+                    onValueChange = { email = it.take(64) },  // ✅ same limit as derma
                     placeholder = "Email",
                     iconRes = R.drawable.icon_email,
                     textColor = Color.Black,
                     isPassword = false,
                     errorMessage = when {
                         email.contains(" ") -> "Email must not contain spaces"
-                        email.isNotBlank() && !Patterns.EMAIL_ADDRESS.matcher(email)
-                            .matches() -> "Enter a valid email"
-
+                        email.isNotBlank() && !Patterns.EMAIL_ADDRESS.matcher(email).matches() ->
+                            "Enter a valid email"
                         else -> null
                     }
                 )
 
-
                 Spacer(modifier = Modifier.height(5.dp))
 
+                // Password (LIMIT 32)
                 InputField(
                     value = password,
-                    onValueChange = { password = it },
+                    onValueChange = { password = it.take(32) },  // ✅ same limit as derma
                     placeholder = "Password",
                     iconRes = R.drawable.icon_pass,
                     textColor = Color.Black,
@@ -208,21 +259,23 @@ fun Register(navController: NavController) {
                     }
                 )
 
-
                 Spacer(modifier = Modifier.height(5.dp))
 
+                // Confirm password (LIMIT 32)
                 InputField(
                     value = confirmPassword,
-                    onValueChange = { confirmPassword = it },
+                    onValueChange = { confirmPassword = it.take(32) }, // ✅ same limit as derma
                     placeholder = "Confirm Password",
                     iconRes = R.drawable.icon_pass,
                     textColor = Color.Black,
                     isPassword = true,
-                    errorMessage = if (confirmPassword.isNotBlank() && password != confirmPassword) "Passwords do not match" else null
+                    errorMessage = if (confirmPassword.isNotBlank() && password != confirmPassword)
+                        "Passwords do not match" else null
                 )
 
                 Spacer(modifier = Modifier.height(30.dp))
 
+                // Button (unchanged)
                 Box(
                     modifier = Modifier
                         .width(320.dp)
@@ -236,17 +289,17 @@ fun Register(navController: NavController) {
                             brush = if (isFormValid && !loading) {
                                 Brush.verticalGradient(
                                     colors = listOf(
-                                        Color(0xFF5FEAEA), // top lighter shade
-                                        Color(0xFF2A9D9D), // middle shade
-                                        Color(0xFF187878)  // bottom darker shade
+                                        Color(0xFF5FEAEA),
+                                        Color(0xFF2A9D9D),
+                                        Color(0xFF187878)
                                     )
                                 )
                             } else {
                                 Brush.verticalGradient(
                                     colors = listOf(
-                                        Color(0xFFBDBDBD), // top light grey
-                                        Color(0xFF9E9E9E), // middle grey
-                                        Color(0xFF757575)  // bottom dark grey
+                                        Color(0xFFBDBDBD),
+                                        Color(0xFF9E9E9E),
+                                        Color(0xFF757575)
                                     )
                                 )
                             },
@@ -258,7 +311,11 @@ fun Register(navController: NavController) {
                                 password = password,
                                 firstName = firstName,
                                 lastName = lastName,
-                                birthday = birthday
+                                birthday = birthday,
+                                role = "patient",
+                                clinicName = null,
+                                contactNumber = null,
+                                clinicAddress = null
                             )
                         },
                     contentAlignment = Alignment.Center
@@ -272,7 +329,6 @@ fun Register(navController: NavController) {
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
-
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Row {
@@ -285,30 +341,33 @@ fun Register(navController: NavController) {
                         text = "Login",
                         style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                         color = Color(0xFF2FD8D8),
-                        modifier = Modifier.clickable { navController.navigate("login") }
+                        modifier = Modifier.clickable {
+                            navController.navigate("login?role=patient")
+                        }
                     )
                 }
             }
+
+            // In Register.kt, inside the main Box scope
+
+// Back confirmation dialog
             if (showBackDialog) {
                 DialogTemplate(
                     show = showBackDialog,
-                    title = "Go Back?",
-                    description = "Your details won’t be saved.",
-                    primaryText = "Yes, go back",
+                    title = "Unsaved Changes",
+                    description = "Are you sure you want to go back? All entered information will be lost.",
+                    primaryText = "Go Back",
                     onPrimary = {
                         showBackDialog = false
                         navController.popBackStack()
                     },
                     secondaryText = "Cancel",
-                    onSecondary = {
-                        showBackDialog = false
-                    },
-                    onDismiss = {
-                        showBackDialog = false
-                    }
+                    onSecondary = { showBackDialog = false },
+                    onDismiss = { showBackDialog = false }
                 )
             }
-            // Show dialog when registration is successful
+
+// 🚀 Add the Registration Success Dialog
             if (showSuccessDialog) {
                 DialogTemplate(
                     show = showSuccessDialog,
@@ -333,32 +392,37 @@ fun Register(navController: NavController) {
                 )
             }
 
-            // Listen for registration success
+// ----------------------------------------------------
+// 🚀 Add the LaunchedEffect Blocks (CRITICAL FIX)
+// ----------------------------------------------------
+
+// B. Success Listener (Triggers the Dialog)
             LaunchedEffect(authSuccess) {
                 if (authSuccess) {
                     showSuccessDialog = true
-                    viewModel.resetAuthSuccess()
+                    viewModel.resetAuthSuccess() // Reset the state so it can be triggered again later
                 }
             }
 
-            // Listen for error messages
+// C. Error Listener (Triggers the Toast)
             LaunchedEffect(errorMessage) {
                 errorMessage?.let {
-                    Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
-                    viewModel.clearError()
+                    Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+                    viewModel.clearError() // Reset the error state
                 }
-
             }
-
         }
     }
 }
+
+
 
 @Composable
 fun BirthdayMaskedField(
     birthday: String,
     onValueChange: (String) -> Unit,
     onValidDate: (String) -> Unit = {},
+    onValidationChange: (Boolean) -> Unit = {}, // report validity upward
     modifier: Modifier = Modifier
 ) {
     var tfv by remember {
@@ -371,103 +435,87 @@ fun BirthdayMaskedField(
     }
     var error by remember { mutableStateOf<String?>(null) }
 
-    // keep external state in sync if it changes (e.g., restored or cleared)
     LaunchedEffect(birthday) {
         if (birthday != tfv.text) {
             tfv = tfv.copy(text = birthday, selection = TextRange(birthday.length))
         }
     }
-    Box(
-        modifier = Modifier.fillMaxWidth(),
-        contentAlignment = Alignment.Center
-    ) {
 
-        TextField(
-            value = tfv,
-            onValueChange = { new ->
-                // mask: keep only digits, insert slashes as MM/DD/YYYY
-                val digits = new.text.filter(Char::isDigit).take(8)
-                val masked = when {
-                    digits.length <= 2 -> digits
-                    digits.length <= 4 -> digits.substring(0, 2) + "/" + digits.substring(2)
-                    else -> digits.substring(0, 2) + "/" + digits.substring(
-                        2,
-                        4
-                    ) + "/" + digits.substring(4)
-                }
+    TextField(
+        value = tfv,
+        onValueChange = { new ->
+            val digits = new.text.filter(Char::isDigit).take(8)
+            val masked = when {
+                digits.length <= 2 -> digits
+                digits.length <= 4 -> digits.substring(0, 2) + "/" + digits.substring(2)
+                else -> digits.substring(0, 2) + "/" + digits.substring(2, 4) + "/" + digits.substring(4)
+            }
 
-                // move cursor to end of masked text
-                tfv = TextFieldValue(masked, selection = TextRange(masked.length))
-                onValueChange(masked)
+            tfv = TextFieldValue(masked, selection = TextRange(masked.length))
+            onValueChange(masked)
 
-                error = null
-                if (masked.length == 10) {
-                    val ok = runCatching {
-                        val sdf =
-                            java.text.SimpleDateFormat("MM/dd/yyyy", java.util.Locale.getDefault())
-                        sdf.isLenient = false
-                        val d = sdf.parse(masked)!!
-                        val now = java.util.Calendar.getInstance()
-                        val min = (now.clone() as java.util.Calendar).apply {
-                            add(
-                                java.util.Calendar.YEAR,
-                                -110
-                            )
-                        }
-                        d.time in min.timeInMillis..now.timeInMillis
-                    }.getOrDefault(false)
-                    if (ok) onValidDate(masked) else error = "Invalid date"
-                }
-            },
-            singleLine = true,
-            readOnly = false,
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Outlined.CalendarToday,
-                    contentDescription = null,
-                    tint = Color.Gray,
-                    modifier = Modifier.size(18.dp)
-                )
-            },
-            placeholder = {
-                Text(
-                    text = "Birthday (MM/DD/YYYY)",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.Normal,
-                        color = Color.DarkGray
-                    )
-                )
-            },
-            textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-            shape = RoundedCornerShape(10.dp),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color(0xFFF7F7F7),
-                unfocusedContainerColor = Color(0xFFF7F7F7),
-                disabledContainerColor = Color(0xFFF0F0F0),
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                focusedTextColor = Color.Black,
-                unfocusedTextColor = Color.Black,
-                cursorColor = Color.Black
-            ),
-            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions.Default.copy(
-                keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
-            ),
-            modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .height(56.dp)
-        )
+            var valid = false
+            error = null
 
-        if (!error.isNullOrBlank()) {
-            Text(
-                text = error!!,
-                color = Color.Red,
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier
-                    .padding(start = 16.dp, top = 4.dp)
-                    .fillMaxWidth(0.9f)
+            if (masked.length == 10) {
+                valid = runCatching {
+                    val sdf = java.text.SimpleDateFormat("MM/dd/yyyy", java.util.Locale.getDefault()).apply {
+                        isLenient = false
+                    }
+                    val d = sdf.parse(masked)!!
+                    val now = java.util.Calendar.getInstance()
+                    val min = (now.clone() as java.util.Calendar).apply { add(java.util.Calendar.YEAR, -110) }
+                    d.time in min.timeInMillis..now.timeInMillis
+                }.getOrDefault(false)
+
+                if (valid) onValidDate(masked) else error = "Invalid date"
+            }
+            onValidationChange(valid)
+        },
+        singleLine = true,
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Outlined.CalendarToday,
+                contentDescription = null,
+                tint = Color.Gray,
+                modifier = Modifier.size(18.dp)
             )
-        }
-    }
+        },
+        placeholder = {
+            Text(
+                text = "Birthday (MM/DD/YYYY)",
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.Normal,
+                    color = Color.DarkGray
+                )
+            )
+        },
+        textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+        shape = RoundedCornerShape(10.dp),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = Color(0xFFF7F7F7),
+            unfocusedContainerColor = Color(0xFFF7F7F7),
+            disabledContainerColor = Color(0xFFF0F0F0),
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+            focusedTextColor = Color.Black,
+            unfocusedTextColor = Color.Black,
+            cursorColor = Color.Black
+        ),
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions.Default.copy(
+            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+        ),
+        modifier = modifier
+            .fillMaxWidth(0.9f),
+        isError = !error.isNullOrBlank(),
+        supportingText = if (!error.isNullOrBlank()) {
+            {
+                Text(
+                    text = error!!,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.labelMedium
+                )
+            }
+        } else null
+    )
 }
-

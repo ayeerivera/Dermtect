@@ -1,6 +1,5 @@
 package com.example.dermtect.ui.screens
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,7 +8,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -21,13 +19,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import com.example.dermtect.R
 import com.example.dermtect.ui.components.BubblesBackground
 import com.example.dermtect.ui.components.InputField
@@ -43,13 +38,10 @@ import android.widget.Toast
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Scaffold
 import com.example.dermtect.ui.components.BackButton
 import com.example.dermtect.ui.components.DialogTemplate
 import com.example.dermtect.ui.components.GifImage
-import com.example.dermtect.ui.components.SecondaryButton
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -57,10 +49,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.sp
 import com.example.dermtect.data.repository.AuthRepositoryImpl
 import com.example.dermtect.domain.usecase.AuthUseCase
+import androidx.activity.compose.BackHandler
 
 
 @Composable
-fun Login(navController: NavController) {
+fun Login(navController: NavController, role: String) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var showBackDialog by remember { mutableStateOf(false) }
@@ -74,6 +67,7 @@ fun Login(navController: NavController) {
 
     val context = LocalContext.current
     val isLoading by viewModel.isLoading.collectAsState()
+    var showEmailNotVerifiedDialog by remember { mutableStateOf(false) }
 
     BubblesBackground {
 
@@ -228,8 +222,6 @@ fun Login(navController: NavController) {
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Row {
@@ -243,11 +235,41 @@ fun Login(navController: NavController) {
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                             color = Color(0xFF2FD8D8),
                             modifier = Modifier.clickable {
-                                navController.navigate("register")
+                                if (role == "patient") {
+                                    navController.navigate("register_user")
+                                } else {
+                                    navController.navigate("derma_register")
+                                }
                             }
+
                         )
+
                     }
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "Back to choose account",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = Color(0xFF2FD8D8),
+                        textDecoration = TextDecoration.Underline,
+                        modifier = Modifier.clickable {
+                            navController.navigate("choose_account") {
+                                popUpTo("login") { inclusive = true }
+                            }
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(32.dp))
+
                 }
+
+
+                EmailNotVerifiedDialog(
+                    show = showEmailNotVerifiedDialog,
+                    viewModel = viewModel,
+                    onClose = { showEmailNotVerifiedDialog = false }
+                )
+                // Back dialog
                 if (showBackDialog) {
                     DialogTemplate(
                         show = showBackDialog,
@@ -264,6 +286,7 @@ fun Login(navController: NavController) {
                     )
                 }
 
+// ✅ SINGLE LaunchedEffect for authSuccess (with popUpTo)
                 LaunchedEffect(authSuccess) {
                     if (authSuccess) {
                         val uid = FirebaseAuth.getInstance().currentUser?.uid
@@ -271,37 +294,50 @@ fun Login(navController: NavController) {
                             val db = FirebaseFirestore.getInstance()
                             db.collection("users").document(uid).get()
                                 .addOnSuccessListener { document ->
-                                    val role = document.getString("role")
-                                    when (role) {
-                                        "patient" -> navController.navigate("user_home")
-                                        "derma" -> navController.navigate("derma_home")
-                                        else -> navController.navigate("user_home")
+                                    val roleFromDb = document.getString("role")
+                                    when (roleFromDb) {
+                                        "patient" -> navController.navigate("user_home") {
+                                            popUpTo("login") { inclusive = true }
+                                        }
+
+                                        "derma" -> navController.navigate("derma_home") {
+                                            popUpTo("login") { inclusive = true }
+                                            launchSingleTop = true
+
+                                        }
+
+                                        else -> navController.navigate("user_home") {
+                                            popUpTo("login") { inclusive = true }
+                                            launchSingleTop = true
+
+                                        }
                                     }
                                     viewModel.resetAuthSuccess()
                                 }
                                 .addOnFailureListener {
-                                    Toast.makeText(context, "Failed to fetch role", Toast.LENGTH_SHORT)
-                                        .show()
+                                    Toast.makeText(
+                                        context,
+                                        "Failed to fetch role",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
                                 }
                         }
                     }
                 }
                 LaunchedEffect(errorMessage) {
                     errorMessage?.let { message ->
-                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-
-                        viewModel.clearError() } }
-                val navigateToHome by viewModel.navigateToHome.collectAsState()
-
-                LaunchedEffect(navigateToHome) {
-                    if (navigateToHome) {
-                        navController.navigate("user_home") {
-                            popUpTo("login") { inclusive = true }
+                        // If it's the "verify email" case, show dialog instead of only toast
+                        if (message.contains("verify your email", ignoreCase = true)) {
+                            showEmailNotVerifiedDialog = true
+                        } else {
+                            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                         }
-                        viewModel.markNavigationDone()
+                        viewModel.clearError()
                     }
                 }
 
+
+// ✅ SINGLE loader dialog
                 DialogTemplate(
                     show = isLoading,
                     title = "Logging you in",
@@ -316,9 +352,50 @@ fun Login(navController: NavController) {
         }
     }
 }
+// In LoginScreen.kt
 
-@Preview(showBackground = true)
 @Composable
-fun LoginPreview() {
-    Login(navController = rememberNavController())
+fun EmailNotVerifiedDialog(
+    show: Boolean,
+    viewModel: AuthViewModel,
+    onClose: () -> Unit // Note: onClose is used to close the dialog
+) {
+    val context = LocalContext.current
+    var isSending by remember { mutableStateOf(false) }
+
+    if (!show) return
+
+    DialogTemplate(
+        show = show,
+        title = "Email Not Verified",
+        description = "Your email is not verified yet. Please check your inbox. " +
+                "If you didn’t receive anything, you can resend the verification email. " +
+                "If you have already verified your email, click Check Status.", // 👈 Updated description
+
+        primaryText = if (isSending) "Sending..." else "Resend Email",
+        onPrimary = {
+            if (!isSending) {
+                isSending = true
+                viewModel.resendVerificationEmail { success, error ->
+                    isSending = false
+                    if (success) {
+                        // ... (Toast message for success)
+                    } else {
+                        // ... (Toast message for error)
+                    }
+                }
+            }
+        },
+
+        // 🚀 CRITICAL CHANGE: Use the secondary action to reload and refresh the state
+        secondaryText = "Check Status", // 👈 New button text
+        onSecondary = {
+            // This calls the function that executes user.reload()
+            // and re-evaluates the AuthUiState.
+            viewModel.reloadAndRefresh()
+            onClose() // Close the dialog
+        },
+
+        onDismiss = { onClose() }
+    )
 }

@@ -1,6 +1,7 @@
 package com.example.dermtect.ui.viewmodel
 
 import android.net.Uri
+import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.compose.runtime.State
@@ -58,6 +59,21 @@ class DermaHomeViewModel : ViewModel() {
     private val _email = mutableStateOf("")
     val email: State<String> = _email
 
+    private val _credentials = mutableStateOf("")
+    val credentials: State<String> = _credentials
+
+    // At top of DermaHomeViewModel (inside class)
+
+    private val _clinicName = MutableStateFlow("")
+    val clinicName: StateFlow<String> = _clinicName
+
+    private val _contactNumber = MutableStateFlow("")
+    val contactNumber: StateFlow<String> = _contactNumber
+
+    private val _clinicAddress = MutableStateFlow("")
+    val clinicAddress: StateFlow<String> = _clinicAddress
+
+
     private val _isGoogleAccount = mutableStateOf(false)
     val isGoogleAccount: State<Boolean> = _isGoogleAccount
 
@@ -65,6 +81,8 @@ class DermaHomeViewModel : ViewModel() {
     val photoUri: State<Uri?> = _photoUri
 
     // --- Firestore / Auth handles ---
+    private val auth = FirebaseAuth.getInstance()
+
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
     private val uid: String? = FirebaseAuth.getInstance().currentUser?.uid
 
@@ -77,11 +95,57 @@ class DermaHomeViewModel : ViewModel() {
     private val _totalCount = MutableStateFlow(0)
     val totalCount: StateFlow<Int> = _totalCount
 
+
+    private val firestore = FirebaseFirestore.getInstance()
+
+    // --- Derma consent state ---
+    private val _dermaHasConsented = MutableStateFlow(false)
+    val dermaHasConsented: StateFlow<Boolean> = _dermaHasConsented
+
+    private val _dermaConsentChecked = MutableStateFlow(false)
+    val dermaConsentChecked: StateFlow<Boolean> = _dermaConsentChecked
+
     init {
         android.util.Log.d("DermaVM", "uid=$uid")
         fetchUserBits()
         loadProfilePhoto()
         startCaseCounters()
+    }
+
+    fun checkDermaConsentStatus() {
+        val uid = auth.currentUser?.uid ?: run {
+            _dermaConsentChecked.value = true
+            _dermaHasConsented.value = false
+            return
+        }
+
+        firestore.collection("users")
+            .document(uid)
+            .get()
+            .addOnSuccessListener { doc ->
+                // you can use any field name you like
+                val consent = doc.getBoolean("dermaDataConsent") ?: false
+                _dermaHasConsented.value = consent
+                _dermaConsentChecked.value = true
+            }
+            .addOnFailureListener {
+                // fail-safe: treat as not consented but mark checked
+                _dermaHasConsented.value = false
+                _dermaConsentChecked.value = true
+            }
+    }
+
+    fun saveDermaConsent() {
+        val uid = auth.currentUser?.uid ?: return
+        firestore.collection("users")
+            .document(uid)
+            .update("dermaDataConsent", true)
+            .addOnSuccessListener {
+                _dermaHasConsented.value = true
+            }
+            .addOnFailureListener {
+                // optional: log error
+            }
     }
 
     private fun loadProfilePhoto() {
@@ -104,6 +168,12 @@ class DermaHomeViewModel : ViewModel() {
                 _lastName.value  = doc.getString("lastName") ?: ""
                 _email.value     = doc.getString("email") ?: ""
                 _isGoogleAccount.value = doc.getBoolean("isGoogleAccount") ?: false
+
+                val dermaMap = doc.get("derma") as? Map<*, *>
+                val rootCreds = doc.getString("credentials")
+                val nestedCreds = dermaMap?.get("credentials") as? String
+                _credentials.value = rootCreds ?: nestedCreds ?: ""
+
             }
     }
 
@@ -240,4 +310,81 @@ class DermaHomeViewModel : ViewModel() {
         regCases?.remove()
         super.onCleared()
     }
+    fun fetchDermaProfile() {
+        val uid = auth.currentUser?.uid ?: return
+
+        db.collection("users").document(uid).get()
+            .addOnSuccessListener { doc ->
+                if (!doc.exists()) return@addOnSuccessListener
+
+                // our registration saved a nested "derma" map
+                val dermaMap = doc.get("derma") as? Map<*, *>
+
+                _clinicName.value   = dermaMap?.get("clinicName")   as? String ?: ""
+                _contactNumber.value= dermaMap?.get("contactNumber")as? String ?: ""
+                _clinicAddress.value= dermaMap?.get("clinicAddress")as? String ?: ""
+
+                val rootCreds   = doc.getString("credentials")
+                val nestedCreds = dermaMap?.get("credentials") as? String
+                _credentials.value = rootCreds ?: nestedCreds ?: ""
+            }
+            .addOnFailureListener { e ->
+                Log.e("DermaHomeVM", "Failed to fetch derma profile: ${e.message}", e)
+            }
+    }
+
+    fun updateDermaProfile(
+        firstName: String,
+        lastName: String,
+        credentials: String,
+        clinicName: String,
+        contactNumber: String,
+        clinicAddress: String,
+        onSuccess: () -> Unit,
+        onFailure: (String) -> Unit
+    ) {
+        val uid = auth.currentUser?.uid
+        if (uid == null) {
+            onFailure("Not logged in.")
+            return
+        }
+
+        // format names nicely
+        val formattedFirst = firstName.trim().lowercase().replaceFirstChar { it.uppercaseChar() }
+        val formattedLast  = lastName.trim().lowercase().replaceFirstChar { it.uppercaseChar() }
+        val trimmedCreds   = credentials.trim()
+
+        val updates = mapOf(
+            // top-level fields
+            "firstName"         to formattedFirst,
+            "lastName"          to formattedLast,
+            "credentials"       to trimmedCreds,      // ✅ root mirror
+
+            // nested derma map
+            "derma.credentials"   to trimmedCreds,
+            "derma.clinicName"    to clinicName,
+            "derma.contactNumber" to contactNumber,
+            "derma.clinicAddress" to clinicAddress
+        )
+
+
+        db.collection("users").document(uid)
+            .update(updates)
+            .addOnSuccessListener {
+                // local state so UI updates immediately
+                _firstName.value      = formattedFirst
+                _lastName.value       = formattedLast
+                _credentials.value    = trimmedCreds
+                _clinicName.value     = clinicName
+                _contactNumber.value  = contactNumber
+                _clinicAddress.value  = clinicAddress
+                onSuccess()
+            }
+            .addOnFailureListener { e ->
+                Log.e("DermaHomeVM", "Failed to update derma profile: ${e.message}", e)
+                onFailure(e.message ?: "Failed to save clinic info.")
+            }
+    }
+
+
 }

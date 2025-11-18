@@ -1,5 +1,7 @@
 package com.example.dermtect.ui.screens
 
+import android.net.Uri
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,7 +27,60 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.example.dermtect.R
 import com.example.dermtect.ui.components.BackButton
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.snapshots
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import java.text.SimpleDateFormat
 import java.util.*
+import com.google.firebase.firestore.snapshots
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+
+fun buildDiagnosisNotificationFlow(userId: String): Flow<List<NotificationItem>> {
+    val db = FirebaseFirestore.getInstance()
+
+    return db.collection("lesion_case")
+        .whereEqualTo("user_id", userId)
+        .snapshots()
+        .map { snapshot ->
+            snapshot.documents.mapNotNull { doc ->
+                val caseId = doc.id
+                val hasNew = doc.getBoolean("has_new_derma_assessment") ?: false
+                val diagnosis = doc.getString("diagnosis")
+                val notes = doc.getString("notes")
+                val assessedAt = doc.getTimestamp("assessed_at")?.toDate()
+                val shownTime = assessedAt ?: doc.getTimestamp("timestamp")?.toDate()
+
+                val hasAssessment = !diagnosis.isNullOrBlank() || !notes.isNullOrBlank()
+                if (!hasAssessment) return@mapNotNull null
+
+                val label = doc.getString("label") ?: "scan"
+                val title = "Assessment Complete"
+                val message =
+                    "A dermatologist has updated the assessment for your $label. Tap to view the official notes and next steps."
+
+                NotificationItem(
+                    id = caseId,
+                    title = title,
+                    message = message,
+                    type = 2, // Diagnosis Notification Type
+                    timestamp = shownTime?.let {
+                        SimpleDateFormat(
+                            "MMM dd, yyyy · HH:mm",
+                            Locale.getDefault()
+                        ).format(it)
+                    } ?: "—",
+                    isRead = !hasNew,
+                    date = shownTime ?: Date()
+                )
+            }
+        }
+}
 
 // Notification data model
 data class NotificationItem(
@@ -45,20 +100,83 @@ fun NotificationScreen(navController: NavController) {
     var filterOption by remember { mutableStateOf(FilterOption.ALL) }
     var showFilterMenu by remember { mutableStateOf(false) }
     var notifications by remember { mutableStateOf<List<NotificationItem>>(emptyList()) }
+    val db = remember { FirebaseFirestore.getInstance() }
+    val auth = remember { FirebaseAuth.getInstance() }
+    val userId = auth.currentUser?.uid
+    val scope = rememberCoroutineScope()
 
-
-    fun applyFilter(list: List<NotificationItem>): List<NotificationItem> {
-        val sortedList = when (filterOption) {
-            FilterOption.NEWEST_FIRST -> list.sortedByDescending { it.date }
-            FilterOption.OLDEST_FIRST -> list.sortedBy { it.date }
-            else -> list
+    val diagnosisNotificationFlow = remember(userId) {
+        if (userId.isNullOrBlank()) {
+            flowOf(emptyList())
+        } else {
+            buildDiagnosisNotificationFlow(userId)
         }
-        return when (filterOption) {
-            FilterOption.READ -> sortedList.filter { it.isRead }
-            FilterOption.UNREAD -> sortedList.filter { !it.isRead }
-            else -> sortedList
+
+        if (userId.isNullOrBlank()) return@remember flowOf(emptyList())
+
+        // 1. Listen to all lesion cases belonging to this user
+        db.collection("lesion_case")
+            .whereEqualTo("user_id", userId)
+            .snapshots()
+            .map { snapshot ->
+                snapshot.documents.mapNotNull { doc ->
+                        val caseId = doc.id
+                        val hasNew = doc.getBoolean("has_new_derma_assessment") ?: false
+                        val diagnosis = doc.getString("diagnosis")
+                        val notes = doc.getString("notes")
+                        val assessedAt = doc.getTimestamp("assessed_at")?.toDate()
+                        // optional: fall back to created timestamp if assessed_at is null
+                        val shownTime = assessedAt ?: doc.getTimestamp("timestamp")?.toDate()
+
+                        val hasAssessment = !diagnosis.isNullOrBlank() || !notes.isNullOrBlank()
+                        if (!hasAssessment) return@mapNotNull null
+
+                        val label = doc.getString("label") ?: "scan"
+                        val title = "Assessment Complete"
+                        val message =
+                            "A dermatologist has updated the assessment for your $label. Tap to view the official notes and next steps."
+
+                        NotificationItem(
+                            id = caseId,
+                            title = title,
+                            message = message,
+                            type = 2, // Diagnosis Notification Type
+                            timestamp = shownTime?.let {
+                                SimpleDateFormat(
+                                    "MMM dd, yyyy · HH:mm",
+                                    Locale.getDefault()
+                                ).format(it)
+                            } ?: "—",
+                            isRead = !hasNew,
+                            date = shownTime ?: Date()
+                        )
+                    }
+                }
+            }
+
+    // 🔑 NEW: Collect the flow and update the 'notifications' state
+    LaunchedEffect(diagnosisNotificationFlow) {
+        diagnosisNotificationFlow.collect { newNotifications ->
+            notifications = newNotifications
         }
     }
+    fun applyFilter(list: List<NotificationItem>): List<NotificationItem> {
+        // Always start with newest → oldest
+        val baseSorted = list.sortedByDescending { it.date }
+
+        return when (filterOption) {
+            FilterOption.ALL -> baseSorted
+
+            FilterOption.READ -> baseSorted.filter { it.isRead }
+
+            FilterOption.UNREAD -> baseSorted.filter { !it.isRead }
+
+            FilterOption.NEWEST_FIRST -> baseSorted  // already newest → oldest
+
+            FilterOption.OLDEST_FIRST -> baseSorted.reversed()
+        }
+    }
+
 
     Column(
         modifier = Modifier
@@ -148,8 +266,9 @@ fun NotificationScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            val filteredList = applyFilter(notifications)
-
+            val filteredList by remember(notifications, filterOption) {
+                derivedStateOf { applyFilter(notifications) }
+            }
             if (filteredList.isEmpty()) {
                 Column(
                     modifier = Modifier.fillMaxSize(),
@@ -182,9 +301,45 @@ fun NotificationScreen(navController: NavController) {
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(filteredList, key = { it.id }) { notification ->
-                            var menuExpanded by remember { mutableStateOf(false) }
+                            val isUnread = !notification.isRead
 
-                            Column(modifier = Modifier.fillMaxWidth()) {
+                            var menuExpanded by remember { mutableStateOf(false) }
+                            var lastClickTime by remember { mutableStateOf(0L) }
+                            fun notTooFast(): Boolean {
+                                val now = System.currentTimeMillis()
+                                return if (now - lastClickTime > 400) { lastClickTime = now; true } else false
+                            }
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        color = if (isUnread) Color(0xFFF1FBFB) else Color.Transparent,
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .border(
+                                        width = if (isUnread) 1.dp else 0.dp,
+                                        color = if (isUnread) Color(0xFFB9EAEA) else Color.Transparent,
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .clickable {
+                                        if (!notTooFast()) return@clickable
+                                        val id = notification.id
+                                        navController.navigateCaseDetail(id)
+                                        if (isUnread && userId != null) {
+                                            scope.launch {
+                                                runCatching {
+                                                    db.collection("lesion_case").document(id)
+                                                        .update("has_new_derma_assessment", false)
+                                                        .await()
+                                                }
+                                                notifications = notifications.map {
+                                                    if (it.id == id) it.copy(isRead = true) else it
+                                                }
+                                            }
+                                        }
+                                    }
+                                    .padding(12.dp)
+                            ) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.Top
@@ -194,10 +349,7 @@ fun NotificationScreen(navController: NavController) {
                                             id = when (notification.type) {
                                                 1 -> R.drawable.notif_type1
                                                 2 -> R.drawable.notif_type2
-                                                3 -> R.drawable.notif_type3
-                                                4 -> R.drawable.notif_type4
-                                                5 -> R.drawable.notif_type5
-                                                else -> R.drawable.notif_type5
+                                                else -> R.drawable.notifications_vector // fallback icon
                                             }
                                         ),
                                         contentDescription = "Notification Icon",
@@ -210,41 +362,34 @@ fun NotificationScreen(navController: NavController) {
                                         Text(
                                             text = notification.title,
                                             style = MaterialTheme.typography.bodyLarge,
-                                            fontWeight = FontWeight.Bold
+                                            fontWeight = if (isUnread) FontWeight.ExtraBold else FontWeight.Bold
                                         )
-                                        Spacer(modifier = Modifier.height(10.dp))
+
+// MESSAGE
                                         Text(
                                             text = notification.message,
-                                            style = MaterialTheme.typography.bodyMedium
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = if (isUnread) FontWeight.SemiBold else FontWeight.Normal
                                         )
                                         Text(
                                             text = notification.timestamp,
-                                            style = MaterialTheme.typography.bodySmall.copy(color = Color.Gray),
+                                            style = MaterialTheme.typography.labelMedium.copy(color = Color.Gray),
                                             modifier = Modifier.padding(top = 4.dp)
                                         )
+
                                     }
-                                    Box {
-                                        IconButton(onClick = { menuExpanded = true }) {
-                                            Icon(Icons.Default.MoreHoriz, contentDescription = "Options")
-                                        }
-                                        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false },modifier = Modifier.background(Color.White)) {
-                                            DropdownMenuItem(
-                                                text = { Text("Delete",  style = MaterialTheme.typography.labelMedium) },
-                                                onClick = {
-                                                    notifications = notifications.filterNot { it.id == notification.id }
-                                                    menuExpanded = false
-                                                }
-                                            )
-                                            DropdownMenuItem(
-                                                text = { Text(if (notification.isRead) "Mark as Unread" else "Mark as Read", style = MaterialTheme.typography.labelMedium) },
-                                                onClick = {
-                                                    notifications = notifications.map {
-                                                        if (it.id == notification.id) it.copy(isRead = !it.isRead) else it
-                                                    }
-                                                    menuExpanded = false
-                                                }
-                                            )
-                                        }
+                                    if (isUnread) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(10.dp)
+                                                .background(
+                                                    Color(0xFF0EA5A5),
+                                                    shape = RoundedCornerShape(50)
+                                                )
+                                                .align(Alignment.CenterVertically)
+                                        )
+                                    } else {
+                                        Spacer(Modifier.width(10.dp))
                                     }
                                 }
                                 if (notification != filteredList.last()) {
@@ -258,9 +403,22 @@ fun NotificationScreen(navController: NavController) {
         }
     }
 }
+private fun caseDetailRoute(rawId: String) = "case_detail/${Uri.encode(rawId)}"
 
-@Preview(showBackground = true)
-@Composable
-fun NotificationScreenPreview() {
-    NotificationScreen(navController = rememberNavController())
+fun NavController.navigateCaseDetail(rawId: String) {
+    val routeNow = currentBackStackEntry?.destination?.route
+    val argId = currentBackStackEntry?.arguments?.getString("caseId")
+    val isAlreadyOnSameDetail =
+        routeNow?.startsWith("case_detail/") == true &&
+                (argId == rawId || argId == Uri.encode(rawId))
+
+    if (isAlreadyOnSameDetail) {
+        popBackStack()
+    }
+
+    navigate(caseDetailRoute(rawId)) {
+        launchSingleTop = true
+        restoreState = false
+    }
 }
+

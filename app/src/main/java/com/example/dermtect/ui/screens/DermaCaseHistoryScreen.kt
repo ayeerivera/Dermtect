@@ -23,7 +23,7 @@ fun DermaHistoryScreen(
 ) {
     // ✅ Single ViewModel instance with your factory
     val vm: DermaHistoryViewModel = viewModel(
-        factory = DermaHistoryVmFactory(DermaFeed.ALL_CASES)
+        factory = DermaHistoryVmFactory(DermaFeed.MY_CASES)
     )
     val uiState by vm.state.collectAsState()
 

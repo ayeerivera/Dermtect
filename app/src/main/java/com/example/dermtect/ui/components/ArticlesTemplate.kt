@@ -1,17 +1,27 @@
 package com.example.dermtect.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -23,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.dermtect.model.NewsItem
 import androidx.compose.ui.text.SpanStyle
+import kotlinx.coroutines.launch
 
 @Composable
 fun ArticleTemplate(
@@ -32,18 +43,17 @@ fun ArticleTemplate(
     BubblesBackground {
         Column(modifier = Modifier.fillMaxSize()) {
 
+            // 🔹 Header (unchanged)
             Column(
                 modifier = Modifier
                     .wrapContentHeight()
                     .padding(top = 50.dp, start = 20.dp, end = 20.dp)
             ) {
-                // Back Button
                 BackButton(
                     onClick = onBackClick,
                     modifier = Modifier.padding(bottom = 10.dp)
                 )
 
-                // Title
                 Text(
                     text = newsItem.title,
                     textAlign = TextAlign.Center,
@@ -62,7 +72,7 @@ fun ArticleTemplate(
                         contentDescription = "Article Image",
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(200.dp) // ✅ fixed height
+                            .height(200.dp)
                             .clip(RoundedCornerShape(12.dp)),
                         contentScale = ContentScale.Crop
                     )
@@ -72,12 +82,11 @@ fun ArticleTemplate(
                         contentDescription = "Article Image",
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(200.dp) // ✅ fixed height
+                            .height(200.dp)
                             .clip(RoundedCornerShape(12.dp)),
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    // Optional: placeholder if neither URL nor drawable is provided
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -90,8 +99,6 @@ fun ArticleTemplate(
                     }
                 }
 
-
-                // Source and Date
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -121,42 +128,90 @@ fun ArticleTemplate(
                 )
             }
 
-            // --- SCROLLABLE BODY ONLY ---
-            Column(
+            // --- SCROLLABLE BODY + FLOATING ARROW ---
+            val scrollState = rememberScrollState()
+            val scope = rememberCoroutineScope()
+
+            Box(
                 modifier = Modifier
-                    .weight(1f) // takes remaining space
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 16.dp)
+                    .weight(1f)
+                    .fillMaxWidth()
             ) {
-                val body = newsItem.body
+                // Scrollable text
+                Column(
+                    modifier = Modifier
+                        .verticalScroll(scrollState)
+                        .padding(horizontal = 20.dp, vertical = 16.dp)
+                ) {
+                    val body = newsItem.body
 
-                Text(
-                    buildAnnotatedString {
-                        val boldRegex = Regex("\\*\\*(.*?)\\*\\*")
-                        var lastIndex = 0
+                    Text(
+                        buildAnnotatedString {
+                            val boldRegex = Regex("\\*\\*(.*?)\\*\\*")
+                            var lastIndex = 0
 
-                        for (match in boldRegex.findAll(body)) {
-                            append(body.substring(lastIndex, match.range.first))
-                            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                                append(match.groupValues[1])
+                            for (match in boldRegex.findAll(body)) {
+                                append(body.substring(lastIndex, match.range.first))
+                                withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                                    append(match.groupValues[1])
+                                }
+                                lastIndex = match.range.last + 1
                             }
-                            lastIndex = match.range.last + 1
-                        }
-                        append(body.substring(lastIndex))
-                    },
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        lineHeight = 27.sp,
-                        color = Color(0xFF1D1D1D)
-                    ),
-                    textAlign = TextAlign.Justify
-                )
+                            append(body.substring(lastIndex))
+                        },
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            lineHeight = 27.sp,
+                            color = Color(0xFF1D1D1D)
+                        ),
+                        textAlign = TextAlign.Justify
+                    )
+                }
+
+                // These must be AFTER the Column so maxValue is known after layout
+                val canScroll = scrollState.maxValue > 0
+                val atBottom = scrollState.value >= scrollState.maxValue
+
+                // ✅ Use fully-qualified AnimatedVisibility to avoid the ColumnScope extension
+                androidx.compose.animation.AnimatedVisibility(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 24.dp),
+                    visible = canScroll && !atBottom,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(50.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.5f))
+                            .border(
+                                width = 1.dp,
+                                brush = Brush.linearGradient(
+                                    listOf(
+                                        Color(0xFFBFFDFD),
+                                        Color(0xFF88E7E7),
+                                        Color(0xFF55BFBF)
+                                    )
+                                ),
+                                shape = CircleShape
+                            )
+                            .clickable {
+                                scope.launch {
+                                    scrollState.animateScrollTo(scrollState.maxValue)
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.ArrowDownward,
+                            contentDescription = "Scroll down",
+                            tint = Color(0xFF0FB2B2),
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
             }
         }
     }
 }
-
-
-
-
-
-

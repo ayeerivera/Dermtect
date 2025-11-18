@@ -728,7 +728,18 @@ private fun CombinedProfileSection(
     var birthday by remember(initialBirthday) { mutableStateOf(initialBirthday) }
 
     val nameValid = first.isNotBlank() && last.isNotBlank()
-    val birthdayValid = birthday.isNotBlank() // same rule you used on Register
+    fun isBirthdayValid(s: String): Boolean =
+        runCatching {
+            if (s.length != 10) return@runCatching false
+            val sdf = java.text.SimpleDateFormat("MM/dd/yyyy", java.util.Locale.getDefault()).apply { isLenient = false }
+            val d = sdf.parse(s)!!
+            val now = java.util.Calendar.getInstance()
+            val min = (now.clone() as java.util.Calendar).apply { add(java.util.Calendar.YEAR, -110) }
+            d.time in min.timeInMillis..now.timeInMillis
+        }.getOrDefault(false)
+
+    var birthdayValid by remember(initialBirthday) { mutableStateOf(isBirthdayValid(initialBirthday)) }
+
     val changed = first != initialFirstName ||
             last != initialLastName ||
             birthday != initialBirthday
@@ -772,14 +783,15 @@ private fun CombinedProfileSection(
         Text("Edit Birthday", style = MaterialTheme.typography.titleLarge, color = Color(0xFF1D1D1D))
         Spacer(Modifier.height(10.dp))
 
+        // ✅ Pass validity up; field itself shows error via supportingText/isError
         BirthdayMaskedField(
             birthday = birthday,
             onValueChange = { birthday = it },
             onValidDate = { birthday = it },
-            modifier = Modifier
-                .wrapContentWidth()
-                .align(Alignment.CenterHorizontally)
+            onValidationChange = { isValid -> birthdayValid = isValid },
+            modifier = Modifier.wrapContentWidth().align(Alignment.CenterHorizontally)
         )
+
 
         Spacer(Modifier.height(12.dp))
 
@@ -787,7 +799,7 @@ private fun CombinedProfileSection(
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             PrimaryButton(
                 text = "Save",
-                onClick = { onSaveAll(first.trim(), last.trim(), birthday.trim())},
+                onClick = { onSaveAll(first.trim(), last.trim(), birthday.trim()) },
                 enabled = canSave,
                 modifier = Modifier.weight(1f).height(48.dp)
             )
@@ -797,6 +809,7 @@ private fun CombinedProfileSection(
                     first = initialFirstName
                     last = initialLastName
                     birthday = initialBirthday
+                    birthdayValid = isBirthdayValid(initialBirthday)
                 },
                 enabled = changed,
                 modifier = Modifier.weight(1f).height(48.dp)
@@ -806,7 +819,7 @@ private fun CombinedProfileSection(
 }
 
 @Composable
-                private fun ChangePasswordSection() {
+                 fun ChangePasswordSection() {
                     val context = LocalContext.current
                     val authViewModel: AuthViewModel = viewModel(
                         factory = AuthViewModelFactory(AuthUseCase(AuthRepositoryImpl()))

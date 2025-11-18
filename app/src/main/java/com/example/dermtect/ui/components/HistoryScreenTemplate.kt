@@ -109,7 +109,18 @@ fun HistoryScreenTemplate(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
-            if (caseList.isEmpty()) {
+            val sortedList = remember(caseList) {
+                // newestFirst? If you have a state/param, swap true/false accordingly.
+                val newestFirst = true  // default behavior you had before
+
+                if (newestFirst) {
+                    caseList.sortedByDescending { it.createdAt.takeIf { t -> t > 0L } ?: Long.MIN_VALUE }
+                } else {
+                    caseList.sortedBy { it.createdAt.takeIf { t -> t > 0L } ?: Long.MAX_VALUE }
+                }
+            }
+
+            if (sortedList.isEmpty()) {
                 // ✅ Empty state
                 Box(
                     modifier = Modifier
@@ -145,17 +156,13 @@ fun HistoryScreenTemplate(
                     }
                 }
             } else {
-                caseList.forEach { case ->
-                    // compute colors/labels per item
-                    val indicatorColor = when {
-                        case.result?.equals("malignant", true) == true -> Color(0xFFF44336)
-                        case.result?.equals("benign", true) == true -> Color(0xFF4CAF50)
-                        else -> Color(0xFFBDBDBD)
-                    }
+                sortedList.forEach { case ->
 
-                    val (statusLabel, statusColor) = when (case.status?.lowercase()) {
-                        "completed" -> "Completed" to Color(0xFF00B69B).copy(alpha = 0.2f)
-                        else -> null to null
+
+                    val statusLabel = when (case.status?.lowercase()) {
+                        "reviewed"  -> "Reviewed"
+                        "completed" -> "Completed"
+                        else        -> null
                     }
 
                     CaseListItem(
@@ -163,10 +170,8 @@ fun HistoryScreenTemplate(
                         result = case.result,
                         date = case.date,
                         status = case.status,
-                        indicatorColor = indicatorColor,
                         statusLabel = statusLabel,
-                        statusColor = statusColor,
-                        imageUrl = case.imageUrl,
+                        imageUrl = case.imageUrl
                     ) {
                         navController.navigate("case_detail/${case.caseId}")
                     }
@@ -178,16 +183,13 @@ fun HistoryScreenTemplate(
     }
 }
 
-
 @Composable
 fun CaseListItem(
     title: String,
     result: String?,
     date: String,
     status: String?,
-    indicatorColor: Color,
     statusLabel: String? = null,
-    statusColor: Color? = null,
     imageUrl: String? = null,
     imageRes: Int? = null,
     hideStatusChip: Boolean = false,
@@ -227,13 +229,6 @@ fun CaseListItem(
                         .background(Color(0xFFE0E0E0))
                 )
             }
-
-            Box(
-                modifier = Modifier
-                    .size(15.dp)
-                    .align(Alignment.TopStart)
-                    .background(indicatorColor, CircleShape)
-            )
         }
 
         Spacer(Modifier.width(15.dp))
@@ -243,21 +238,25 @@ fun CaseListItem(
             Text(date, style = MaterialTheme.typography.labelMedium, color = Color.Gray)
         }
 
-        statusLabel?.let {
+        if (!hideStatusChip && statusLabel != null) {
+            val (textColor, bgColor) = when (statusLabel.lowercase()) {
+                "completed" -> Color(0xFF00B69B) to Color(0xFF00B69B).copy(alpha = 0.15f) // green
+                "reviewed"  -> Color(0xFF1565C0) to Color(0xFF1565C0).copy(alpha = 0.15f) // blue
+                else        -> Color(0xFF9E9E9E) to Color(0xFF9E9E9E).copy(alpha = 0.15f) // neutral fallback
+        }
+
             Text(
-                text = it,
+                text = statusLabel,
                 style = MaterialTheme.typography.labelSmall,
-                color = when {
-                    it.equals("Completed", true) -> Color(0xFF00B69B)
-                    else -> Color(0xFFFFC107)
-                },
+                color = textColor,
                 modifier = Modifier
-                    .background(statusColor ?: Color.Gray.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
+                    .background(bgColor, RoundedCornerShape(4.dp))
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             )
-        } ?: Spacer(Modifier.width(0.dp))
+        }
     }
 }
+
 @Composable
 fun HistoryFilterButton(
     isDerma: Boolean,

@@ -541,7 +541,18 @@ fun TakePhotoScreen(
                         val r = withTimeout(TimeoutConfig.INFER_MS) {
                             withContext(Dispatchers.Default) { tfService.infer(image) }
                         }
-                        modelFlag = if (r.probability >= 0.0112f) "Malignant" else "Benign"
+                        val prob = r.probability          // 0.0–1.0
+                        val pPct = prob * 100f            // 0–100%
+                        val alerted = prob >= 0.0112f     // keep this threshold exactly
+
+                        // Only call it "Malignant" if it's alerted AND at least 30%
+                        // You can tweak 30f later if needed.
+                        modelFlag = if (alerted && pPct > 30f) {
+                            "Malignant"
+                        } else {
+                            "Benign"
+                        }
+
                         val merged = r.heatmap?.let { overlayBitmaps(image, it, 115) }
                         inferenceResult = r.copy(heatmap = merged)
                     } catch (t: TimeoutCancellationException) {
@@ -691,14 +702,22 @@ fun TakePhotoScreen(
                                         // 8) Summary paragraph (same as LesionCaseScreen version)
                                         val pdfSummary = if (!alerted) {
                                             "This scan looks reassuring, with a very low likelihood of a serious issue. " +
-                                                    "You can continue your normal skincare routine. Just keep being mindful of your skin and how it changes over time."
+                                                    "You can continue your normal skincare routine. However, it's still a good idea to consult a dermatologist for proper evaluation. " +
+                                                    "If you notice any changes in the spot within 2 to 4 weeks, such as growth, darkening, itching, or bleeding, please schedule a check-up."
                                         } else {
                                             when {
-                                                pPct < 10f -> "Your result shows a very low chance of concern. This is reassuring, and there’s no need to worry. It may help to simply check your skin from time to time, just to stay aware of any changes."
-                                                pPct < 30f -> "Your result suggests only a low chance of concern. Everything appears fine. We encourage you to casually observe your skin every now and then, and let a doctor know if you notice something different."
-                                                pPct < 60f -> "We noticed some minor concern in your skin. This does not mean there is a serious issue, but talking with a doctor could provide peace of mind and helpful guidance."
-                                                pPct < 80f -> "Your result shows some concern. To better understand this, we recommend scheduling a skin check with a dermatologist. They can give you clearer answers and reassurance."
-                                                else       -> "Your result shows a higher level of concern. For your safety and peace of mind, we encourage you to visit a dermatologist soon so you can receive proper care and support."
+                                                pPct < 10f -> "Your result shows a very low chance of concern. This is reassuring, and there’s no need to worry. " +
+                                                        "Still, we recommend consulting a dermatologist for proper assessment. " +
+                                                        "If the mole or spot changes in the next 2 to 4 weeks, it's best to get it checked."
+                                                pPct < 30f -> "Your result suggests a low chance of concern. Everything appears fine. " +
+                                                "For safety, we still encourage visiting a dermatologist for confirmation. " +
+                                            "Monitor the area and consult a doctor if you notice changes within 1 to 3 weeks."
+                                                pPct < 60f -> "We noticed a minor concern in your scan. This does not mean there is a serious issue, but consulting a dermatologist can provide clarity and peace of mind. " +
+                                                        "Please also monitor the spot for any changes within 1 to 3 weeks."
+                                                pPct < 80f -> "Your result shows some concern. To better understand this finding, we recommend scheduling a skin check with a dermatologist. " +
+                                                        "If the area changes in appearance over the next 1 to 2 weeks, please seek medical care sooner."
+                                                else       -> "Your result shows a higher level of concern. For your safety and peace of mind, we strongly encourage you to visit a dermatologist soon for proper evaluation. " +
+                                                        "If you notice any changes in the spot within 1 to 2 weeks, seek medical attention immediately."
                                             }
                                         }
 

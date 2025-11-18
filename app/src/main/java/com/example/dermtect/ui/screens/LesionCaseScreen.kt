@@ -1,8 +1,11 @@
 package com.example.dermtect.ui.screens
 
+import android.content.Intent
 import kotlinx.coroutines.launch
 import android.graphics.Bitmap
+import android.net.Uri
 import android.util.Log
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
@@ -36,6 +39,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocalHospital
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.shadow
@@ -46,7 +55,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.app.NotificationManagerCompat
 import com.example.dermtect.tflt.DermtectResult
 
 
@@ -63,7 +74,6 @@ fun LesionCaseScreen(
     val ctx = LocalContext.current
     val imageLoader = remember { ImageLoader(ctx) }
 
-    // --- UI state
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -74,6 +84,10 @@ fun LesionCaseScreen(
     var scanUrl by remember { mutableStateOf<String?>(null) }
     var heatmapUrl by remember { mutableStateOf<String?>(null) }
     var timestampMs by remember { mutableStateOf<Long?>(null) }
+    var dermaStatus by remember { mutableStateOf<String?>(null) }
+    var dermaNotes by remember { mutableStateOf<String?>(null) }
+    var dermaName by remember { mutableStateOf<String?>(null) } // 👈 add this
+    var dermaDisplayName by remember { mutableStateOf<String?>(null) }
 
     val questions = remember {
         listOf(
@@ -126,6 +140,31 @@ fun LesionCaseScreen(
             val photoUrl = doc.getString("scan_url")
             val heatUrl = doc.getString("heatmap_url")
 
+            dermaStatus = doc.getString("derma_status") ?: doc.getString("status")
+            dermaNotes = doc.getString("notes")
+            // ✅ Prefer cached name on the case doc
+            dermaName = doc.getString("assessor_display_name")
+// ✅ Final: resolve derma name only if missing
+            if (dermaName.isNullOrBlank()) {
+                val assessorId = doc.getString("assessor_id") ?: doc.getString("assessorId")
+                if (!assessorId.isNullOrBlank()) {
+                    dermaName = try {
+                        val pub = db.collection("profiles_public").document(assessorId).get().await()
+                        pub.getString("displayName") ?: pub.getString("fullName")
+                    } catch (_: Throwable) { null }
+                        ?: run {
+                            try {
+                                val u = db.collection("users").document(assessorId).get().await()
+                                u.getString("full_name")?.trim().takeUnless { it.isNullOrBlank() }
+                                    ?: listOfNotNull(
+                                        u.getString("firstName")?.trim(),
+                                        u.getString("lastName")?.trim()
+                                    ).filter { it.isNotBlank() }.joinToString(" ").ifBlank { null }
+                            } catch (_: Throwable) { null }
+                        }
+                }
+            }
+
             // 2) Helper for Coil bitmap load
             suspend fun loadBitmap(url: String?): Bitmap? {
                 if (url.isNullOrBlank()) return null
@@ -172,9 +211,10 @@ fun LesionCaseScreen(
             }
 
             else -> {
+                val hasDerma = dermaStatus == "completed" && !dermaNotes.isNullOrBlank()
+
                 val tau = 0.0112f
                 val alert = probability >= tau
-                val uiPrediction = if (alert) "Malignant" else "Benign"
 
                 LesionCaseTemplate(
                     imageResId = null,
@@ -182,10 +222,13 @@ fun LesionCaseScreen(
                     camBitmap = heatmapBitmap,
                     title = title,
                     timestamp = timestampText,
-                    riskTitle = "Risk Assessment",
+                    riskTitle = "",
                     riskDescription = "", // not used anymore
-                    prediction = uiPrediction,
+                    prediction = "",
                     probability = probability,
+                    showRiskSection = !hasDerma,
+                    dermaNotes = dermaNotes,
+                    dermaName = dermaName,
                     onBackClick = onBackClick,
                     showPrimaryButtons = false,
                     showSecondaryActions = true,
@@ -257,16 +300,27 @@ fun LesionCaseScreen(
                                 // 8) Compact summary text (no bullets; bullets come from possibleConditions)
                                 val pdfSummary = if (!alerted) {
                                     "This scan looks reassuring, with a very low likelihood of a serious issue. " +
-                                            "You can continue your normal skincare routine. Just keep being mindful of your skin and how it changes over time."
+                                            "You can continue your normal skincare routine. However, it's still a good idea to consult a dermatologist for proper evaluation. " +
+                                            "If you notice any changes in the spot within 2 to 4 weeks, such as growth, darkening, itching, or bleeding, please schedule a check-up."
                                 } else {
                                     when {
-                                        pPct < 10f -> "Your result shows a very low chance of concern. This is reassuring, and there’s no need to worry. It may help to simply check your skin from time to time, just to stay aware of any changes."
-                                        pPct < 30f -> "Your result suggests only a low chance of concern. Everything appears fine. We encourage you to casually observe your skin every now and then, and let a doctor know if you notice something different."
-                                        pPct < 60f -> "We noticed some minor concern in your skin. This does not mean there is a serious issue, but talking with a doctor could provide peace of mind and helpful guidance."
-                                        pPct < 80f -> "Your result shows some concern. To better understand this, we recommend scheduling a skin check with a dermatologist. They can give you clearer answers and reassurance."
-                                        else       -> "Your result shows a higher level of concern. For your safety and peace of mind, we encourage you to visit a dermatologist soon so you can receive proper care and support."
+                                        pPct < 10f -> "Your result shows a very low chance of concern. This is reassuring, and there’s no need to worry. " +
+                                                "Still, we recommend consulting a dermatologist for proper assessment. " +
+                                                "If the mole or spot changes in the next 2 to 4 weeks, it's best to get it checked."
+
+                                        pPct < 30f -> "Your result suggests a low chance of concern. Everything appears fine. " +
+                                                "For safety, we still encourage visiting a dermatologist for confirmation. " +
+                                                "Monitor the area and consult a doctor if you notice changes within 1 to 3 weeks."
+                                        pPct < 60f -> "We noticed a minor concern in your scan. This does not mean there is a serious issue, but consulting a dermatologist can provide clarity and peace of mind. " +
+                                                "Please also monitor the spot for any changes within 1 to 3 weeks."
+                                        pPct < 80f -> "Your result shows some concern. To better understand this finding, we recommend scheduling a skin check with a dermatologist. " +
+                                                "If the area changes in appearance over the next 1 to 2 weeks, please seek medical care sooner."
+
+                                        else       -> "Your result shows a higher level of concern. For your safety and peace of mind, we strongly encourage you to visit a dermatologist soon for proper evaluation. " +
+                                                "If you notice any changes in the spot within 1 to 2 weeks, seek medical attention immediately."
                                     }
                                 }
+
 
                                 // 9) Build PDF payload (short code goes into reportId)
                                 val data = PdfExporter.CasePdfData(
@@ -297,6 +351,8 @@ fun LesionCaseScreen(
                     onFindClinicClick = onFindClinicClick,
                     onImageClick = { page -> fullImagePage = page }
                 )
+
+
                 if (fullImagePage != null) {
                     Dialog(
                         onDismissRequest = { fullImagePage = null },
@@ -369,6 +425,10 @@ fun LesionCaseScreen(
                             }
                         }
                     )
+                }
+                LaunchedEffect(Unit) {
+                    // When leaving the screen, clear the gate so the user can reopen it later
+                    navController.currentBackStackEntry?.savedStateHandle?.set("__last_case_nav__", null)
                 }
 
             }

@@ -15,7 +15,7 @@ class DermaTutorialManager : TutorialManager() {
     override val steps = listOf(
         TutorialStep(
             "derma_profile_menu",
-            "Open your profile menu here to access Notifications, Edit Profile, About DermTect, and Log Out."
+            "Open your profile menu here to access Profile, About DermTect, and Log Out."
         ),
         TutorialStep(
             "pending_cases_tab",

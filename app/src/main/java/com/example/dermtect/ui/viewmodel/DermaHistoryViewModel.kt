@@ -22,7 +22,7 @@ data class DermaHistoryUiState(
 
 class DermaHistoryViewModel(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
-    private val feed: DermaFeed = DermaFeed.ALL_CASES
+    private val feed: DermaFeed = DermaFeed.MY_CASES   // ✅ default to MY_CASES
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(DermaHistoryUiState())
@@ -39,35 +39,52 @@ class DermaHistoryViewModel(
 
     fun refresh() = viewModelScope.launch {
         _state.value = _state.value.copy(loading = true, error = null)
+
+        val user = FirebaseAuth.getInstance().currentUser
+        val uid = user?.uid
+
+        if (user == null || uid == null) {
+            _state.value = DermaHistoryUiState(loading = false, error = "User not logged in or session expired.")
+            return@launch
+        }
+
         try {
-            val uid = FirebaseAuth.getInstance().currentUser?.uid
+            // 🛑 IMPORTANT: Use "lesion_case" based on your rules, not "cases" if that's what you used previously.
+            var query: Query = db.collection("lesion_case")
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .limit(100)
 
-            var q: Query = db.collection("lesion_case")
-
-            when (feed) {
-                DermaFeed.MY_CASES -> if (uid != null) {
-                    q = q.whereEqualTo("assessor_id", uid)
+            // 🚀 CRITICAL FIX: Add the security filter based on the feed
+            query = when (feed) {
+                DermaFeed.MY_CASES -> {
+                    // Must be filtered by assessor_id to satisfy your rule's requirement for 'list'
+                    query.whereEqualTo("assessor_id", uid)
                 }
                 DermaFeed.PENDING_ONLY -> {
-                    val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@launch
-                    // ✅ CORRECT: Filter by BOTH assessor ID AND status
-                    q = q.whereEqualTo("assessor_id", uid)
-                        .whereEqualTo("derma_status", "derma_pending")
+                    // 🚀 FIX: Add a public access filter to secure the query scope
+                    query.whereEqualTo("derma_status", "derma_pending")
+                        .whereEqualTo("public_allowed", true)
                 }
-                else -> { /* ALL_CASES: no extra filter */ }
+                DermaFeed.ALL_CASES -> {
+                     query.whereArrayContains("opened_by", uid) // Cases this derma has at least opened once
+                }
             }
 
-            // helpful ordering (UI will still re-sort)
-            q = q.orderBy("assessed_at", Query.Direction.DESCENDING)
-
-            val snap = q.get().await()
+            val snap = query.get().await() // Execute the filtered query
             val items = snap.documents.map { d -> d.toDermaCaseData() }
 
-            _state.value = DermaHistoryUiState(loading = false, items = items)
+            _state.value = DermaHistoryUiState(
+                loading = false,
+                items = items
+            )
         } catch (t: Throwable) {
-            _state.value = DermaHistoryUiState(loading = false, error = t.message ?: "Load error")
+            _state.value = DermaHistoryUiState(
+                loading = false,
+                error = t.message ?: "Load error"
+            )
         }
     }
+
 
     private fun com.google.firebase.firestore.DocumentSnapshot.toDermaCaseData(): DermaCaseData {
         // createdAt: use assessed_at if present; else original timestamp if you have one
